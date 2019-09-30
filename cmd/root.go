@@ -62,6 +62,7 @@ func always(cmd *cobra.Command, args []string) {
 
 	// Also init some defaults
 	viper.SetDefault(config.DBlockSyncRetryPeriod, time.Second*5)
+	viper.SetDefault(config.Network, "MainNet")
 
 	// Catch ctl+c
 	signalChan := make(chan os.Signal, 1)

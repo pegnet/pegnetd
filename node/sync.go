@@ -72,6 +72,56 @@ func (d *Pegnetd) SyncBlock(ctx context.Context, height uint32) error {
 
 	fLog := log.WithFields(log.Fields{"height": height})
 	fLog.Debug("syncing...")
+
+	dblock := new(factom.DBlock)
+	dblock.Header.Height = height
+	if err := dblock.Get(d.FactomClient); err != nil {
+		return err
+	}
+
+	// Look for the eblocks we care about, and sync them in a transactional way.
+	// We should be able to rollback any one of these eblock syncs.
+	var err error
+	eblocks := make(map[string]*factom.EBlock)
+EntrySyncLoop: // Syncs all eblocks we care about and their entries
+	for k, v := range d.Tracking {
+		if eblock := dblock.EBlock(v); eblock != nil {
+			if err = eblock.Get(d.FactomClient); err != nil {
+				break
+			}
+			for i := range eblock.Entries {
+				if err = eblock.Entries[i].Get(d.FactomClient); err != nil {
+					break EntrySyncLoop
+				}
+			}
+			eblocks[k] = eblock
+		}
+	}
+
+	if err != nil {
+		// Eblock missing entries. This is step 1 in syncing, so just exit
+		return err
+	}
+
+	// Entries are gathered at this point
+	// TODO: I think it might be easier just to hardcode a function for each chain we care about
+	// 		currently just the opr chain, then the tx chain
+
+	graded, err := d.Grade(eblocks["opr"])
+	if err != nil {
+		return err // We can still just exit at this point with no rollback
+	}
+
+	// TODO: Handle converts/txs
+
+	// Sync the factoid chain in a transactional way. We should be able to rollback
+	// the burn sync if we need too. We can first populate the eblocks that we care about
+
+	// Apply all the effects
+	if graded != nil { // If graded was nil, then there was no oprs this eblock
+		d.Pegnet.InsertGradedBlock(graded)
+	}
+
 	return nil
 }
 
