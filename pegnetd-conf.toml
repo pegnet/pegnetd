@@ -1,0 +1,6 @@
+# Pegnetd config file
+[app]
+  loglevel = "info"
+
+[dblocksync]
+  retry = "5s"
