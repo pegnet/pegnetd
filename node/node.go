@@ -1,9 +1,6 @@
 package node
 
 import (
-	"database/sql"
-	"os"
-
 	"github.com/Factom-Asset-Tokens/factom"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/pegnet/pegnet/modules/grader"
@@ -23,9 +20,6 @@ type Pegnetd struct {
 	Sync BlockSync
 
 	Pegnet *pegnet.Pegnet
-
-	// This is the sqlite db to store state
-	DB *sql.DB
 }
 
 func NewPegnetd(conf *viper.Viper) (*Pegnetd, error) {
@@ -44,21 +38,15 @@ func NewPegnetd(conf *viper.Viper) (*Pegnetd, error) {
 	}
 
 	n.Pegnet = pegnet.New(conf)
+	if err := n.Pegnet.Init(); err != nil {
+		return nil, err
+	}
 
 	// TODO: Check this, harcoding it high to skip the initial stuff
 	n.Sync.Synced = 206421
 
 	// TODO :Is this the spot spot to init?
 	grader.InitLX()
-
-	// Load the sqldb (or create it)
-	path := os.ExpandEnv(viper.GetString(config.SqliteDBPath))
-	// TODO: Idc which sqlite to use. Change this if you want.
-	db, err := sql.Open("sqlite3", path)
-	if err != nil {
-		return nil, err
-	}
-	n.DB = db
 
 	return n, nil
 }
