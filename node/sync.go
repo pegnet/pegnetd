@@ -116,10 +116,70 @@ EntrySyncLoop: // Syncs all eblocks we care about and their entries
 
 	// Sync the factoid chain in a transactional way. We should be able to rollback
 	// the burn sync if we need too. We can first populate the eblocks that we care about
+	if err := d.SyncFactoidBlock(ctx, dblock); err != nil {
+		// TODO: Ensure that we rollback any txs up to this point
+		return err
+	}
 
 	// Apply all the effects
 	if graded != nil { // If graded was nil, then there was no oprs this eblock
 		d.Pegnet.InsertGradedBlock(graded)
+	}
+
+	return nil
+}
+
+// SyncFactoidBlock
+// TODO: Send in a sql tx to actually enter the balance changes.
+func (d *Pegnetd) SyncFactoidBlock(ctx context.Context, dblock *factom.DBlock) error {
+	fblock := new(factom.FBlock)
+	fblock.Header.Height = dblock.Header.Height
+	if err := fblock.Get(d.FactomClient); err != nil {
+		return err
+	}
+
+	var totalBurned uint64
+	var burns []factom.FactoidTransactionIO
+
+	// Register all burns. Burns have a few requirements
+	// - Only 1 output, and that output must be the EC burn address
+	// - The output amount must be 0
+	// - Must only have 1 input
+	for i := range fblock.Transactions {
+		if isDone(ctx) {
+			return context.Canceled
+		}
+
+		if err := fblock.Transactions[i].Get(d.FactomClient); err != nil {
+			return err
+		}
+
+		tx := fblock.Transactions[i]
+		// Check number of inputs/outputs
+		if len(tx.ECOutputs) != 1 || len(tx.FCTInputs) != 1 || len(tx.FCTOutputs) > 0 {
+			continue // Wrong number of ins/outs for a burn
+		}
+
+		// Check correct output
+		out := tx.ECOutputs[0]
+		if PegnetBurnRCD(d.Network) != *out.Address {
+			continue // Wrong EC output for a burn
+		}
+
+		// Check right output amount
+		if out.Amount != 0 {
+			continue // You cannot buy EC and burn
+		}
+
+		in := tx.FCTInputs[0]
+		totalBurned += in.Amount
+		burns = append(burns, in)
+	}
+
+	// TODO: do something with the burns for this block
+	var _ = burns
+	if totalBurned > 0 { // Just some debugging
+		log.WithFields(log.Fields{"height": dblock.Header.Height, "amount": totalBurned}).Debug("fct burned")
 	}
 
 	return nil
