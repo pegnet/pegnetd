@@ -1,7 +1,11 @@
 package node
 
 import (
+	"database/sql"
+	"os"
+
 	"github.com/Factom-Asset-Tokens/factom"
+	_ "github.com/mattn/go-sqlite3"
 	"github.com/pegnet/pegnet/modules/grader"
 	"github.com/pegnet/pegnetd/config"
 	"github.com/pegnet/pegnetd/node/pegnet"
@@ -19,9 +23,12 @@ type Pegnetd struct {
 	Sync BlockSync
 
 	Pegnet *pegnet.Pegnet
+
+	// This is the sqlite db to store state
+	DB *sql.DB
 }
 
-func NewPegnetd(conf *viper.Viper) *Pegnetd {
+func NewPegnetd(conf *viper.Viper) (*Pegnetd, error) {
 	// TODO : Init factom clients better
 	n := new(Pegnetd)
 	n.FactomClient = factom.NewClient(nil, nil)
@@ -44,5 +51,14 @@ func NewPegnetd(conf *viper.Viper) *Pegnetd {
 	// TODO :Is this the spot spot to init?
 	grader.InitLX()
 
-	return n
+	// Load the sqldb (or create it)
+	path := os.ExpandEnv(viper.GetString(config.SqliteDBPath))
+	// TODO: Idc which sqlite to use. Change this if you want.
+	db, err := sql.Open("sqlite3", path)
+	if err != nil {
+		return nil, err
+	}
+	n.DB = db
+
+	return n, nil
 }

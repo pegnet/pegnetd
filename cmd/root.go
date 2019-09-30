@@ -41,7 +41,11 @@ var RootCmd = &cobra.Command{
 
 		// Get the config
 		conf := viper.GetViper()
-		daemon := node.NewPegnetd(conf)
+		daemon, err := node.NewPegnetd(conf)
+		if err != nil {
+			log.WithError(err).Errorf("failed to launce pegnet node")
+			os.Exit(1)
+		}
 
 		// Run
 		daemon.DBlockSync(ctx)
@@ -63,6 +67,8 @@ func always(cmd *cobra.Command, args []string) {
 	// Also init some defaults
 	viper.SetDefault(config.DBlockSyncRetryPeriod, time.Second*5)
 	viper.SetDefault(config.Network, "MainNet")
+	// TODO: Change the path to be dependent on the network
+	viper.SetDefault(config.SqliteDBPath, "$HOME/pegnetd/$PEGNETNETWORK/sql.db")
 
 	// Catch ctl+c
 	signalChan := make(chan os.Signal, 1)
@@ -85,6 +91,8 @@ func ReadConfig(cmd *cobra.Command, args []string) {
 		log.WithError(err).Error("failed to load config")
 		os.Exit(1)
 	}
+
+	_ = os.Setenv("PEGNETNETWORK", viper.GetString(config.Network))
 
 	initLogger()
 }

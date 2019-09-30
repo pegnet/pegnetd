@@ -4,6 +4,7 @@ package config
 const (
 	LoggingLevel = "app.loglevel"
 	Network      = "app.Network"
+	SqliteDBPath = "app.dbpath"
 
 	// DBlockSync Stuff
 	DBlockSyncRetryPeriod = "dblocksync.retry"
