@@ -116,5 +116,5 @@ func (t PTicker) String() string {
 	if t <= PTickerInvalid || PTickerMax <= t {
 		return fmt.Errorf("invalid token type").Error()
 	}
-	return validPTickerStrings[int(t)]
+	return validPTickerStrings[int(t) - 1]
 }
