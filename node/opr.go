@@ -1,13 +1,14 @@
 package node
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/Factom-Asset-Tokens/factom"
 	"github.com/pegnet/pegnet/modules/grader"
 )
 
-func (d *Pegnetd) Grade(block *factom.EBlock) (grader.GradedBlock, error) {
+func (d *Pegnetd) Grade(ctx context.Context, block *factom.EBlock) (grader.GradedBlock, error) {
 	if block == nil {
 		// TODO: Handle the case where there is no opr block.
 		// 		Must delay conversions if this happens
@@ -25,9 +26,10 @@ func (d *Pegnetd) Grade(block *factom.EBlock) (grader.GradedBlock, error) {
 	}
 
 	var prevWinners []string = nil
-	prev := d.Pegnet.FetchPreviousBlock()
-	if prev != nil {
-		prevWinners = prev.WinnersShortHashes()
+	prev, err := d.Pegnet.SelectGrade(ctx, block.Height-1)
+	// assume that error means it's below genesis for now
+	if err != nil {
+		prevWinners = prev
 	}
 
 	g, err := grader.NewGrader(ver, int32(block.Height), prevWinners)

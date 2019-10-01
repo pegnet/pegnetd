@@ -4,9 +4,10 @@ import (
 	"container/list"
 	"database/sql"
 	"fmt"
-	"github.com/pegnet/pegnetd/config"
 	"os"
 	"os/user"
+
+	"github.com/pegnet/pegnetd/config"
 
 	"github.com/pegnet/pegnet/modules/grader"
 
@@ -50,6 +51,14 @@ func (p *Pegnet) Init() error {
 		if err.Error() != "table \"pn_addresses\" already exists" {
 			return err
 		}
+	}
+	err = p.CreateTableGrade()
+	if err != nil {
+		return err
+	}
+	err = p.CreateTableRate()
+	if err != nil {
+		return err
 	}
 	return nil
 }

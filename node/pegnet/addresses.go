@@ -5,7 +5,7 @@ import (
 	"github.com/pegnet/pegnetd/fat/fat2"
 )
 
-const createTableAddresses = `CREATE TABLE "pn_addresses" (
+const createTableAddresses = `CREATE TABLE IF NOT EXISTS "pn_addresses" (
         "id"            INTEGER PRIMARY KEY,
         "address"       BLOB NOT NULL UNIQUE,
         "peg_balance"   INTEGER NOT NULL

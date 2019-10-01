@@ -8,4 +8,7 @@ const (
 
 	// DBlockSync Stuff
 	DBlockSyncRetryPeriod = "dblocksync.retry"
+
+	Server = "app.Server"
+	Wallet = "app.Wallet"
 )

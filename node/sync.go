@@ -86,13 +86,8 @@ func (d *Pegnetd) SyncBlock(ctx context.Context, height uint32) error {
 EntrySyncLoop: // Syncs all eblocks we care about and their entries
 	for k, v := range d.Tracking {
 		if eblock := dblock.EBlock(v); eblock != nil {
-			if err = eblock.Get(d.FactomClient); err != nil {
-				break
-			}
-			for i := range eblock.Entries {
-				if err = eblock.Entries[i].Get(d.FactomClient); err != nil {
-					break EntrySyncLoop
-				}
+			if err = eblock.GetEntries(d.FactomClient); err != nil {
+				break EntrySyncLoop
 			}
 			eblocks[k] = eblock
 		}
@@ -107,7 +102,7 @@ EntrySyncLoop: // Syncs all eblocks we care about and their entries
 	// TODO: I think it might be easier just to hardcode a function for each chain we care about
 	// 		currently just the opr chain, then the tx chain
 
-	graded, err := d.Grade(eblocks["opr"])
+	graded, err := d.Grade(ctx, eblocks["opr"])
 	if err != nil {
 		return err // We can still just exit at this point with no rollback
 	}
@@ -124,6 +119,11 @@ EntrySyncLoop: // Syncs all eblocks we care about and their entries
 	// Apply all the effects
 	if graded != nil { // If graded was nil, then there was no oprs this eblock
 		d.Pegnet.InsertGradedBlock(graded)
+		d.Pegnet.InsertGrade(ctx, height, graded.WinnersShortHashes())
+		winners := graded.Winners()
+		if len(winners) > 0 {
+			d.Pegnet.InsertRate(ctx, height, winners[0].OPR.GetOrderedAssetsUint())
+		}
 	}
 
 	return nil

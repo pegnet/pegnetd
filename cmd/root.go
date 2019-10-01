@@ -19,6 +19,8 @@ import (
 
 func init() {
 	RootCmd.PersistentFlags().String("log", "info", "Change the logging level. Can choose from 'trace', 'debug', 'info', 'warn', 'error', or 'fatal'")
+	RootCmd.PersistentFlags().StringP("server", "s", "http://localhost:8088", "The url to the factomd endpoint witout a trailing slash")
+	RootCmd.PersistentFlags().StringP("wallet", "w", "http://localhost:8089", "The url to the factomd-wallet endpoint witout a trailing slash")
 }
 
 func Execute() {
@@ -43,7 +45,7 @@ var RootCmd = &cobra.Command{
 		conf := viper.GetViper()
 		daemon, err := node.NewPegnetd(conf)
 		if err != nil {
-			log.WithError(err).Errorf("failed to launce pegnet node")
+			log.WithError(err).Errorf("failed to launch pegnet node")
 			os.Exit(1)
 		}
 
@@ -62,7 +64,9 @@ func always(cmd *cobra.Command, args []string) {
 
 	// Setup global command line flag overrides
 	// This gets run before any command executes. It will init global flags to the config
-	_ = viper.BindPFlag(config.LoggingLevel, cmd.Flags().Lookup("log"))
+	viper.BindPFlag(config.LoggingLevel, cmd.Flags().Lookup("log"))
+	viper.BindPFlag(config.Server, cmd.Flags().Lookup("server"))
+	viper.BindPFlag(config.Wallet, cmd.Flags().Lookup("wallet"))
 
 	// Also init some defaults
 	viper.SetDefault(config.DBlockSyncRetryPeriod, time.Second*5)

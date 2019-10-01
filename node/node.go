@@ -26,6 +26,8 @@ func NewPegnetd(conf *viper.Viper) (*Pegnetd, error) {
 	// TODO : Init factom clients better
 	n := new(Pegnetd)
 	n.FactomClient = factom.NewClient(nil, nil)
+	n.FactomClient.FactomdServer = conf.GetString(config.Server)
+	n.FactomClient.WalletdServer = conf.GetString(config.Wallet)
 	n.Config = conf
 
 	// TODO: Handle all casings and handle testnet -> testnet-pM2 or w/e
