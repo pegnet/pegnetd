@@ -3,9 +3,7 @@ package pegnet_test
 import (
 	"context"
 	"database/sql"
-	"fmt"
 	"os"
-	"os/user"
 	"testing"
 
 	"github.com/Factom-Asset-Tokens/factom"
@@ -20,11 +18,7 @@ func setupPegnet() (*Pegnet, error) {
 	// Taken from a combination of Pegnet.New() and Pegnet.Init()
 	// just avoiding the config for now
 	p := new(Pegnet)
-	usr, err := user.Current()
-	if err != nil {
-		return nil, err
-	}
-	path := fmt.Sprintf("%s/pegnet-tmp.db", usr.HomeDir)
+	path := "/tmp/pegnet-tmp.db"
 	_ = os.Remove(path)
 	db, err := sql.Open("sqlite3", path)
 	if err != nil {
@@ -40,9 +34,7 @@ func setupPegnet() (*Pegnet, error) {
 
 func tearDownPegnet(p *Pegnet) {
 	_ = p.DB.Close()
-	usr, _ := user.Current()
-	path := fmt.Sprintf("%s/pegnet-tmp.db", usr.HomeDir)
-	_ = os.Remove(path)
+	_ = os.Remove("/tmp/pegnet-tmp.db")
 }
 
 func TestPegnet_SelectBalance_Empty(t *testing.T) {
