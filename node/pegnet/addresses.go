@@ -102,6 +102,9 @@ func (p *Pegnet) SelectBalance(adr *factom.FAAddress, ticker fat2.PTicker) (uint
 	stmt := fmt.Sprintf(stmtStringFmt, strings.ToLower(ticker.String()))
 	err := p.DB.QueryRow(stmt, adr[:]).Scan(&balance)
 	if err != nil {
+		if err.Error() == "sql: no rows in result set" {
+			return 0, nil
+		}
 		return 0, err
 	}
 	return balance, nil
@@ -154,6 +157,9 @@ func (p *Pegnet) SelectBalances(adr *factom.FAAddress) (map[fat2.PTicker]uint64,
 		&balances[fat2.PTickerDCR],
 	)
 	if err != nil {
+		if err.Error() == "sql: no rows in result set" {
+			return balanceMap, nil
+		}
 		return nil, err
 	}
 	for i := fat2.PTickerInvalid + 1; i < fat2.PTickerMax; i++ {
