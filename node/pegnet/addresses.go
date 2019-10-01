@@ -115,8 +115,7 @@ func (p *Pegnet) SubFromBalance(tx *sql.Tx, adr *factom.FAAddress, ticker fat2.P
 		id, err = p.AddToBalance(tx, adr, ticker, 0)
 		return id, nil, err
 	}
-	// TODO: query balance using the pending tx instead
-	balance, err := p.SelectBalance(adr, ticker)
+	balance, err := p.SelectPendingBalance(tx, adr, ticker)
 	if err != nil {
 		if err.Error() == sqlNoRowsError {
 			return 0, fmt.Errorf("insufficient balance: %v", adr), nil
@@ -145,6 +144,26 @@ func (p *Pegnet) SubFromBalance(tx *sql.Tx, adr *factom.FAAddress, ticker fat2.P
 }
 
 const sqlNoRowsError = "sql: no rows in result set"
+
+// SelectPendingBalance returns the balance of an individual token type for the given
+// address, in the context of a given sql transaction. If the address is not in the
+// database or will not be in the database after the tx is committed, 0 will be returned.
+func (p *Pegnet) SelectPendingBalance(tx *sql.Tx, adr *factom.FAAddress, ticker fat2.PTicker) (uint64, error) {
+	if ticker <= fat2.PTickerInvalid || fat2.PTickerMax <= ticker {
+		return 0, fmt.Errorf("invalid token type")
+	}
+	var balance uint64
+	stmtStringFmt := `SELECT %s_balance FROM pn_addresses WHERE address = ?;`
+	stmt := fmt.Sprintf(stmtStringFmt, strings.ToLower(ticker.String()))
+	err := tx.QueryRow(stmt, adr[:]).Scan(&balance)
+	if err != nil {
+		if err.Error() == sqlNoRowsError {
+			return 0, nil
+		}
+		return 0, err
+	}
+	return balance, nil
+}
 
 // SelectBalance returns the balance of an individual token type for the given
 // address. If the address is not in the database, 0 will be returned.
