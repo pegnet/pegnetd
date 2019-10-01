@@ -1,6 +1,8 @@
 package node
 
 import (
+	"context"
+
 	"github.com/Factom-Asset-Tokens/factom"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/pegnet/pegnet/modules/grader"
@@ -22,7 +24,7 @@ type Pegnetd struct {
 	Pegnet *pegnet.Pegnet
 }
 
-func NewPegnetd(conf *viper.Viper) (*Pegnetd, error) {
+func NewPegnetd(ctx context.Context, conf *viper.Viper) (*Pegnetd, error) {
 	// TODO : Init factom clients better
 	n := new(Pegnetd)
 	n.FactomClient = factom.NewClient(nil, nil)
@@ -45,7 +47,7 @@ func NewPegnetd(conf *viper.Viper) (*Pegnetd, error) {
 	}
 
 	// TODO: Check this, harcoding it high to skip the initial stuff
-	n.Sync.Synced = 206421
+	n.Sync.Synced = n.Pegnet.SelectSynced(ctx)
 
 	// TODO :Is this the spot spot to init?
 	grader.InitLX()

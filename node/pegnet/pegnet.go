@@ -60,6 +60,10 @@ func (p *Pegnet) Init() error {
 	if err != nil {
 		return err
 	}
+	err = p.CreateTableMetadata()
+	if err != nil {
+		return err
+	}
 	return nil
 }
 

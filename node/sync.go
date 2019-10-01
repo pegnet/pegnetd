@@ -126,6 +126,11 @@ EntrySyncLoop: // Syncs all eblocks we care about and their entries
 		}
 	}
 
+	err = d.Pegnet.InsertSynced(ctx, height)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 

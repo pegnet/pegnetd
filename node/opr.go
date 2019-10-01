@@ -6,6 +6,7 @@ import (
 
 	"github.com/Factom-Asset-Tokens/factom"
 	"github.com/pegnet/pegnet/modules/grader"
+	log "github.com/sirupsen/logrus"
 )
 
 func (d *Pegnetd) Grade(ctx context.Context, block *factom.EBlock) (grader.GradedBlock, error) {
@@ -29,6 +30,8 @@ func (d *Pegnetd) Grade(ctx context.Context, block *factom.EBlock) (grader.Grade
 	prev, err := d.Pegnet.SelectGrade(ctx, block.Height-1)
 	// assume that error means it's below genesis for now
 	if err != nil {
+		log.WithError(err).Debug("failed to get previous winners")
+	} else {
 		prevWinners = prev
 	}
 
