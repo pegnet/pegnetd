@@ -8,6 +8,7 @@ import (
 	"github.com/pegnet/pegnet/modules/grader"
 	"github.com/pegnet/pegnetd/config"
 	"github.com/pegnet/pegnetd/node/pegnet"
+	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 )
 
@@ -46,8 +47,12 @@ func NewPegnetd(ctx context.Context, conf *viper.Viper) (*Pegnetd, error) {
 		return nil, err
 	}
 
-	// TODO: Check this, harcoding it high to skip the initial stuff
-	n.Sync.Synced = n.Pegnet.SelectSynced(ctx)
+	if sync, err := n.Pegnet.SelectSynced(ctx); err != nil {
+		log.WithError(err).Debug("no synced state saved, using genesis")
+		n.Sync.Synced = 206421
+	} else {
+		n.Sync.Synced = sync
+	}
 
 	// TODO :Is this the spot spot to init?
 	grader.InitLX()

@@ -32,12 +32,12 @@ func (p *Pegnet) InsertSynced(ctx context.Context, height uint32) error {
 	return nil
 }
 
-func (p *Pegnet) SelectSynced(ctx context.Context) uint32 {
+func (p *Pegnet) SelectSynced(ctx context.Context) (uint32, error) {
 	var data []byte
 	err := p.DB.QueryRowContext(ctx, "SELECT value FROM pn_metadata WHERE name = $1", "synced").Scan(&data)
 	if err != nil {
-		return 206421
+		return 0, err
 	}
 
-	return binary.BigEndian.Uint32(data)
+	return binary.BigEndian.Uint32(data), nil
 }
