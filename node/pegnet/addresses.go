@@ -1,74 +1,76 @@
 package pegnet
 
 import (
+	"database/sql"
 	"fmt"
+	"strings"
+
 	"github.com/Factom-Asset-Tokens/factom"
 	"github.com/pegnet/pegnetd/fat/fat2"
-	"strings"
 )
 
 const createTableAddresses = `CREATE TABLE "pn_addresses" (
         "id"            INTEGER PRIMARY KEY,
         "address"       BLOB NOT NULL UNIQUE,
-        "peg_balance"   INTEGER NOT NULL
+        "peg_balance"   INTEGER NOT NULL DEFAULT 0
                         CONSTRAINT "insufficient balance" CHECK ("peg_balance" >= 0),
-        "pusd_balance"  INTEGER NOT NULL
+        "pusd_balance"  INTEGER NOT NULL DEFAULT 0
                         CONSTRAINT "insufficient balance" CHECK ("pusd_balance" >= 0),
-        "peur_balance"  INTEGER NOT NULL
+        "peur_balance"  INTEGER NOT NULL DEFAULT 0
                         CONSTRAINT "insufficient balance" CHECK ("peur_balance" >= 0),
-        "pjpy_balance"  INTEGER NOT NULL
+        "pjpy_balance"  INTEGER NOT NULL DEFAULT 0
                         CONSTRAINT "insufficient balance" CHECK ("pjpy_balance" >= 0),
-        "pgbp_balance"  INTEGER NOT NULL
+        "pgbp_balance"  INTEGER NOT NULL DEFAULT 0
                         CONSTRAINT "insufficient balance" CHECK ("pgbp_balance" >= 0),
-        "pcad_balance"  INTEGER NOT NULL
+        "pcad_balance"  INTEGER NOT NULL DEFAULT 0
                         CONSTRAINT "insufficient balance" CHECK ("pcad_balance" >= 0),
-        "pchf_balance"  INTEGER NOT NULL
+        "pchf_balance"  INTEGER NOT NULL DEFAULT 0
                         CONSTRAINT "insufficient balance" CHECK ("pchf_balance" >= 0),
-        "pinr_balance"  INTEGER NOT NULL
+        "pinr_balance"  INTEGER NOT NULL DEFAULT 0
                         CONSTRAINT "insufficient balance" CHECK ("pinr_balance" >= 0),
-        "psgd_balance"  INTEGER NOT NULL
+        "psgd_balance"  INTEGER NOT NULL DEFAULT 0
                         CONSTRAINT "insufficient balance" CHECK ("psgd_balance" >= 0),
-        "pcny_balance"  INTEGER NOT NULL
+        "pcny_balance"  INTEGER NOT NULL DEFAULT 0
                         CONSTRAINT "insufficient balance" CHECK ("pcny_balance" >= 0),
-        "phkd_balance"  INTEGER NOT NULL
+        "phkd_balance"  INTEGER NOT NULL DEFAULT 0
                         CONSTRAINT "insufficient balance" CHECK ("phkd_balance" >= 0),
-        "pkrw_balance"  INTEGER NOT NULL
+        "pkrw_balance"  INTEGER NOT NULL DEFAULT 0
                         CONSTRAINT "insufficient balance" CHECK ("pkrw_balance" >= 0),
-        "pbrl_balance"  INTEGER NOT NULL
+        "pbrl_balance"  INTEGER NOT NULL DEFAULT 0
                         CONSTRAINT "insufficient balance" CHECK ("pbrl_balance" >= 0),
-        "pphp_balance"  INTEGER NOT NULL
+        "pphp_balance"  INTEGER NOT NULL DEFAULT 0
                         CONSTRAINT "insufficient balance" CHECK ("pphp_balance" >= 0),
-        "pmxn_balance"  INTEGER NOT NULL
+        "pmxn_balance"  INTEGER NOT NULL DEFAULT 0
                         CONSTRAINT "insufficient balance" CHECK ("pmxn_balance" >= 0),
-        "pxau_balance"  INTEGER NOT NULL
+        "pxau_balance"  INTEGER NOT NULL DEFAULT 0
                         CONSTRAINT "insufficient balance" CHECK ("pxau_balance" >= 0),
-        "pxag_balance"  INTEGER NOT NULL
+        "pxag_balance"  INTEGER NOT NULL DEFAULT 0
                         CONSTRAINT "insufficient balance" CHECK ("pxag_balance" >= 0),
-        "pxbt_balance"  INTEGER NOT NULL
+        "pxbt_balance"  INTEGER NOT NULL DEFAULT 0
                         CONSTRAINT "insufficient balance" CHECK ("pxbt_balance" >= 0),
-        "peth_balance"  INTEGER NOT NULL
+        "peth_balance"  INTEGER NOT NULL DEFAULT 0
                         CONSTRAINT "insufficient balance" CHECK ("peth_balance" >= 0),
-        "pltc_balance"  INTEGER NOT NULL
+        "pltc_balance"  INTEGER NOT NULL DEFAULT 0
                         CONSTRAINT "insufficient balance" CHECK ("pltc_balance" >= 0),
-        "prvn_balance"  INTEGER NOT NULL
+        "prvn_balance"  INTEGER NOT NULL DEFAULT 0
                         CONSTRAINT "insufficient balance" CHECK ("prvn_balance" >= 0),
-        "pxbc_balance"  INTEGER NOT NULL
+        "pxbc_balance"  INTEGER NOT NULL DEFAULT 0
                         CONSTRAINT "insufficient balance" CHECK ("pxbc_balance" >= 0),
-        "pfct_balance"  INTEGER NOT NULL
+        "pfct_balance"  INTEGER NOT NULL DEFAULT 0
                         CONSTRAINT "insufficient balance" CHECK ("pfct_balance" >= 0),
-        "pbnb_balance"  INTEGER NOT NULL
+        "pbnb_balance"  INTEGER NOT NULL DEFAULT 0
                         CONSTRAINT "insufficient balance" CHECK ("pbnb_balance" >= 0),
-        "pxlm_balance"  INTEGER NOT NULL
+        "pxlm_balance"  INTEGER NOT NULL DEFAULT 0
                         CONSTRAINT "insufficient balance" CHECK ("pxlm_balance" >= 0),
-        "pada_balance"  INTEGER NOT NULL
+        "pada_balance"  INTEGER NOT NULL DEFAULT 0
                         CONSTRAINT "insufficient balance" CHECK ("pada_balance" >= 0),
-        "pxmr_balance"  INTEGER NOT NULL
+        "pxmr_balance"  INTEGER NOT NULL DEFAULT 0
                         CONSTRAINT "insufficient balance" CHECK ("pxmr_balance" >= 0),
-        "pdas_balance"  INTEGER NOT NULL
+        "pdas_balance"  INTEGER NOT NULL DEFAULT 0
                         CONSTRAINT "insufficient balance" CHECK ("pdas_balance" >= 0),
-        "pzec_balance"  INTEGER NOT NULL
+        "pzec_balance"  INTEGER NOT NULL DEFAULT 0
                         CONSTRAINT "insufficient balance" CHECK ("pzec_balance" >= 0),
-        "pdcr_balance"  INTEGER NOT NULL
+        "pdcr_balance"  INTEGER NOT NULL DEFAULT 0
                         CONSTRAINT "insufficient balance" CHECK ("pdcr_balance" >= 0)
 );
 `
@@ -81,15 +83,68 @@ func (p *Pegnet) CreateTableAddresses() error {
 	return nil
 }
 
-func (p *Pegnet) AddToBalance(adr *factom.FAAddress, ticker fat2.PTicker, add uint64) (int64, error) {
-	// TODO: implement AddToBalance
-	return 0, nil
+// AddToBalance adds value to the typed balance of adr, creating a new row in
+// "pn_addresses" if it does not exist. If successful, the row id is returned.
+func (p *Pegnet) AddToBalance(tx *sql.Tx, adr *factom.FAAddress, ticker fat2.PTicker, value uint64) (int64, error) {
+	stmtStringFmt := `INSERT INTO "pn_addresses"
+                ("address", "%[1]s_balance") VALUES (?, ?)
+                ON CONFLICT("address") DO
+                UPDATE SET "%[1]s_balance" = "%[1]s_balance" + "excluded"."%[1]s_balance";`
+	stmt, err := tx.Prepare(fmt.Sprintf(stmtStringFmt, strings.ToLower(ticker.String())))
+	if err != nil {
+		return 0, err
+	}
+	res, err := stmt.Exec(adr[:], value)
+	if err != nil {
+		return 0, err
+	}
+	lastID, err := res.LastInsertId()
+	if err != nil {
+		return 0, err
+	}
+	return lastID, nil
 }
 
-func (p *Pegnet) SubFromBalance(adr *factom.FAAddress, ticker fat2.PTicker, add uint64) (int64, error) {
-	// TODO: implement SubFromBalance
-	return 0, nil
+// SubFromBalance subtracts value from the typed balance of adr, creating a new row in
+// "pn_addresses" if it does not exist and value is 0. If successful, the row id is returned,
+// otherwise 0. If subtracting sub would result in a negative balance, txErr is not nil
+// and starts with "insufficient balance".
+func (p *Pegnet) SubFromBalance(tx *sql.Tx, adr *factom.FAAddress, ticker fat2.PTicker, value uint64) (id int64, txError, err error) {
+	if value == 0 {
+		// Allow tx's with zeros to result in an INSERT.
+		id, err = p.AddToBalance(tx, adr, ticker, 0)
+		return id, nil, err
+	}
+	// TODO: query balance using the pending tx instead
+	balance, err := p.SelectBalance(adr, ticker)
+	if err != nil {
+		if err.Error() == sqlNoRowsError {
+			return 0, fmt.Errorf("insufficient balance: %v", adr), nil
+		}
+		return 0, nil, err
+	}
+	if balance < value {
+		return 0, fmt.Errorf("insufficient balance: %v", adr), nil
+	}
+
+	stmtStringFmt := `UPDATE pn_addresses SET %[1]s_balance = %[1]s_balance - ? WHERE address = ?;`
+	tickerLower := strings.ToLower(ticker.String())
+	stmt, err := tx.Prepare(fmt.Sprintf(stmtStringFmt, tickerLower))
+	if err != nil {
+		return 0, nil, err
+	}
+	res, err := stmt.Exec(value, adr[:])
+	if err != nil {
+		return 0, nil, err
+	}
+	lastID, err := res.LastInsertId()
+	if err != nil {
+		return 0, nil, err
+	}
+	return lastID, nil, nil
 }
+
+const sqlNoRowsError = "sql: no rows in result set"
 
 // SelectBalance returns the balance of an individual token type for the given
 // address. If the address is not in the database, 0 will be returned.
@@ -102,7 +157,7 @@ func (p *Pegnet) SelectBalance(adr *factom.FAAddress, ticker fat2.PTicker) (uint
 	stmt := fmt.Sprintf(stmtStringFmt, strings.ToLower(ticker.String()))
 	err := p.DB.QueryRow(stmt, adr[:]).Scan(&balance)
 	if err != nil {
-		if err.Error() == "sql: no rows in result set" {
+		if err.Error() == sqlNoRowsError {
 			return 0, nil
 		}
 		return 0, err
@@ -157,7 +212,7 @@ func (p *Pegnet) SelectBalances(adr *factom.FAAddress) (map[fat2.PTicker]uint64,
 		&balances[fat2.PTickerDCR],
 	)
 	if err != nil {
-		if err.Error() == "sql: no rows in result set" {
+		if err.Error() == sqlNoRowsError {
 			return balanceMap, nil
 		}
 		return nil, err
