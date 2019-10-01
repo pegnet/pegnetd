@@ -1,7 +1,7 @@
 # Pegnetd config file
 [app]
   loglevel = "info"
-  dbpath   = ".pegnet/node.db"
+  dbpath   = "$HOME/.pegnetd/node.db"
 
 [dblocksync]
   retry = "5s"

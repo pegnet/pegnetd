@@ -43,7 +43,7 @@ var RootCmd = &cobra.Command{
 		conf := viper.GetViper()
 		daemon, err := node.NewPegnetd(conf)
 		if err != nil {
-			log.WithError(err).Errorf("failed to launce pegnet node")
+			log.WithError(err).Errorf("failed to launch pegnet node")
 			os.Exit(1)
 		}
 

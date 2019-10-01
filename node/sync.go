@@ -2,8 +2,10 @@ package node
 
 import (
 	"context"
+	"database/sql"
 	"time"
 
+	"github.com/pegnet/pegnetd/fat/fat2"
 	"github.com/Factom-Asset-Tokens/factom"
 	"github.com/pegnet/pegnetd/config"
 	log "github.com/sirupsen/logrus"
@@ -39,15 +41,34 @@ OuterSyncLoop:
 		}
 
 		for d.Sync.Synced < heights.DirectoryBlock {
+			hLog := log.WithFields(log.Fields{"height": d.Sync.Synced + 1})
 			if isDone(ctx) {
 				return
+			}
+
+			blocktx, err := d.Pegnet.DB.Begin()
+			if err != nil {
+				hLog.WithError(err).Errorf("failed to init db tx")
+				time.Sleep(retryPeriod)
+				continue // Loop will just keep retrying until factomd is reached
 			}
 
 			// We are not synced, so we need to iterate through the dblocks and sync them
 			// one by one. We can only sync our current synced height +1
 			// TODO: This skips the genesis block. I'm sure that is fine
-			if err := d.SyncBlock(ctx, d.Sync.Synced+1); err != nil {
-				log.WithError(err).WithFields(log.Fields{"height": d.Sync.Synced + 1}).Errorf("failed to sync height")
+			if err := d.SyncBlock(ctx, blocktx, d.Sync.Synced+1); err != nil {
+				hLog.WithError(err).Errorf("failed to sync height")
+				if err := blocktx.Rollback(); err !=nil {
+					log.WithError(err).Errorf("failed rollback tx")
+				}
+				time.Sleep(retryPeriod)
+				// If we fail, we backout to the outer loop. This allows error handling on factomd state to be a bit
+				// cleaner, such as a rebooted node with a different db. That node would have a new heights response.
+				continue OuterSyncLoop
+			}
+
+			if err := blocktx.Commit(); err !=nil {
+				hLog.WithError(err).Errorf("failed commit tx")
 				time.Sleep(retryPeriod)
 				// If we fail, we backout to the outer loop. This allows error handling on factomd state to be a bit
 				// cleaner, such as a rebooted node with a different db. That node would have a new heights response.
@@ -65,7 +86,7 @@ OuterSyncLoop:
 // If SyncBlock returns no error, than that height was synced and saved. If any part of the sync fails,
 // the whole sync should be rolled back and not applied. An error should then be returned.
 // The context should be respected if it is cancelled
-func (d *Pegnetd) SyncBlock(ctx context.Context, height uint32) error {
+func (d *Pegnetd) SyncBlock(ctx context.Context, tx *sql.Tx, height uint32) error {
 	if isDone(ctx) { // Just an example about how to handle it being cancelled
 		return context.Canceled
 	}
@@ -116,7 +137,7 @@ EntrySyncLoop: // Syncs all eblocks we care about and their entries
 
 	// Sync the factoid chain in a transactional way. We should be able to rollback
 	// the burn sync if we need too. We can first populate the eblocks that we care about
-	if err := d.SyncFactoidBlock(ctx, dblock); err != nil {
+	if err := d.SyncFactoidBlock(ctx, tx, dblock); err != nil {
 		// TODO: Ensure that we rollback any txs up to this point
 		return err
 	}
@@ -131,7 +152,7 @@ EntrySyncLoop: // Syncs all eblocks we care about and their entries
 
 // SyncFactoidBlock
 // TODO: Send in a sql tx to actually enter the balance changes.
-func (d *Pegnetd) SyncFactoidBlock(ctx context.Context, dblock *factom.DBlock) error {
+func (d *Pegnetd) SyncFactoidBlock(ctx context.Context, tx *sql.Tx, dblock *factom.DBlock) error {
 	fblock := new(factom.FBlock)
 	fblock.Header.Height = dblock.Header.Height
 	if err := fblock.Get(d.FactomClient); err != nil {
@@ -176,10 +197,17 @@ func (d *Pegnetd) SyncFactoidBlock(ctx context.Context, dblock *factom.DBlock) e
 		burns = append(burns, in)
 	}
 
-	// TODO: do something with the burns for this block
-	var _ = burns
 	if totalBurned > 0 { // Just some debugging
-		log.WithFields(log.Fields{"height": dblock.Header.Height, "amount": totalBurned}).Debug("fct burned")
+		log.WithFields(log.Fields{"height": dblock.Header.Height, "amount": totalBurned, "quantity":len(burns)}).Debug("fct burned")
+	}
+
+	// All burns are FCT inputs
+	for i := range burns {
+		var add factom.FAAddress
+		copy(add[:], burns[i].Address[:])
+		if _, err := d.Pegnet.AddToBalance(tx, &add, fat2.PTickerFCT, burns[i].Amount); err != nil {
+			return err // The tx should be rolled back by the caller if we return an error during this.
+		}
 	}
 
 	return nil
