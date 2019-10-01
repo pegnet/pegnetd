@@ -13,14 +13,6 @@ const createTableMetadata = `CREATE TABLE IF NOT EXISTS "pn_metadata" (
 );
 `
 
-func (p *Pegnet) CreateTableMetadata() error {
-	_, err := p.DB.Exec(createTableMetadata)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
 func (p *Pegnet) InsertSynced(ctx context.Context, height uint32) error {
 	b := make([]byte, 4)
 	binary.BigEndian.PutUint32(b, height)

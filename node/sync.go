@@ -83,19 +83,13 @@ func (d *Pegnetd) SyncBlock(ctx context.Context, height uint32) error {
 	// We should be able to rollback any one of these eblock syncs.
 	var err error
 	eblocks := make(map[string]*factom.EBlock)
-EntrySyncLoop: // Syncs all eblocks we care about and their entries
 	for k, v := range d.Tracking {
 		if eblock := dblock.EBlock(v); eblock != nil {
 			if err = eblock.GetEntries(d.FactomClient); err != nil {
-				break EntrySyncLoop
+				return err
 			}
 			eblocks[k] = eblock
 		}
-	}
-
-	if err != nil {
-		// Eblock missing entries. This is step 1 in syncing, so just exit
-		return err
 	}
 
 	// Entries are gathered at this point
@@ -106,8 +100,6 @@ EntrySyncLoop: // Syncs all eblocks we care about and their entries
 	if err != nil {
 		return err // We can still just exit at this point with no rollback
 	}
-
-	// TODO: Handle converts/txs
 
 	// Sync the factoid chain in a transactional way. We should be able to rollback
 	// the burn sync if we need too. We can first populate the eblocks that we care about
@@ -126,6 +118,9 @@ EntrySyncLoop: // Syncs all eblocks we care about and their entries
 		}
 	}
 
+	// TODO: Handle converts/txs
+
+	// update synced state
 	err = d.Pegnet.InsertSynced(ctx, height)
 	if err != nil {
 		return err
@@ -134,7 +129,7 @@ EntrySyncLoop: // Syncs all eblocks we care about and their entries
 	return nil
 }
 
-// SyncFactoidBlock
+// SyncFactoidBlock tracks the burns for a specific dblock
 // TODO: Send in a sql tx to actually enter the balance changes.
 func (d *Pegnetd) SyncFactoidBlock(ctx context.Context, dblock *factom.DBlock) error {
 	fblock := new(factom.FBlock)
@@ -167,7 +162,7 @@ func (d *Pegnetd) SyncFactoidBlock(ctx context.Context, dblock *factom.DBlock) e
 
 		// Check correct output
 		out := tx.ECOutputs[0]
-		if PegnetBurnRCD(d.Network) != *out.Address {
+		if BurnRCD != *out.Address {
 			continue // Wrong EC output for a burn
 		}
 

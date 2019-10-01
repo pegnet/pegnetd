@@ -18,20 +18,20 @@ import (
 )
 
 func init() {
-	RootCmd.PersistentFlags().String("log", "info", "Change the logging level. Can choose from 'trace', 'debug', 'info', 'warn', 'error', or 'fatal'")
-	RootCmd.PersistentFlags().StringP("server", "s", "http://localhost:8088", "The url to the factomd endpoint witout a trailing slash")
-	RootCmd.PersistentFlags().StringP("wallet", "w", "http://localhost:8089", "The url to the factomd-wallet endpoint witout a trailing slash")
+	rootCmd.PersistentFlags().String("log", "info", "Change the logging level. Can choose from 'trace', 'debug', 'info', 'warn', 'error', or 'fatal'")
+	rootCmd.PersistentFlags().StringP("server", "s", "http://localhost:8088", "The url to the factomd endpoint witout a trailing slash")
+	rootCmd.PersistentFlags().StringP("wallet", "w", "http://localhost:8089", "The url to the factomd-wallet endpoint witout a trailing slash")
 }
 
+// Execute is cobra's entry point
 func Execute() {
-	if err := RootCmd.Execute(); err != nil {
+	if err := rootCmd.Execute(); err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}
 }
 
-// The cli enter point
-var RootCmd = &cobra.Command{
+var rootCmd = &cobra.Command{
 	Use:              "pegnetd",
 	Short:            "pegnetd is the pegnet daemon to track balances/conversion/transactions",
 	PersistentPreRun: always,
@@ -43,14 +43,14 @@ var RootCmd = &cobra.Command{
 
 		// Get the config
 		conf := viper.GetViper()
-		daemon, err := node.NewPegnetd(ctx, conf)
+		node, err := node.NewPegnetd(ctx, conf)
 		if err != nil {
 			log.WithError(err).Errorf("failed to launch pegnet node")
 			os.Exit(1)
 		}
 
 		// Run
-		daemon.DBlockSync(ctx)
+		node.DBlockSync(ctx)
 	},
 }
 
@@ -70,8 +70,6 @@ func always(cmd *cobra.Command, args []string) {
 
 	// Also init some defaults
 	viper.SetDefault(config.DBlockSyncRetryPeriod, time.Second*5)
-	viper.SetDefault(config.Network, "MainNet")
-	// TODO: Change the path to be dependent on the network
 	viper.SetDefault(config.SqliteDBPath, "$HOME/pegnetd/$PEGNETNETWORK/sql.db")
 
 	// Catch ctl+c
@@ -96,13 +94,10 @@ func ReadConfig(cmd *cobra.Command, args []string) {
 		os.Exit(1)
 	}
 
-	_ = os.Setenv("PEGNETNETWORK", viper.GetString(config.Network))
-
 	initLogger()
 }
 
-// initLogger
-// Currently we just use a global logger
+// TODO implement a dedicated logger
 func initLogger() {
 	switch strings.ToLower(viper.GetString(config.LoggingLevel)) {
 	case "trace":

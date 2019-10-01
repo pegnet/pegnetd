@@ -45,24 +45,23 @@ func (p *Pegnet) Init() error {
 		return err
 	}
 	p.DB = db
-	err = p.CreateTableAddresses()
+	err = p.createTables()
 	if err != nil {
-		// TODO: implement better schema validation
-		if err.Error() != "table \"pn_addresses\" already exists" {
+		return err
+	}
+	return nil
+}
+
+func (p *Pegnet) createTables() error {
+	for _, sql := range []string{
+		createTableAddresses,
+		createTableGrade,
+		createTableRate,
+		createTableMetadata,
+	} {
+		if _, err := p.DB.Exec(sql); err != nil {
 			return err
 		}
-	}
-	err = p.CreateTableGrade()
-	if err != nil {
-		return err
-	}
-	err = p.CreateTableRate()
-	if err != nil {
-		return err
-	}
-	err = p.CreateTableMetadata()
-	if err != nil {
-		return err
 	}
 	return nil
 }

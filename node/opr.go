@@ -16,13 +16,12 @@ func (d *Pegnetd) Grade(ctx context.Context, block *factom.EBlock) (grader.Grade
 		return nil, nil
 	}
 
-	if *block.ChainID != d.Tracking["opr"] {
+	if *block.ChainID != OPRChain {
 		return nil, fmt.Errorf("trying to grade a non-opr chain")
 	}
 
 	ver := uint8(1)
-	// TODO: Handle other than mainnet?
-	if block.Height > 210330 {
+	if block.Height >= 210330 {
 		ver = 2
 	}
 
@@ -41,7 +40,6 @@ func (d *Pegnetd) Grade(ctx context.Context, block *factom.EBlock) (grader.Grade
 	}
 
 	for _, entry := range block.Entries {
-		// TODO: Is there an easier way to go []Bytes -> [][]byte?
 		extids := make([][]byte, len(entry.ExtIDs))
 		for i := range entry.ExtIDs {
 			extids[i] = entry.ExtIDs[i]

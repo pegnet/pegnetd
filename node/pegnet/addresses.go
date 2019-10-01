@@ -71,14 +71,6 @@ const createTableAddresses = `CREATE TABLE IF NOT EXISTS "pn_addresses" (
 );
 `
 
-func (p *Pegnet) CreateTableAddresses() error {
-	_, err := p.DB.Exec(createTableAddresses)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
 func (p *Pegnet) AddToBalance(adr *factom.FAAddress, ticker fat2.PTicker, add uint64) (int64, error) {
 	// TODO: implement AddToBalance
 	return 0, nil

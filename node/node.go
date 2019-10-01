@@ -12,13 +12,14 @@ import (
 	"github.com/spf13/viper"
 )
 
+var OPRChain = *factom.NewBytes32FromString("a642a8674f46696cc47fdb6b65f9c87b2a19c5ea8123b3d2f0c13b6f33a9d5ef")
+
 type Pegnetd struct {
 	FactomClient *factom.Client
 	Config       *viper.Viper
 
 	// Tracking indicates which chains we are tracking for the sync routing
 	Tracking map[string]factom.Bytes32
-	Network  string
 
 	Sync BlockSync
 
@@ -26,20 +27,17 @@ type Pegnetd struct {
 }
 
 func NewPegnetd(ctx context.Context, conf *viper.Viper) (*Pegnetd, error) {
-	// TODO : Init factom clients better
+	// TODO : Update emyrk's factom library
 	n := new(Pegnetd)
 	n.FactomClient = factom.NewClient(nil, nil)
 	n.FactomClient.FactomdServer = conf.GetString(config.Server)
 	n.FactomClient.WalletdServer = conf.GetString(config.Wallet)
 	n.Config = conf
 
-	// TODO: Handle all casings and handle testnet -> testnet-pM2 or w/e
-	n.Network = viper.GetString(config.Network)
-
 	// Ignore the factoid chain, as that is tracked separately
 	n.Tracking = map[string]factom.Bytes32{
 		// OPR Chain
-		"opr": ComputeChainIDFromStrings([]string{"PegNet", n.Network, "OraclePriceRecords"}),
+		"opr": OPRChain,
 	}
 
 	n.Pegnet = pegnet.New(conf)
@@ -54,8 +52,6 @@ func NewPegnetd(ctx context.Context, conf *viper.Viper) (*Pegnetd, error) {
 		n.Sync.Synced = sync
 	}
 
-	// TODO :Is this the spot spot to init?
 	grader.InitLX()
-
 	return n, nil
 }

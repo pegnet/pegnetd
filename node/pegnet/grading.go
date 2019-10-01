@@ -24,21 +24,6 @@ const createTableRate = `CREATE TABLE IF NOT EXISTS "pn_rate" (
 );
 `
 
-func (p *Pegnet) CreateTableGrade() error {
-	_, err := p.DB.Exec(createTableGrade)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-func (p *Pegnet) CreateTableRate() error {
-	_, err := p.DB.Exec(createTableRate)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
 func (p *Pegnet) InsertRate(ctx context.Context, height uint32, rates []opr.AssetUint) error {
 	for _, r := range rates {
 		_, err := p.DB.ExecContext(ctx, "INSERT INTO pn_rate (height, token, value) VALUES ($1, $2, $3)", height, r.Name, r.Value)
