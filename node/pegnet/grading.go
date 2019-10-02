@@ -48,9 +48,24 @@ func (p *Pegnet) InsertGrade(ctx context.Context, height uint32, winners []strin
 }
 
 func (p *Pegnet) SelectGrade(ctx context.Context, height uint32) ([]string, error) {
-	// this assumes that all previous heights have rows
 	var data []byte
 	err := p.DB.QueryRowContext(ctx, "SELECT winners FROM pn_grade WHERE height = $1", height).Scan(&data)
+	if err != nil {
+		return nil, err
+	}
+
+	var winners []string
+	err = json.Unmarshal(data, &winners)
+	if err != nil {
+		return nil, err
+	}
+
+	return winners, nil
+}
+
+func (p *Pegnet) SelectPrevious(ctx context.Context, height uint32) ([]string, error) {
+	var data []byte
+	err := p.DB.QueryRowContext(ctx, "SELECT winners FROM pn_grade WHERE height < $1 ORDER BY height DESC LIMIT 1", height).Scan(&data)
 	if err != nil {
 		return nil, err
 	}
