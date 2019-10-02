@@ -189,6 +189,7 @@ func (d *Pegnetd) PayWinners(tx *sql.Tx, winners []*grader.GradingOPR) error {
 			return err // The tx should be rolled back by the caller if we return an error during this.
 		}
 	}
+	return nil
 }
 
 // SyncFactoidBlock tracks the burns for a specific dblock
