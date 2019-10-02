@@ -88,10 +88,10 @@ func (t *PTicker) UnmarshalJSON(data []byte) error {
 	// When unmarshalling, the bytes passed in are []byte("\"PEG\"") rather
 	// than just[]byte("PEG") so we must ensure that we take the quotes into
 	// account here
-	if len(ticker) < 3 || ticker[0] != "\""[0] || ticker[len(ticker)-1] != "\""[0] {
+	if len(ticker) < 3 {
 		return fmt.Errorf("invalid token type")
 	}
-	pTicker, ok := validPTickers[ticker[1:len(ticker)-1]]
+	pTicker, ok := validPTickers[ticker]
 	if !ok {
 		*t = PTickerInvalid
 		return fmt.Errorf("invalid token type")
@@ -106,9 +106,7 @@ func (t PTicker) MarshalJSON() ([]byte, error) {
 		return nil, fmt.Errorf("invalid token type")
 	}
 	pTickerString := validPTickerStrings[int(t)]
-	// Ensure that quotes are included in the resulting bytes as it
-	// will be used in the JSON exactly as marshalled
-	return []byte(fmt.Sprintf("\"%s\"", pTickerString)), nil
+	return []byte(pTickerString), nil
 }
 
 // String returns the string representation of this PTicker
@@ -116,5 +114,5 @@ func (t PTicker) String() string {
 	if t <= PTickerInvalid || PTickerMax <= t {
 		return fmt.Errorf("invalid token type").Error()
 	}
-	return validPTickerStrings[int(t) - 1]
+	return validPTickerStrings[int(t)-1]
 }

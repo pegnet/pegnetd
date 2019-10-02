@@ -2,12 +2,13 @@ package pegnet
 
 import (
 	"database/sql"
+
 	"github.com/pegnet/pegnetd/fat/fat2"
 
 	"github.com/Factom-Asset-Tokens/factom"
 )
 
-const createTableTransactionBatchHolding = `CREATE TABLE "pn_transaction_batch_holding" (
+const createTableTransactionBatchHolding = `CREATE TABLE IF NOT EXISTS "pn_transaction_batch_holding" (
         "id"            INTEGER PRIMARY KEY,
         "entry_hash"    BLOB NOT NULL UNIQUE,
         "entry_data"    BLOB NOT NULL,

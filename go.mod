@@ -3,7 +3,7 @@ module github.com/pegnet/pegnetd
 go 1.13
 
 require (
-	github.com/AdamSLevy/jsonrpc2 v2.0.0+incompatible // indirect
+	github.com/AdamSLevy/jsonrpc2 v2.0.0+incompatible
 	github.com/AdamSLevy/jsonrpc2/v11 v11.3.2
 	github.com/Factom-Asset-Tokens/factom v0.0.0-20190911201853-7b283996f02a
 	github.com/Factom-Asset-Tokens/fatd v0.6.1-0.20190927200133-81408234a2b5

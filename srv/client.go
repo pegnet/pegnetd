@@ -39,14 +39,14 @@ type Client struct {
 
 // Defaults for the factomd and factom-walletd endpoints.
 const (
-	FatdDefault = "http://localhost:8078"
+	PegnetdDefault = "http://localhost:8070"
 )
 
 // NewClient returns a pointer to a Client initialized with the default
 // localhost endpoints for factomd and factom-walletd, and 15 second timeouts
 // for each of the http.Clients.
 func NewClient() *Client {
-	c := &Client{PegnetdServer: FatdDefault}
+	c := &Client{PegnetdServer: PegnetdDefault}
 	c.Timeout = 15 * time.Second
 	return c
 }

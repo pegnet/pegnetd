@@ -13,7 +13,7 @@ import (
 // "pn_addresses" table, which must exist first.
 //
 // If the transaction is a conversion, both "to" and "conversion" are set to true
-const createTableTransactions = `CREATE TABLE "pn_address_transactions" (
+const createTableTransactions = `CREATE TABLE IF NOT EXISTS "pn_address_transactions" (
         "entry_hash"    BLOB NOT NULL UNIQUE,
         "address_id"    INTEGER NOT NULL,
         "tx_index"      INTEGER NOT NULL,
@@ -24,7 +24,7 @@ const createTableTransactions = `CREATE TABLE "pn_address_transactions" (
 
         FOREIGN KEY("address_id") REFERENCES "pn_addresses"
 );
-CREATE INDEX "idx_address_transactions_address_id" ON "pn_address_transactions"("address_id");
+CREATE INDEX IF NOT EXISTS "idx_address_transactions_address_id" ON "pn_address_transactions"("address_id");
 `
 
 // InsertTransactionRelation inserts a row into "pnaddress_transactions" relating

@@ -24,7 +24,10 @@ package srv
 
 import (
 	"bytes"
+	"database/sql"
 	"encoding/json"
+
+	"github.com/AdamSLevy/jsonrpc2"
 
 	jrpc "github.com/AdamSLevy/jsonrpc2/v11"
 	"github.com/Factom-Asset-Tokens/factom"
@@ -121,17 +124,14 @@ func (s *APIServer) getPegnetBalances(data json.RawMessage) interface{} {
 	if _, _, err := validate(data, &params); err != nil {
 		return err
 	}
-	balances := make(ResultGetPegnetBalances, int(fat2.PTickerMax))
-	for i := 1; i < int(fat2.PTickerMax); i++ {
-		//_, balance, err := db.SelectBalances(params.Address)
-		//if err != nil {
-		//	panic(err)
-		//}
-		//if balance > 0 {
-		//	balances[fat2.PTicker(i)] = balance
-		//}
+	bals, err := s.Node.Pegnet.SelectBalances(params.Address)
+	if err == sql.ErrNoRows {
+		return ErrorAddressNotFound
 	}
-	return balances
+	if err != nil {
+		return jsonrpc2.InternalError
+	}
+	return ResultGetPegnetBalances(bals)
 }
 
 func sendTransaction(data json.RawMessage) interface{} {

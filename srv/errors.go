@@ -36,4 +36,6 @@ var (
 		"not configured with entry credits")
 	ErrorPendingDisabled = jrpc.NewError(-32807, "Pending Transactions Disabled",
 		"fatd is not tracking pending transactions")
+	ErrorAddressNotFound = jrpc.NewError(-32808, "Address Not Found",
+		"address may be invalid, or not yet tracked")
 )

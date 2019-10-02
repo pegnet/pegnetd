@@ -65,7 +65,7 @@ func (p *Pegnet) InsertGradeBlock(tx *sql.Tx, eblock *factom.EBlock, graded grad
 		return err
 	}
 	_, err = tx.Exec("INSERT INTO pn_grade (height, keymr, prevkeymr, eb_seq, shorthashes, version, cutoff, count) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
-		eblock.Height, eblock.KeyMR, eblock.PrevKeyMR, eblock.Sequence, data, graded.Version(), graded.Cutoff(), graded.Count())
+		eblock.Height, eblock.KeyMR[:], eblock.PrevKeyMR[:], eblock.Sequence, data, graded.Version(), graded.Cutoff(), graded.Count())
 	if err != nil {
 		return err
 	}
