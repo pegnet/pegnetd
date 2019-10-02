@@ -7,13 +7,6 @@ import (
 	"github.com/Factom-Asset-Tokens/factom"
 )
 
-// createTableTransactionBatchHolding is a SQL string that creates the
-// "pn_transaction_batch_holding" table.
-//
-// The "pn_transaction_batch_holding" table has a foreign key reference to the
-// "pn_addresses" table, which must exist first.
-//
-// If the transaction is a conversion, both "to" and "conversion" are set to true
 const createTableTransactionBatchHolding = `CREATE TABLE "pn_transaction_batch_holding" (
         "id"            INTEGER PRIMARY KEY,
         "entry_hash"    BLOB NOT NULL UNIQUE,
