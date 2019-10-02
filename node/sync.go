@@ -81,7 +81,12 @@ OuterSyncLoop:
 			if err != nil {
 				d.Sync.Synced--
 				log.WithError(err).Errorf("unable to commit transaction")
-				continue OuterSyncLoop
+				err = tx.Rollback()
+				if err != nil {
+					// TODO evaluate if we can recover from this point or not
+					log.WithError(err).Fatal("unable to roll back transaction")
+				}
+
 			}
 		}
 
