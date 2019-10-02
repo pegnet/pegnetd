@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/pegnet/pegnet/modules/grader"
 	"github.com/pegnet/pegnetd/fat/fat2"
 
 	"github.com/Factom-Asset-Tokens/factom"
@@ -159,28 +160,36 @@ func (d *Pegnetd) SyncBlock(ctx context.Context, tx *sql.Tx, height uint32) erro
 			}
 		}
 
-		// Reward the winners
-		for i := range winners {
-			peg := winners[i].Payout()
-			addr, err := factom.NewFAAddress(winners[i].OPR.GetAddress())
-			if err != nil {
-				// TODO: This is kinda an odd case. I think we should just drop the rewards
-				// 		for an invalid address. We can always add back the rewards and they will have
-				//		a higher balance after a change.
-				fLog.WithError(err).WithFields(log.Fields{
-					"ehash": fmt.Sprintf("%x", winners[i].EntryHash),
-				}).Warnf("failed to reward")
-				continue
-			}
-
-			if _, err := d.Pegnet.AddToBalance(tx, &addr, fat2.PTickerPEG, uint64(peg)); err != nil {
-				return err // The tx should be rolled back by the caller if we return an error during this.
-			}
+		if err := d.PayWinners(tx, winners); err != nil {
+			return err
 		}
+
 	}
 
 	// TODO: Handle converts/txs
 	return nil
+}
+
+func (d *Pegnetd) PayWinners(tx *sql.Tx, winners []*grader.GradingOPR) error {
+	// Reward the winners
+	for i := range winners {
+		peg := winners[i].Payout()
+		addr, err := factom.NewFAAddress(winners[i].OPR.GetAddress())
+		if err != nil {
+			// TODO: This is kinda an odd case. I think we should just drop the rewards
+			// 		for an invalid address. We can always add back the rewards and they will have
+			//		a higher balance after a change.
+			log.WithError(err).WithFields(log.Fields{
+				"height": winners[i].OPR.GetHeight(),
+				"ehash":  fmt.Sprintf("%x", winners[i].EntryHash),
+			}).Warnf("failed to reward")
+			continue
+		}
+
+		if _, err := d.Pegnet.AddToBalance(tx, &addr, fat2.PTickerPEG, uint64(peg)); err != nil {
+			return err // The tx should be rolled back by the caller if we return an error during this.
+		}
+	}
 }
 
 // SyncFactoidBlock tracks the burns for a specific dblock
