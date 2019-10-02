@@ -18,7 +18,7 @@ const createTableTransactions = `CREATE TABLE "pn_address_transactions" (
         "address_id"    INTEGER NOT NULL,
         "tx_index"      INTEGER NOT NULL,
         "to"            BOOL NOT NULL,
-		"conversion"    BOOL NOT NULL,
+        "conversion"    BOOL NOT NULL,
 
         PRIMARY KEY("entry_hash", "address_id"),
 

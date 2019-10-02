@@ -15,7 +15,7 @@ import (
 //
 // If the transaction is a conversion, both "to" and "conversion" are set to true
 const createTableTransactionBatchHolding = `CREATE TABLE "pn_transaction_batch_holding" (
-		"id"			INTEGER PRIMARY KEY,
+        "id"            INTEGER PRIMARY KEY,
         "entry_hash"    BLOB NOT NULL UNIQUE,
         "entry_data"    BLOB NOT NULL,
         "height"        INTEGER NOT NULL,
