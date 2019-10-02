@@ -3,6 +3,7 @@ package node
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"time"
 
 	"github.com/pegnet/pegnetd/fat/fat2"
@@ -155,6 +156,25 @@ func (d *Pegnetd) SyncBlock(ctx context.Context, tx *sql.Tx, height uint32) erro
 			err = d.Pegnet.InsertRate(tx, height, winners[0].OPR.GetOrderedAssetsUint())
 			if err != nil {
 				return err
+			}
+		}
+
+		// Reward the winners
+		for i := range winners {
+			peg := winners[i].Payout()
+			addr, err := factom.NewFAAddress(winners[i].OPR.GetAddress())
+			if err != nil {
+				// TODO: This is kinda an odd case. I think we should just drop the rewards
+				// 		for an invalid address. We can always add back the rewards and they will have
+				//		a higher balance after a change.
+				fLog.WithError(err).WithFields(log.Fields{
+					"ehash": fmt.Sprintf("%x", winners[i].EntryHash),
+				}).Warnf("failed to reward")
+				continue
+			}
+
+			if _, err := d.Pegnet.AddToBalance(tx, &addr, fat2.PTickerPEG, uint64(peg)); err != nil {
+				return err // The tx should be rolled back by the caller if we return an error during this.
 			}
 		}
 	}
