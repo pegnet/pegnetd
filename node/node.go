@@ -22,7 +22,7 @@ type Pegnetd struct {
 	// Tracking indicates which chains we are tracking for the sync routing
 	Tracking map[string]factom.Bytes32
 
-	Sync BlockSync
+	Sync *pegnet.BlockSync
 
 	Pegnet *pegnet.Pegnet
 }
@@ -48,13 +48,14 @@ func NewPegnetd(ctx context.Context, conf *viper.Viper) (*Pegnetd, error) {
 
 	if sync, err := n.Pegnet.SelectSynced(ctx); err != nil {
 		if err == sql.ErrNoRows {
+			n.Sync = new(pegnet.BlockSync)
 			n.Sync.Synced = 206421
 			log.Debug("connected to a fresh database")
 		} else {
 			return nil, err
 		}
 	} else {
-		n.Sync.Synced = sync
+		n.Sync = sync
 	}
 
 	grader.InitLX()

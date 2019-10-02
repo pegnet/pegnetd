@@ -9,10 +9,6 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-type BlockSync struct {
-	Synced uint32
-}
-
 // DBlockSync iterates through dblocks and syncs the various chains
 func (d *Pegnetd) DBlockSync(ctx context.Context) {
 	retryPeriod := d.Config.GetDuration(config.DBlockSyncRetryPeriod)
@@ -56,6 +52,7 @@ OuterSyncLoop:
 
 			// Bump our sync, and march forward
 			d.Sync.Synced++
+			d.Pegnet.InsertSynced(ctx, d.Sync)
 		}
 
 	}
@@ -125,13 +122,6 @@ func (d *Pegnetd) SyncBlock(ctx context.Context, height uint32) error {
 	}
 
 	// TODO: Handle converts/txs
-
-	// update synced state
-	err = d.Pegnet.InsertSynced(ctx, height)
-	if err != nil {
-		return err
-	}
-
 	return nil
 }
 
