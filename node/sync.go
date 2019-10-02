@@ -6,10 +6,10 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/pegnet/pegnet/modules/grader"
-	"github.com/pegnet/pegnetd/fat/fat2"
 	"github.com/Factom-Asset-Tokens/factom"
+	"github.com/pegnet/pegnet/modules/grader"
 	"github.com/pegnet/pegnetd/config"
+	"github.com/pegnet/pegnetd/fat/fat2"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -43,7 +43,12 @@ OuterSyncLoop:
 			continue
 		}
 
+		var totalDur time.Duration
+		var iterations int
+
+		begin := time.Now()
 		for d.Sync.Synced < heights.DirectoryBlock {
+			start := time.Now()
 			hLog := log.WithFields(log.Fields{"height": d.Sync.Synced + 1})
 			if isDone(ctx) {
 				return
@@ -95,7 +100,23 @@ OuterSyncLoop:
 					// TODO evaluate if we can recover from this point or not
 					hLog.WithError(err).Fatal("unable to roll back transaction")
 				}
+			}
 
+			elapsed := time.Since(start)
+			hLog.WithFields(log.Fields{"took": elapsed}).Debugf("synced")
+
+			iterations++
+			totalDur += elapsed
+			// Only print if we are > 50 behind and every 50
+			if iterations%50 == 0 {
+				toGo := heights.DirectoryBlock - d.Sync.Synced
+				avg := totalDur / time.Duration(iterations)
+				hLog.WithFields(log.Fields{
+					"avg":        avg,
+					"left":       time.Duration(toGo) * avg,
+					"syncing-to": heights.DirectoryBlock,
+					"elapsed":    time.Since(begin),
+				}).Infof("sync stats")
 			}
 		}
 
@@ -111,9 +132,6 @@ func (d *Pegnetd) SyncBlock(ctx context.Context, tx *sql.Tx, height uint32) erro
 		return context.Canceled
 	}
 
-	fLog := log.WithFields(log.Fields{"height": height})
-	fLog.Debug("syncing...")
-
 	dblock := new(factom.DBlock)
 	dblock.Height = height
 	if err := dblock.Get(d.FactomClient); err != nil {
@@ -126,6 +144,7 @@ func (d *Pegnetd) SyncBlock(ctx context.Context, tx *sql.Tx, height uint32) erro
 	eblocks := make(map[string]*factom.EBlock)
 	for k, v := range d.Tracking {
 		if eblock := dblock.EBlock(v); eblock != nil {
+			// TODO: Multithread this to speed up performance. This is the slowest part
 			if err = eblock.GetEntries(d.FactomClient); err != nil {
 				return err
 			}
@@ -175,6 +194,10 @@ func (d *Pegnetd) SyncBlock(ctx context.Context, tx *sql.Tx, height uint32) erro
 }
 
 func (d *Pegnetd) PayWinners(tx *sql.Tx, winners []*grader.GradingOPR) error {
+	// Batch up the winner payouts to make less sql tx calls. If 1 FA address wins 5 for example,
+	// that is 1 call vs 5
+	totalRewards := make(map[factom.FAAddress]uint64)
+
 	// Reward the winners
 	for i := range winners {
 		addr, err := factom.NewFAAddress(winners[i].OPR.GetAddress())
@@ -189,7 +212,11 @@ func (d *Pegnetd) PayWinners(tx *sql.Tx, winners []*grader.GradingOPR) error {
 			continue
 		}
 
-		if _, err := d.Pegnet.AddToBalance(tx, &addr, fat2.PTickerPEG, uint64(winners[i].Payout())); err != nil {
+		totalRewards[addr] += uint64(winners[i].Payout())
+	}
+
+	for addr, reward := range totalRewards {
+		if _, err := d.Pegnet.AddToBalance(tx, &addr, fat2.PTickerPEG, reward); err != nil {
 			return err // The tx should be rolled back by the caller if we return an error during this.
 		}
 	}
