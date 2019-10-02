@@ -111,10 +111,16 @@ func (d *Pegnetd) SyncBlock(ctx context.Context, height uint32) error {
 	// Apply all the effects
 	if graded != nil { // If graded was nil, then there was no oprs this eblock
 		d.Pegnet.InsertGradedBlock(graded)
-		d.Pegnet.InsertGrade(ctx, height, graded.WinnersShortHashes())
+		err = d.Pegnet.InsertGradeBlock(ctx, eblocks["opr"], graded)
+		if err != nil {
+			return err
+		}
 		winners := graded.Winners()
 		if len(winners) > 0 {
-			d.Pegnet.InsertRate(ctx, height, winners[0].OPR.GetOrderedAssetsUint())
+			err = d.Pegnet.InsertRate(ctx, height, winners[0].OPR.GetOrderedAssetsUint())
+			if err != nil {
+				return err
+			}
 		}
 	}
 

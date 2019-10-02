@@ -58,6 +58,7 @@ func (p *Pegnet) createTables() error {
 		createTableGrade,
 		createTableRate,
 		createTableMetadata,
+		createTableWinners,
 	} {
 		if _, err := p.DB.Exec(sql); err != nil {
 			return err

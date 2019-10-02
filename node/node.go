@@ -2,6 +2,7 @@ package node
 
 import (
 	"context"
+	"database/sql"
 
 	"github.com/Factom-Asset-Tokens/factom"
 	_ "github.com/mattn/go-sqlite3"
@@ -46,8 +47,12 @@ func NewPegnetd(ctx context.Context, conf *viper.Viper) (*Pegnetd, error) {
 	}
 
 	if sync, err := n.Pegnet.SelectSynced(ctx); err != nil {
-		log.WithError(err).Debug("no synced state saved, using genesis")
-		n.Sync.Synced = 206421
+		if err == sql.ErrNoRows {
+			n.Sync.Synced = 206421
+			log.Debug("connected to a fresh database")
+		} else {
+			return nil, err
+		}
 	} else {
 		n.Sync.Synced = sync
 	}

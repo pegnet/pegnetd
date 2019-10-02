@@ -26,7 +26,7 @@ func (d *Pegnetd) Grade(ctx context.Context, block *factom.EBlock) (grader.Grade
 	}
 
 	var prevWinners []string = nil
-	prev, err := d.Pegnet.SelectPrevious(ctx, block.Height)
+	prev, err := d.Pegnet.SelectPreviousWinners(ctx, block.Height)
 	// assume that error means it's below genesis for now
 	if err != nil {
 		if err != sql.ErrNoRows {
