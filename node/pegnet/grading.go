@@ -98,3 +98,32 @@ func (p *Pegnet) SelectPreviousWinners(ctx context.Context, height uint32) ([]st
 
 	return winners, nil
 }
+
+func (p *Pegnet) SelectRates(ctx context.Context, height uint32) ([]opr.AssetUint, error) {
+	rows, err := p.DB.Query("SELECT token, value FROM pn_rate WHERE height = $1", height)
+	if err != nil {
+		return nil, err
+	}
+	return _extractAssets(rows)
+}
+
+func (p *Pegnet) SelectRatesByKeyMR(ctx context.Context, keymr *factom.Bytes32) ([]opr.AssetUint, error) {
+	rows, err := p.DB.Query("SELECT token, value FROM pn_rate WHERE height = (SELECT height FROM pn_grade WHERE keymr = $1)", keymr)
+	if err != nil {
+		return nil, err
+	}
+	return _extractAssets(rows)
+}
+
+func _extractAssets(rows *sql.Rows) ([]opr.AssetUint, error) {
+	defer rows.Close()
+	var assets []opr.AssetUint
+	for rows.Next() {
+		var a opr.AssetUint
+		if err := rows.Scan(&a.Name, &a.Value); err != nil {
+			return nil, err
+		}
+		assets = append(assets, a)
+	}
+	return assets, nil
+}
