@@ -5,8 +5,12 @@ import (
 	"database/sql"
 	"time"
 
+	"github.com/pegnet/pegnet/modules/factoidaddress"
+	"github.com/pegnet/pegnet/modules/grader"
+
 	"github.com/Factom-Asset-Tokens/factom"
 	"github.com/pegnet/pegnetd/config"
+	"github.com/pegnet/pegnetd/fat/fat2"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -153,10 +157,28 @@ func (d *Pegnetd) SyncBlock(ctx context.Context, tx *sql.Tx, height uint32) erro
 			if err != nil {
 				return err
 			}
+			err = d.PayWinners(tx, winners)
+			if err != nil {
+				return err
+			}
 		}
 	}
 
 	// TODO: Handle converts/txs
+	return nil
+}
+
+func (d *Pegnetd) PayWinners(tx *sql.Tx, winners []*grader.GradingOPR) error {
+	for _, o := range winners {
+		var add factom.FAAddress
+
+		// oprs are already validated by the grader
+		b := factoidaddress.Base58Decode(o.OPR.GetAddress())
+		copy(add[:], b)
+		if _, err := d.Pegnet.AddToBalance(tx, &add, fat2.PTickerPEG, uint64(o.Payout())); err != nil {
+			return err // The tx should be rolled back by the caller if we return an error during this.
+		}
+	}
 	return nil
 }
 
