@@ -35,7 +35,6 @@ const createTableWinners = `CREATE TABLE IF NOT EXISTS "pn_winners" (
 	"position" INTEGER,
 	"minerid" TEXT,
 	"address" BLOB,
-	"opr" BLOB,
 	UNIQUE("height", "position")
 );`
 
@@ -73,12 +72,8 @@ func (p *Pegnet) InsertGradeBlock(ctx context.Context, eblock *factom.EBlock, gr
 	for _, o := range graded.Graded() {
 		diff := make([]byte, 8)
 		binary.BigEndian.PutUint64(diff, o.SelfReportedDifficulty)
-		m, err := o.OPR.Marshal()
-		if err != nil {
-			return nil //unlikely to ever happen
-		}
-		_, err = p.DB.ExecContext(ctx, `INSERT INTO pn_winners (height, entryhash, oprhash, payout, grade, nonce, difficulty, position, minerid, address, opr) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
-			eblock.Height, o.EntryHash, o.OPRHash, o.Payout(), o.Grade, o.Nonce, diff, o.Position(), o.OPR.GetID(), o.OPR.GetAddress(), m)
+		_, err = p.DB.ExecContext(ctx, `INSERT INTO pn_winners (height, entryhash, oprhash, payout, grade, nonce, difficulty, position, minerid, address) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+			eblock.Height, o.EntryHash, o.OPRHash, o.Payout(), o.Grade, o.Nonce, diff, o.Position(), o.OPR.GetID(), o.OPR.GetAddress())
 		if err != nil {
 			return err
 		}
