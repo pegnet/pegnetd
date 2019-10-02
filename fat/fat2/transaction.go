@@ -3,6 +3,7 @@ package fat2
 import (
 	"encoding/json"
 	"fmt"
+
 	"github.com/Factom-Asset-Tokens/factom"
 	"github.com/Factom-Asset-Tokens/fatd/fat"
 	"github.com/Factom-Asset-Tokens/fatd/fat/jsonlen"
@@ -57,7 +58,7 @@ func (t *TypedAddressAmountTuple) UnmarshalJSON(data []byte) error {
 	tRaw := struct {
 		Address json.RawMessage `json:"address"`
 		Amount  json.RawMessage `json:"amount"`
-		Type    json.RawMessage `json:"type"`
+		Type    PTicker         `json:"type,string"`
 	}{}
 	if err := json.Unmarshal(data, &tRaw); err != nil {
 		return fmt.Errorf("%T: %v", t, err)
@@ -68,12 +69,12 @@ func (t *TypedAddressAmountTuple) UnmarshalJSON(data []byte) error {
 	if err := json.Unmarshal(tRaw.Amount, &t.Amount); err != nil {
 		return fmt.Errorf("%T.Amount: %v", t, err)
 	}
-	if err := json.Unmarshal(tRaw.Type, &t.Type); err != nil {
-		return fmt.Errorf("%T.Type: %v", t, err)
-	}
 
-	expectedJSONLen := len(`{"address":,"amount":,"type":}`) +
-		len(tRaw.Address) + len(tRaw.Amount) + len(tRaw.Type)
+	t.Type = tRaw.Type
+
+	// The last 2 quotes are added back because they are stripped when the PType is unmarshalled
+	expectedJSONLen := len(`{"address":,"amount":,"type":""}`) +
+		len(tRaw.Address) + len(tRaw.Amount) + len(tRaw.Type.String())
 	if expectedJSONLen != len(data) {
 		return fmt.Errorf("%T: unexpected JSON length", t)
 	}

@@ -8,6 +8,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/pegnet/pegnetd/srv"
+
 	"github.com/pegnet/pegnetd/exit"
 
 	"github.com/pegnet/pegnetd/config"
@@ -19,8 +21,9 @@ import (
 
 func init() {
 	rootCmd.PersistentFlags().String("log", "info", "Change the logging level. Can choose from 'trace', 'debug', 'info', 'warn', 'error', or 'fatal'")
-	rootCmd.PersistentFlags().StringP("server", "s", "http://localhost:8088", "The url to the factomd endpoint witout a trailing slash")
+	rootCmd.PersistentFlags().StringP("server", "s", "http://localhost:8088/v2", "The url to the factomd endpoint witout a trailing slash")
 	rootCmd.PersistentFlags().StringP("wallet", "w", "http://localhost:8089", "The url to the factomd-wallet endpoint witout a trailing slash")
+	rootCmd.PersistentFlags().String("api", "8070", "Change the api listening port for the api")
 }
 
 // Execute is cobra's entry point
@@ -49,6 +52,9 @@ var rootCmd = &cobra.Command{
 			os.Exit(1)
 		}
 
+		apiserver := srv.NewAPIServer(conf, node)
+		go apiserver.Start(ctx.Done())
+
 		// Run
 		node.DBlockSync(ctx)
 	},
@@ -67,6 +73,7 @@ func always(cmd *cobra.Command, args []string) {
 	_ = viper.BindPFlag(config.LoggingLevel, cmd.Flags().Lookup("log"))
 	_ = viper.BindPFlag(config.Server, cmd.Flags().Lookup("server"))
 	_ = viper.BindPFlag(config.Wallet, cmd.Flags().Lookup("wallet"))
+	_ = viper.BindPFlag(config.APIListen, cmd.Flags().Lookup("api"))
 
 	// Also init some defaults
 	viper.SetDefault(config.DBlockSyncRetryPeriod, time.Second*5)
