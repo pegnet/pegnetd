@@ -173,7 +173,6 @@ func (d *Pegnetd) SyncBlock(ctx context.Context, tx *sql.Tx, height uint32) erro
 func (d *Pegnetd) PayWinners(tx *sql.Tx, winners []*grader.GradingOPR) error {
 	// Reward the winners
 	for i := range winners {
-		peg := winners[i].Payout()
 		addr, err := factom.NewFAAddress(winners[i].OPR.GetAddress())
 		if err != nil {
 			// TODO: This is kinda an odd case. I think we should just drop the rewards
@@ -186,7 +185,7 @@ func (d *Pegnetd) PayWinners(tx *sql.Tx, winners []*grader.GradingOPR) error {
 			continue
 		}
 
-		if _, err := d.Pegnet.AddToBalance(tx, &addr, fat2.PTickerPEG, uint64(peg)); err != nil {
+		if _, err := d.Pegnet.AddToBalance(tx, &addr, fat2.PTickerPEG, uint64(winners[i].Payout())); err != nil {
 			return err // The tx should be rolled back by the caller if we return an error during this.
 		}
 	}
