@@ -21,7 +21,6 @@ type Pegnetd struct {
 
 	// Tracking indicates which chains we are tracking for the sync routing
 	Tracking map[string]factom.Bytes32
-	Network  string
 
 	Sync *pegnet.BlockSync
 
