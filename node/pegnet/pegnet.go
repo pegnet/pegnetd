@@ -4,9 +4,10 @@ import (
 	"container/list"
 	"database/sql"
 	"fmt"
-	"github.com/pegnet/pegnetd/config"
 	"os"
 	"os/user"
+
+	"github.com/pegnet/pegnetd/config"
 
 	"github.com/pegnet/pegnet/modules/grader"
 
@@ -44,10 +45,22 @@ func (p *Pegnet) Init() error {
 		return err
 	}
 	p.DB = db
-	err = p.CreateTableAddresses()
+	err = p.createTables()
 	if err != nil {
-		// TODO: implement better schema validation
-		if err.Error() != "table \"pn_addresses\" already exists" {
+		return err
+	}
+	return nil
+}
+
+func (p *Pegnet) createTables() error {
+	for _, sql := range []string{
+		createTableAddresses,
+		createTableGrade,
+		createTableRate,
+		createTableMetadata,
+		createTableWinners,
+	} {
+		if _, err := p.DB.Exec(sql); err != nil {
 			return err
 		}
 	}

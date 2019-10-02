@@ -1,33 +1,39 @@
 package node
 
 import (
+	"context"
+	"database/sql"
 	"fmt"
 
 	"github.com/Factom-Asset-Tokens/factom"
 	"github.com/pegnet/pegnet/modules/grader"
 )
 
-func (d *Pegnetd) Grade(block *factom.EBlock) (grader.GradedBlock, error) {
+func (d *Pegnetd) Grade(ctx context.Context, block *factom.EBlock) (grader.GradedBlock, error) {
 	if block == nil {
 		// TODO: Handle the case where there is no opr block.
 		// 		Must delay conversions if this happens
 		return nil, nil
 	}
 
-	if *block.ChainID != d.Tracking["opr"] {
+	if *block.ChainID != OPRChain {
 		return nil, fmt.Errorf("trying to grade a non-opr chain")
 	}
 
 	ver := uint8(1)
-	// TODO: Handle other than mainnet?
-	if block.Height > 210330 {
+	if block.Height >= 210330 {
 		ver = 2
 	}
 
 	var prevWinners []string = nil
-	prev := d.Pegnet.FetchPreviousBlock()
-	if prev != nil {
-		prevWinners = prev.WinnersShortHashes()
+	prev, err := d.Pegnet.SelectPreviousWinners(ctx, block.Height)
+	// assume that error means it's below genesis for now
+	if err != nil {
+		if err != sql.ErrNoRows {
+			return nil, err
+		}
+	} else {
+		prevWinners = prev
 	}
 
 	g, err := grader.NewGrader(ver, int32(block.Height), prevWinners)
@@ -36,7 +42,6 @@ func (d *Pegnetd) Grade(block *factom.EBlock) (grader.GradedBlock, error) {
 	}
 
 	for _, entry := range block.Entries {
-		// TODO: Is there an easier way to go []Bytes -> [][]byte?
 		extids := make([][]byte, len(entry.ExtIDs))
 		for i := range entry.ExtIDs {
 			extids[i] = entry.ExtIDs[i]
