@@ -2,6 +2,7 @@ package node
 
 import (
 	"context"
+	"database/sql"
 	"time"
 
 	"github.com/Factom-Asset-Tokens/factom"
@@ -39,20 +40,44 @@ OuterSyncLoop:
 				return
 			}
 
+			// start transaction for all block actions
+			tx, err := d.Pegnet.DB.BeginTx(ctx, nil)
+			if err != nil {
+				log.WithError(err).Errorf("failed to start transaction")
+				continue
+			}
 			// We are not synced, so we need to iterate through the dblocks and sync them
 			// one by one. We can only sync our current synced height +1
 			// TODO: This skips the genesis block. I'm sure that is fine
-			if err := d.SyncBlock(ctx, d.Sync.Synced+1); err != nil {
+			if err := d.SyncBlock(ctx, tx, d.Sync.Synced+1); err != nil {
 				log.WithError(err).WithFields(log.Fields{"height": d.Sync.Synced + 1}).Errorf("failed to sync height")
 				time.Sleep(retryPeriod)
 				// If we fail, we backout to the outer loop. This allows error handling on factomd state to be a bit
 				// cleaner, such as a rebooted node with a different db. That node would have a new heights response.
+				err = tx.Rollback()
+				if err != nil {
+					// TODO evaluate if we can recover from this point or not
+					log.WithError(err).Fatal("unable to roll back transaction")
+				}
 				continue OuterSyncLoop
 			}
 
 			// Bump our sync, and march forward
+
 			d.Sync.Synced++
-			d.Pegnet.InsertSynced(ctx, d.Sync)
+			err = d.Pegnet.InsertSynced(tx, d.Sync)
+			if err != nil {
+				d.Sync.Synced--
+				log.WithError(err).Errorf("unable to update synced metadata")
+				continue OuterSyncLoop
+			}
+
+			err = tx.Commit()
+			if err != nil {
+				d.Sync.Synced--
+				log.WithError(err).Errorf("unable to commit transaction")
+				continue OuterSyncLoop
+			}
 		}
 
 	}
@@ -62,7 +87,7 @@ OuterSyncLoop:
 // If SyncBlock returns no error, than that height was synced and saved. If any part of the sync fails,
 // the whole sync should be rolled back and not applied. An error should then be returned.
 // The context should be respected if it is cancelled
-func (d *Pegnetd) SyncBlock(ctx context.Context, height uint32) error {
+func (d *Pegnetd) SyncBlock(ctx context.Context, tx *sql.Tx, height uint32) error {
 	if isDone(ctx) { // Just an example about how to handle it being cancelled
 		return context.Canceled
 	}
@@ -108,13 +133,13 @@ func (d *Pegnetd) SyncBlock(ctx context.Context, height uint32) error {
 	// Apply all the effects
 	if graded != nil { // If graded was nil, then there was no oprs this eblock
 		d.Pegnet.InsertGradedBlock(graded)
-		err = d.Pegnet.InsertGradeBlock(ctx, eblocks["opr"], graded)
+		err = d.Pegnet.InsertGradeBlock(tx, eblocks["opr"], graded)
 		if err != nil {
 			return err
 		}
 		winners := graded.Winners()
 		if len(winners) > 0 {
-			err = d.Pegnet.InsertRate(ctx, height, winners[0].OPR.GetOrderedAssetsUint())
+			err = d.Pegnet.InsertRate(tx, height, winners[0].OPR.GetOrderedAssetsUint())
 			if err != nil {
 				return err
 			}

@@ -2,6 +2,7 @@ package pegnet
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 )
 
@@ -17,13 +18,13 @@ type BlockSync struct {
 	Synced uint32
 }
 
-func (p *Pegnet) InsertSynced(ctx context.Context, bs *BlockSync) error {
+func (p *Pegnet) InsertSynced(tx *sql.Tx, bs *BlockSync) error {
 	data, err := json.Marshal(bs)
 	if err != nil {
 		return err
 	}
 
-	_, err = p.DB.ExecContext(ctx, "REPLACE INTO pn_metadata (name, value) VALUES ($1, $2)", "synced", data)
+	_, err = tx.Exec("REPLACE INTO pn_metadata (name, value) VALUES ($1, $2)", "synced", data)
 	if err != nil {
 		return err
 	}

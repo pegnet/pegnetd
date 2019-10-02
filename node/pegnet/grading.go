@@ -2,6 +2,7 @@ package pegnet
 
 import (
 	"context"
+	"database/sql"
 	"encoding/binary"
 	"encoding/json"
 
@@ -47,9 +48,9 @@ const createTableRate = `CREATE TABLE IF NOT EXISTS "pn_rate" (
 );
 `
 
-func (p *Pegnet) InsertRate(ctx context.Context, height uint32, rates []opr.AssetUint) error {
+func (p *Pegnet) InsertRate(tx *sql.Tx, height uint32, rates []opr.AssetUint) error {
 	for _, r := range rates {
-		_, err := p.DB.ExecContext(ctx, "INSERT INTO pn_rate (height, token, value) VALUES ($1, $2, $3)", height, r.Name, r.Value)
+		_, err := tx.Exec("INSERT INTO pn_rate (height, token, value) VALUES ($1, $2, $3)", height, r.Name, r.Value)
 		if err != nil {
 			return err
 		}
@@ -57,13 +58,13 @@ func (p *Pegnet) InsertRate(ctx context.Context, height uint32, rates []opr.Asse
 	return nil
 }
 
-func (p *Pegnet) InsertGradeBlock(ctx context.Context, eblock *factom.EBlock, graded grader.GradedBlock) error {
+func (p *Pegnet) InsertGradeBlock(tx *sql.Tx, eblock *factom.EBlock, graded grader.GradedBlock) error {
 
 	data, err := json.Marshal(graded.WinnersShortHashes())
 	if err != nil {
 		return err
 	}
-	_, err = p.DB.ExecContext(ctx, "INSERT INTO pn_grade (height, keymr, prevkeymr, eb_seq, shorthashes, version, cutoff, count) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
+	_, err = tx.Exec("INSERT INTO pn_grade (height, keymr, prevkeymr, eb_seq, shorthashes, version, cutoff, count) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
 		eblock.Height, eblock.KeyMR, eblock.PrevKeyMR, eblock.Sequence, data, graded.Version(), graded.Cutoff(), graded.Count())
 	if err != nil {
 		return err
@@ -72,7 +73,7 @@ func (p *Pegnet) InsertGradeBlock(ctx context.Context, eblock *factom.EBlock, gr
 	for _, o := range graded.Graded() {
 		diff := make([]byte, 8)
 		binary.BigEndian.PutUint64(diff, o.SelfReportedDifficulty)
-		_, err = p.DB.ExecContext(ctx, `INSERT INTO pn_winners (height, entryhash, oprhash, payout, grade, nonce, difficulty, position, minerid, address) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+		_, err = tx.Exec(`INSERT INTO pn_winners (height, entryhash, oprhash, payout, grade, nonce, difficulty, position, minerid, address) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
 			eblock.Height, o.EntryHash, o.OPRHash, o.Payout(), o.Grade, o.Nonce, diff, o.Position(), o.OPR.GetID(), o.OPR.GetAddress())
 		if err != nil {
 			return err
