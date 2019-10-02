@@ -28,22 +28,20 @@ import (
 
 	jrpc "github.com/AdamSLevy/jsonrpc2/v11"
 	"github.com/Factom-Asset-Tokens/factom"
-	"github.com/Factom-Asset-Tokens/fatd/db/entries"
-	"github.com/Factom-Asset-Tokens/fatd/engine"
-	"github.com/Factom-Asset-Tokens/fatd/flag"
 	"github.com/pegnet/pegnetd/fat/fat2"
 )
 
-var c = flag.FactomClient
+func (s *APIServer) jrpcMethods() jrpc.MethodMap {
+	return jrpc.MethodMap{
+		"get-transaction":       s.getTransaction(false),
+		"get-transaction-entry": s.getTransaction(true),
+		"get-pegnet-balances":   s.getPegnetBalances,
 
-var jrpcMethods = jrpc.MethodMap{
-	"get-transaction":       getTransaction(false),
-	"get-transaction-entry": getTransaction(true),
-	"get-pegnet-balances":   getPegnetBalances,
+		"send-transaction": sendTransaction,
 
-	"send-transaction": sendTransaction,
+		"get-sync-status": s.getSyncStatus,
+	}
 
-	"get-sync-status": getSyncStatus,
 }
 
 type ResultGetTransaction struct {
@@ -53,39 +51,40 @@ type ResultGetTransaction struct {
 	Tx        interface{}     `json:"data"`
 }
 
-func getTransaction(getEntry bool) jrpc.MethodFunc {
+func (s *APIServer) getTransaction(getEntry bool) jrpc.MethodFunc {
 	return func(data json.RawMessage) interface{} {
-		params := ParamsGetTransaction{}
-		chain, put, err := validate(data, &params)
-		if err != nil {
-			return err
-		}
-		defer put()
+		//params := ParamsGetTransaction{}
+		//chain, put, err := validate(data, &params)
+		//if err != nil {
+		//	return err
+		//}
+		//defer put()
 
 		// TODO: use pegnet specific database code here to fetch an entry
-		entry, err := entries.SelectValidByHash(chain.Conn, params.Hash)
-		if err != nil {
-			panic(err)
-		}
-		if !entry.IsPopulated() {
-			return ErrorTransactionNotFound
-		}
-
-		if getEntry {
-			return entry
-		}
-
-		result := ResultGetTransaction{
-			Hash:      entry.Hash,
-			Timestamp: entry.Timestamp.Unix(),
-		}
-
-		tx := fat2.NewTransactionBatch(entry)
-		if err := tx.UnmarshalEntry(); err != nil {
-			panic(err)
-		}
-		result.Tx = tx
-		return result
+		//entry, err := entries.SelectValidByHash(chain.Conn, params.Hash)
+		//if err != nil {
+		//	panic(err)
+		//}
+		//if !entry.IsPopulated() {
+		//	return ErrorTransactionNotFound
+		//}
+		//
+		//if getEntry {
+		//	return entry
+		//}
+		//
+		//result := ResultGetTransaction{
+		//	Hash:      entry.Hash,
+		//	Timestamp: entry.Timestamp.Unix(),
+		//}
+		//
+		//tx := fat2.NewTransactionBatch(entry)
+		//if err := tx.UnmarshalEntry(); err != nil {
+		//	panic(err)
+		//}
+		//result.Tx = tx
+		//return result
+		return nil
 	}
 }
 
@@ -105,16 +104,19 @@ func (r *ResultGetPegnetBalances) UnmarshalJSON(data []byte) error {
 	}
 	*r = make(map[fat2.PTicker]uint64, len(strMap))
 	for str, balance := range strMap {
-		var ticker fat2.PTicker
-		if err := fat2.PTicker.UnmarshalJSON(ticker, []byte(str)); err != nil {
+		ticker := new(fat2.PTicker)
+		if err := ticker.UnmarshalJSON([]byte(str)); err != nil {
 			return err
 		}
-		(*r)[ticker] = balance
+		//if err := fat2.PTicker.UnmarshalJSON(&ticker, []byte(str)); err != nil {
+		//	return err
+		//}
+		(*r)[*ticker] = balance
 	}
 	return nil
 }
 
-func getPegnetBalances(data json.RawMessage) interface{} {
+func (s *APIServer) getPegnetBalances(data json.RawMessage) interface{} {
 	params := ParamsGetPegnetBalances{}
 	if _, _, err := validate(data, &params); err != nil {
 		return err
@@ -133,87 +135,96 @@ func getPegnetBalances(data json.RawMessage) interface{} {
 }
 
 func sendTransaction(data json.RawMessage) interface{} {
-	params := ParamsSendTransaction{}
-	chain, put, err := validate(data, &params)
-	if err != nil {
-		return err
-	}
-	defer put()
-
-	// TODO: srv.sendTransaction(): use EC address from a config file
-	if !params.DryRun && factom.Bytes32(flag.EsAdr).IsZero() {
-		return ErrorNoEC
-	}
-
-	entry := params.Entry()
-	txErr, err := attemptApplyFAT2TxBatch(chain, entry)
-	if err != nil {
-		panic(err)
-	}
-	if txErr != nil {
-		err := ErrorInvalidTransaction
-		err.Data = txErr.Error()
-		return err
-	}
-
-	var txID *factom.Bytes32
-	if !params.DryRun {
-		balance, err := flag.ECAdr.GetBalance(c)
-		if err != nil {
-			panic(err)
-		}
-		cost, err := entry.Cost()
-		if err != nil {
-			rerr := ErrorInvalidTransaction
-			rerr.Data = err.Error()
-			return rerr
-		}
-		if balance < uint64(cost) {
-			return ErrorNoEC
-		}
-		txID, err = entry.ComposeCreate(c, flag.EsAdr)
-		if err != nil {
-			panic(err)
-		}
-	}
-
-	return struct {
-		ChainID *factom.Bytes32 `json:"chainid"`
-		TxID    *factom.Bytes32 `json:"txid,omitempty"`
-		Hash    *factom.Bytes32 `json:"entryhash"`
-	}{ChainID: chain.ID, TxID: txID, Hash: entry.Hash}
-}
-func attemptApplyFAT2TxBatch(chain *engine.Chain, e factom.Entry) (txErr, err error) {
-	txBatch := fat2.NewTransactionBatch(e)
-	if txErr = txBatch.Validate(); txErr != nil {
-		return
-	}
-	// TODO: check this entry never been put in chain before
-	//valid, err := entries.CheckUniquelyValid(chain.Conn, 0, e.Hash)
+	//params := ParamsSendTransaction{}
+	//chain, put, err := validate(data, &params)
 	//if err != nil {
-	//	return
+	//	return err
 	//}
-	//if !valid {
-	//	txErr = fmt.Errorf("replay: hash previously marked valid")
-	//	return
+	//defer put()
+	//
+	//// TODO: srv.sendTransaction(): use EC address from a config file
+	//if !params.DryRun && factom.Bytes32(flag.EsAdr).IsZero() {
+	//	return ErrorNoEC
+	//}
+	//
+	//entry := params.Entry()
+	//txErr, err := attemptApplyFAT2TxBatch(chain, entry)
+	//if err != nil {
+	//	panic(err)
+	//}
+	//if txErr != nil {
+	//	err := ErrorInvalidTransaction
+	//	err.Data = txErr.Error()
+	//	return err
+	//}
+	//
+	//var txID *factom.Bytes32
+	//if !params.DryRun {
+	//	balance, err := flag.ECAdr.GetBalance(c)
+	//	if err != nil {
+	//		panic(err)
+	//	}
+	//	cost, err := entry.Cost()
+	//	if err != nil {
+	//		rerr := ErrorInvalidTransaction
+	//		rerr.Data = err.Error()
+	//		return rerr
+	//	}
+	//	if balance < uint64(cost) {
+	//		return ErrorNoEC
+	//	}
+	//	txID, err = entry.ComposeCreate(c, flag.EsAdr)
+	//	if err != nil {
+	//		panic(err)
+	//	}
 	//}
 
-	// TODO: Check all input balances
-
-	return
+	//return struct {
+	//	ChainID *factom.Bytes32 `json:"chainid"`
+	//	TxID    *factom.Bytes32 `json:"txid,omitempty"`
+	//	Hash    *factom.Bytes32 `json:"entryhash"`
+	//}{ChainID: chain.ID, TxID: txID, Hash: entry.Hash}
+	// TODO: Implement this, and probably allow the user to provide a self signed commit for a shared node
+	return nil
 }
+
+//func attemptApplyFAT2TxBatch(chain *engine.Chain, e factom.Entry) (txErr, err error) {
+//	txBatch := fat2.NewTransactionBatch(e)
+//	if txErr = txBatch.Validate(); txErr != nil {
+//		return
+//	}
+//	// TODO: check this entry never been put in chain before
+//	//valid, err := entries.CheckUniquelyValid(chain.Conn, 0, e.Hash)
+//	//if err != nil {
+//	//	return
+//	//}
+//	//if !valid {
+//	//	txErr = fmt.Errorf("replay: hash previously marked valid")
+//	//	return
+//	//}
+//
+//	// TODO: Check all input balances
+//
+//	return
+//}
 
 type ResultGetSyncStatus struct {
 	Sync    uint32 `json:"syncheight"`
-	Current uint32 `json:"factomheight"`
+	Current int32  `json:"factomheight"`
 }
 
-func getSyncStatus(data json.RawMessage) interface{} {
-	sync, current := engine.GetSyncStatus()
-	return ResultGetSyncStatus{Sync: sync, Current: current}
+func (s *APIServer) getSyncStatus(data json.RawMessage) interface{} {
+	heights := new(factom.Heights)
+	err := heights.Get(s.Node.FactomClient)
+	if err != nil {
+		return ResultGetSyncStatus{Sync: s.Node.GetCurrentSync(), Current: -1}
+	}
+	return ResultGetSyncStatus{Sync: s.Node.GetCurrentSync(), Current: int32(heights.DirectoryBlock)}
 }
 
-func validate(data json.RawMessage, params Params) (*engine.Chain, func(), error) {
+// TODO: Re-eval this function. The chain data that is supplied needs to be reimplemented
+//		return was (*engine.Chain, func(), error)
+func validate(data json.RawMessage, params Params) (interface{}, func(), error) {
 	if params == nil {
 		if len(data) > 0 {
 			return nil, nil, jrpc.InvalidParams(`no "params" accepted`)
@@ -229,21 +240,21 @@ func validate(data json.RawMessage, params Params) (*engine.Chain, func(), error
 	if err := params.IsValid(); err != nil {
 		return nil, nil, err
 	}
-	if params.HasIncludePending() && flag.DisablePending {
-		return nil, nil, ErrorPendingDisabled
-	}
+	//if params.HasIncludePending() && flag.DisablePending {
+	//	return nil, nil, ErrorPendingDisabled
+	//}
 	chainID := params.ValidChainID()
 	if chainID != nil {
-		chain := engine.Chains.Get(chainID)
-		if !chain.IsIssued() {
-			return nil, nil, ErrorTokenNotFound
-		}
-		if params.HasIncludePending() {
-			chain.ApplyPending()
-		}
-		conn, put := chain.Get()
-		chain.Conn = conn
-		return &chain, put, nil
+		//chain := engine.Chains.Get(chainID)
+		//if !chain.IsIssued() {
+		//	return nil, nil, ErrorTokenNotFound
+		//}
+		//if params.HasIncludePending() {
+		//	chain.ApplyPending()
+		//}
+		//conn, put := chain.Get()
+		//chain.Conn = conn
+		//return &chain, put, nil
 	}
 	return nil, nil, nil
 }

@@ -8,11 +8,15 @@ import (
 
 	"github.com/pegnet/pegnet/modules/grader"
 	"github.com/pegnet/pegnetd/fat/fat2"
-
 	"github.com/Factom-Asset-Tokens/factom"
 	"github.com/pegnet/pegnetd/config"
 	log "github.com/sirupsen/logrus"
 )
+
+func (d *Pegnetd) GetCurrentSync() uint32 {
+	// Should be thread safe since we only have 1 routine writing to it
+	return d.Sync.Synced
+}
 
 // DBlockSync iterates through dblocks and syncs the various chains
 func (d *Pegnetd) DBlockSync(ctx context.Context) {
@@ -111,7 +115,7 @@ func (d *Pegnetd) SyncBlock(ctx context.Context, tx *sql.Tx, height uint32) erro
 	fLog.Debug("syncing...")
 
 	dblock := new(factom.DBlock)
-	dblock.Header.Height = height
+	dblock.Height = height
 	if err := dblock.Get(d.FactomClient); err != nil {
 		return err
 	}
@@ -195,7 +199,7 @@ func (d *Pegnetd) PayWinners(tx *sql.Tx, winners []*grader.GradingOPR) error {
 // SyncFactoidBlock tracks the burns for a specific dblock
 func (d *Pegnetd) SyncFactoidBlock(ctx context.Context, tx *sql.Tx, dblock *factom.DBlock) error {
 	fblock := new(factom.FBlock)
-	fblock.Header.Height = dblock.Header.Height
+	fblock.Header.Height = dblock.Height
 	if err := fblock.Get(d.FactomClient); err != nil {
 		return err
 	}
@@ -240,7 +244,7 @@ func (d *Pegnetd) SyncFactoidBlock(ctx context.Context, tx *sql.Tx, dblock *fact
 
 	var _ = burns
 	if totalBurned > 0 { // Just some debugging
-		log.WithFields(log.Fields{"height": dblock.Header.Height, "amount": totalBurned, "quantity": len(burns)}).Debug("fct burned")
+		log.WithFields(log.Fields{"height": dblock.Height, "amount": totalBurned, "quantity": len(burns)}).Debug("fct burned")
 	}
 
 	// All burns are FCT inputs

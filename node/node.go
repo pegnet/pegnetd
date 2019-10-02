@@ -21,6 +21,7 @@ type Pegnetd struct {
 
 	// Tracking indicates which chains we are tracking for the sync routing
 	Tracking map[string]factom.Bytes32
+	Network  string
 
 	Sync *pegnet.BlockSync
 
@@ -30,7 +31,7 @@ type Pegnetd struct {
 func NewPegnetd(ctx context.Context, conf *viper.Viper) (*Pegnetd, error) {
 	// TODO : Update emyrk's factom library
 	n := new(Pegnetd)
-	n.FactomClient = factom.NewClient(nil, nil)
+	n.FactomClient = factom.NewClient()
 	n.FactomClient.FactomdServer = conf.GetString(config.Server)
 	n.FactomClient.WalletdServer = conf.GetString(config.Wallet)
 	n.Config = conf

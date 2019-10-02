@@ -67,10 +67,12 @@ func always(cmd *cobra.Command, args []string) {
 	_ = viper.BindPFlag(config.LoggingLevel, cmd.Flags().Lookup("log"))
 	_ = viper.BindPFlag(config.Server, cmd.Flags().Lookup("server"))
 	_ = viper.BindPFlag(config.Wallet, cmd.Flags().Lookup("wallet"))
+	_ = viper.BindPFlag(config.APIListen, cmd.Flags().Lookup("api"))
 
 	// Also init some defaults
 	viper.SetDefault(config.DBlockSyncRetryPeriod, time.Second*5)
 	viper.SetDefault(config.SqliteDBPath, "$HOME/pegnetd/mainnet/sql.db")
+	viper.SetDefault(config.APIListen, "8070")
 
 	// Catch ctl+c
 	signalChan := make(chan os.Signal, 1)

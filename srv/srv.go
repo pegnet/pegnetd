@@ -23,42 +23,63 @@
 package srv
 
 import (
+	"fmt"
 	"net/http"
+	"strings"
 
 	jrpc "github.com/AdamSLevy/jsonrpc2/v11"
-	"github.com/Factom-Asset-Tokens/fatd/flag"
-	"github.com/goji/httpauth"
+	"github.com/pegnet/pegnetd/config"
+	"github.com/pegnet/pegnetd/node"
 	"github.com/rs/cors"
 	log "github.com/sirupsen/logrus"
+	"github.com/spf13/viper"
 )
 
 var srv http.Server
+
+// APIServer is to avoid the need of keeping state objects in a global space.
+// It can hold the full pegnet node, since that will give us complete access
+// to not only the node related database, but also the FactomClient for factomd
+// interaction.
+type APIServer struct {
+	Node   *node.Pegnetd
+	Config *viper.Viper
+}
+
+func NewAPIServer(conf *viper.Viper, n *node.Pegnetd) *APIServer {
+	s := new(APIServer)
+	s.Node = n
+	s.Config = conf
+
+	return s
+}
 
 // Start the server in its own goroutine. If stop is closed, the server is
 // closed and any goroutines will exit. The done channel is closed when the
 // server exits for any reason. If the done channel is closed before the stop
 // channel is closed, an error occurred. Errors are logged.
-func Start(stop <-chan struct{}) (done <-chan struct{}) {
+func (s *APIServer) Start(stop <-chan struct{}) (done <-chan struct{}) {
 	// Set up JSON RPC 2.0 handler with correct headers.
 	jrpc.DebugMethodFunc = true
-	jrpcHandler := jrpc.HTTPRequestHandler(jrpcMethods)
+	jrpcHandler := jrpc.HTTPRequestHandler(s.jrpcMethods())
 
 	var handler http.Handler = http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
 			jrpcHandler(w, r)
 		})
-	if flag.HasAuth {
-		authOpts := httpauth.AuthOptions{
-			User:     flag.Username,
-			Password: flag.Password,
-			UnauthorizedHandler: http.HandlerFunc(
-				func(w http.ResponseWriter, _ *http.Request) {
-					w.WriteHeader(http.StatusUnauthorized)
-					w.Write([]byte(`{}`))
-				}),
-		}
-		handler = httpauth.BasicAuth(authOpts)(handler)
-	}
+	// TODO: Renable tls auth
+	//if flag.HasAuth {
+	//	authOpts := httpauth.AuthOptions{
+	//		User:     flag.Username,
+	//		Password: flag.Password,
+	//		UnauthorizedHandler: http.HandlerFunc(
+	//			func(w http.ResponseWriter, _ *http.Request) {
+	//				w.WriteHeader(http.StatusUnauthorized)
+	//				w.Write([]byte(`{}`))
+	//			}),
+	//	}
+	//	handler = httpauth.BasicAuth(authOpts)(handler)
+	//}
 
 	// Set up server.
 	srvMux := http.NewServeMux()
@@ -69,18 +90,25 @@ func Start(stop <-chan struct{}) (done <-chan struct{}) {
 	cors := cors.New(cors.Options{AllowedOrigins: []string{"*"}})
 	srv = http.Server{Handler: cors.Handler(srvMux)}
 
-	srv.Addr = flag.APIAddress
+	if strings.Contains(s.Config.GetString(config.APIListen), ":") {
+		// This means the use set the listen address rather than just the port
+		srv.Addr = s.Config.GetString(config.APIListen)
+	} else {
+		// Set the full listen address from the port
+		srv.Addr = fmt.Sprintf(":%d", s.Config.GetInt(config.APIListen))
+	}
 
 	// Start server.
 	_done := make(chan struct{})
-	log.Infof("Listening on %v...", flag.APIAddress)
+	log.Infof("Listening on %v...", srv.Addr)
 	go func() {
 		var err error
-		if flag.HasTLS {
-			err = srv.ListenAndServeTLS(flag.TLSCertFile, flag.TLSKeyFile)
-		} else {
-			err = srv.ListenAndServe()
-		}
+		// TODO: Renable tls
+		//if flag.HasTLS {
+		//	err = srv.ListenAndServeTLS(flag.TLSCertFile, flag.TLSKeyFile)
+		//} else {
+		err = srv.ListenAndServe()
+		//}
 		if err != http.ErrServerClosed {
 			log.Errorf("srv.ListenAndServe(): %v", err)
 		}
