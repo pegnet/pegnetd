@@ -1,6 +1,10 @@
 package fat2
 
-import "fmt"
+import (
+	"encoding/json"
+	"fmt"
+	"strings"
+)
 
 // PPTicker is an internal representation of a PegNet asset type
 type PTicker int
@@ -81,16 +85,29 @@ var validPTickers = func() map[string]PTicker {
 	return pTickers
 }()
 
+func StringToTicker(str string) PTicker {
+	var ticker PTicker
+	err := json.Unmarshal([]byte(fmt.Sprintf(`"%s"`, str)), &ticker)
+	if err != nil {
+		return PTickerInvalid
+	}
+	return ticker
+}
+
 // UnmarshalJSON unmarshals the bytes into a PTicker and returns an error
 // if the ticker is invalid
 func (t *PTicker) UnmarshalJSON(data []byte) error {
 	ticker := string(data)
+	if ticker[0] == '"' {
+		ticker = strings.Trim(ticker, `"`)
+	}
 	// When unmarshalling, the bytes passed in are []byte("\"PEG\"") rather
 	// than just[]byte("PEG") so we must ensure that we take the quotes into
 	// account here
 	if len(ticker) < 3 {
 		return fmt.Errorf("invalid token type")
 	}
+
 	pTicker, ok := validPTickers[ticker]
 	if !ok {
 		*t = PTickerInvalid
