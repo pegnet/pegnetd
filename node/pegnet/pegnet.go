@@ -3,14 +3,12 @@ package pegnet
 import (
 	"container/list"
 	"database/sql"
-	"fmt"
 	"os"
-	"os/user"
-
-	"github.com/pegnet/pegnetd/config"
+	"path/filepath"
 
 	"github.com/pegnet/pegnet/modules/grader"
-
+	"github.com/pegnet/pegnetd/config"
+	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 )
 
@@ -33,12 +31,18 @@ func New(conf *viper.Viper) *Pegnet {
 }
 
 func (p *Pegnet) Init() error {
+	// The path should contain a $HOME env variable.
+	// TODO: Check that works on windows....
 	path := os.ExpandEnv(viper.GetString(config.SqliteDBPath))
-	usr, err := user.Current()
+
+	// Ensure the path exists
+	dir := filepath.Dir(path)
+	err := os.MkdirAll(dir, 0777)
 	if err != nil {
 		return err
 	}
-	path = fmt.Sprintf("%s/%s", usr.HomeDir, path)
+
+	log.Infof("Opening database from '%s'", path)
 	// TODO: Idc which sqlite to use. Change this if you want.T
 	db, err := sql.Open("sqlite3", path)
 	if err != nil {

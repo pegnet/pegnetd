@@ -64,13 +64,13 @@ func always(cmd *cobra.Command, args []string) {
 
 	// Setup global command line flag overrides
 	// This gets run before any command executes. It will init global flags to the config
-	viper.BindPFlag(config.LoggingLevel, cmd.Flags().Lookup("log"))
-	viper.BindPFlag(config.Server, cmd.Flags().Lookup("server"))
-	viper.BindPFlag(config.Wallet, cmd.Flags().Lookup("wallet"))
+	_ = viper.BindPFlag(config.LoggingLevel, cmd.Flags().Lookup("log"))
+	_ = viper.BindPFlag(config.Server, cmd.Flags().Lookup("server"))
+	_ = viper.BindPFlag(config.Wallet, cmd.Flags().Lookup("wallet"))
 
 	// Also init some defaults
 	viper.SetDefault(config.DBlockSyncRetryPeriod, time.Second*5)
-	viper.SetDefault(config.SqliteDBPath, "$HOME/pegnetd/$PEGNETNETWORK/sql.db")
+	viper.SetDefault(config.SqliteDBPath, "$HOME/pegnetd/mainnet/sql.db")
 
 	// Catch ctl+c
 	signalChan := make(chan os.Signal, 1)

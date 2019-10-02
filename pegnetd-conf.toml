@@ -1,7 +1,8 @@
 # Pegnetd config file
 [app]
   loglevel = "info"
-  dbpath   = ".pegnet/node.db"
+  # Hardcoding the mainnet path, but allowing for future net support
+  dbpath   = "$HOME/.pegnetd/mainnet/node.db"
 
 [dblocksync]
   retry = "5s"
