@@ -33,7 +33,7 @@ CREATE INDEX IF NOT EXISTS "idx_address_transactions_address_id" ON "pn_address_
 // returned.
 //
 // If isConversion is true, the to field will automatically be set to true.
-func InsertTransactionRelation(tx *sql.Tx, adrID int64, entryHash factom.Bytes32, txIndex uint64, to bool, isConversion bool) (int64, error) {
+func (p *Pegnet) InsertTransactionRelation(tx *sql.Tx, adrID int64, entryHash *factom.Bytes32, txIndex uint64, to bool, isConversion bool) (int64, error) {
 	stmt, err := tx.Prepare(`INSERT INTO "pn_address_transactions"
                 ("entry_hash", "address_id", "tx_index", "to", "conversion") VALUES
                 (?, ?, ?, ?, ?)`)
@@ -49,4 +49,11 @@ func InsertTransactionRelation(tx *sql.Tx, adrID int64, entryHash factom.Bytes32
 		return -1, err
 	}
 	return lastID, nil
+}
+
+// IsReplayTransaction returns true if there exist any transaction relations in the
+// "pn_address_transactions" table.
+func (p *Pegnet) IsReplayTransaction(tx *sql.Tx, entryHash *factom.Bytes32) (bool, error) {
+	// TODO: implement Pegnet.IsReplayTransaction()
+	return false, nil
 }

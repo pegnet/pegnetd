@@ -14,16 +14,13 @@ import (
 )
 
 var OPRChain = *factom.NewBytes32FromString("a642a8674f46696cc47fdb6b65f9c87b2a19c5ea8123b3d2f0c13b6f33a9d5ef")
+var TransactionChain = *factom.NewBytes32FromString("cffce0f409ebba4ed236d49d89c70e4bd1f1367d86402a3363366683265a242d")
 
 type Pegnetd struct {
 	FactomClient *factom.Client
 	Config       *viper.Viper
 
-	// Tracking indicates which chains we are tracking for the sync routing
-	Tracking map[string]factom.Bytes32
-
-	Sync *pegnet.BlockSync
-
+	Sync   *pegnet.BlockSync
 	Pegnet *pegnet.Pegnet
 }
 
@@ -34,12 +31,6 @@ func NewPegnetd(ctx context.Context, conf *viper.Viper) (*Pegnetd, error) {
 	n.FactomClient.FactomdServer = conf.GetString(config.Server)
 	n.FactomClient.WalletdServer = conf.GetString(config.Wallet)
 	n.Config = conf
-
-	// Ignore the factoid chain, as that is tracked separately
-	n.Tracking = map[string]factom.Bytes32{
-		// OPR Chain
-		"opr": OPRChain,
-	}
 
 	n.Pegnet = pegnet.New(conf)
 	if err := n.Pegnet.Init(); err != nil {
