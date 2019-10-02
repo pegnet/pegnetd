@@ -22,11 +22,7 @@ type Pegnetd struct {
 	FactomClient *factom.Client
 	Config       *viper.Viper
 
-	// Tracking indicates which chains we are tracking for the sync routing
-	Tracking map[string]factom.Bytes32
-
-	Sync *pegnet.BlockSync
-
+	Sync   *pegnet.BlockSync
 	Pegnet *pegnet.Pegnet
 }
 
@@ -35,12 +31,6 @@ func NewPegnetd(ctx context.Context, conf *viper.Viper) (*Pegnetd, error) {
 	n := new(Pegnetd)
 	n.FactomClient = FactomClientFromConfig(conf)
 	n.Config = conf
-
-	// Ignore the factoid chain, as that is tracked separately
-	n.Tracking = map[string]factom.Bytes32{
-		// OPR Chain
-		"opr": OPRChain,
-	}
 
 	n.Pegnet = pegnet.New(conf)
 	if err := n.Pegnet.Init(); err != nil {
