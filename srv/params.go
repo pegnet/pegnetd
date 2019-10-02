@@ -54,7 +54,7 @@ func (p ParamsToken) ValidChainID() *factom.Bytes32 {
 	if p.ChainID != nil {
 		return p.ChainID
 	}
-	return nil
+	return p.ChainID
 }
 
 // ParamsGetTransaction is used to query for a single particular transaction

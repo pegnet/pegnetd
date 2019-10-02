@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/pegnet/pegnetd/fat/fat2"
+
 	"github.com/Factom-Asset-Tokens/factom"
 	"github.com/pegnet/pegnet/cmd"
 	"github.com/pegnet/pegnetd/srv"
@@ -14,6 +16,7 @@ import (
 
 func init() {
 	rootCmd.AddCommand(balances)
+	rootCmd.AddCommand(balance)
 }
 
 var balance = &cobra.Command{
@@ -26,7 +29,13 @@ var balance = &cobra.Command{
 		cmd.CustomArgOrderValidationBuilder(false, cmd.ArgValidatorAssetAndAll, cmd.ArgValidatorFCTAddress),
 		cobra.MinimumNArgs(1)),
 	Run: func(cmd *cobra.Command, args []string) {
-		// TODO
+		res, err := queryBalances(args[1])
+		if err != nil {
+			fmt.Println(err)
+			os.Exit(1)
+		}
+
+		fmt.Println(res[fat2.StringToTicker(args[0])])
 	},
 }
 
@@ -40,20 +49,9 @@ var balances = &cobra.Command{
 		cmd.CustomArgOrderValidationBuilder(false, cmd.ArgValidatorFCTAddress),
 		cobra.MinimumNArgs(1)),
 	Run: func(cmd *cobra.Command, args []string) {
-		cl := srv.NewClient()
-		// TODO: Able to change loc
-		addr, err := factom.NewFAAddress(args[0])
+		res, err := queryBalances(args[0])
 		if err != nil {
-			// TODO: Better error
-			fmt.Println("1", err)
-			os.Exit(1)
-		}
-
-		var res srv.ResultGetPegnetBalances
-		err = cl.Request("get-pegnet-balances", srv.ParamsGetPegnetBalances{&addr}, &res)
-		if err != nil {
-			// TODO: Better error
-			fmt.Println("2", err)
+			fmt.Println(err)
 			os.Exit(1)
 		}
 
@@ -63,4 +61,25 @@ var balances = &cobra.Command{
 		}
 		fmt.Println(string(data))
 	},
+}
+
+func queryBalances(humanAddress string) (srv.ResultGetPegnetBalances, error) {
+	cl := srv.NewClient()
+	// TODO: Able to change loc
+	addr, err := factom.NewFAAddress(humanAddress)
+	if err != nil {
+		// TODO: Better error
+		fmt.Println("1", err)
+		os.Exit(1)
+	}
+
+	var res srv.ResultGetPegnetBalances
+	err = cl.Request("get-pegnet-balances", srv.ParamsGetPegnetBalances{&addr}, &res)
+	if err != nil {
+		// TODO: Better error
+		fmt.Println("2", err)
+		os.Exit(1)
+	}
+
+	return res, nil
 }

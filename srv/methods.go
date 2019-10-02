@@ -26,6 +26,9 @@ import (
 	"bytes"
 	"database/sql"
 	"encoding/json"
+	"fmt"
+
+	"github.com/pegnet/pegnetd/node"
 
 	"github.com/AdamSLevy/jsonrpc2"
 
@@ -91,6 +94,7 @@ func (s *APIServer) getTransaction(getEntry bool) jrpc.MethodFunc {
 	}
 }
 
+// TODO: This is incompatible with FAT.
 type ResultGetPegnetBalances map[fat2.PTicker]uint64
 
 func (r ResultGetPegnetBalances) MarshalJSON() ([]byte, error) {
@@ -245,6 +249,11 @@ func validate(data json.RawMessage, params Params) (interface{}, func(), error) 
 	//}
 	chainID := params.ValidChainID()
 	if chainID != nil {
+		fmt.Printf("%x\n", chainID)
+		if *chainID != node.TransactionChain {
+			return nil, nil, ErrorTokenNotFound
+		}
+		// TODO: Do we need to stub out any of the chain fields?
 		//chain := engine.Chains.Get(chainID)
 		//if !chain.IsIssued() {
 		//	return nil, nil, ErrorTokenNotFound
@@ -256,6 +265,9 @@ func validate(data json.RawMessage, params Params) (interface{}, func(), error) 
 		//chain.Conn = conn
 		//return &chain, put, nil
 	}
+
+	// If there is no chain, then we can't really validate it since we aren't fatd.
+	// The chainid is just to be compatible, but in reality it means nothing to us.
 	return nil, nil, nil
 }
 
