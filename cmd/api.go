@@ -5,12 +5,13 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/pegnet/pegnetd/fat/fat2"
+	"github.com/pegnet/pegnetd/config"
+	"github.com/spf13/viper"
 
 	"github.com/Factom-Asset-Tokens/factom"
 	"github.com/pegnet/pegnet/cmd"
+	"github.com/pegnet/pegnetd/fat/fat2"
 	"github.com/pegnet/pegnetd/srv"
-
 	"github.com/spf13/cobra"
 )
 
@@ -21,7 +22,7 @@ func init() {
 
 var balance = &cobra.Command{
 	Use:              "balance",
-	Short:            "",
+	Short:            "Fetch the balance for a given asset and address",
 	Example:          "pegnetd balance PEG FA2CEc2JSkhuckEXy42K111MvM9bycUDkbrrHjd9bNkBfvPBSGKd",
 	PersistentPreRun: always,
 	PreRun:           ReadConfig,
@@ -65,7 +66,7 @@ var balances = &cobra.Command{
 
 func queryBalances(humanAddress string) (srv.ResultGetPegnetBalances, error) {
 	cl := srv.NewClient()
-	// TODO: Able to change loc
+	cl.PegnetdServer = viper.GetString(config.Pegnetd)
 	addr, err := factom.NewFAAddress(humanAddress)
 	if err != nil {
 		// TODO: Better error
