@@ -54,7 +54,7 @@ func (p *Pegnet) InsertTransactionRelation(tx *sql.Tx, adrID int64, entryHash *f
 // IsReplayTransaction returns true if there exist any transaction relations in the
 // "pn_address_transactions" table.
 func (p *Pegnet) IsReplayTransaction(tx *sql.Tx, entryHash *factom.Bytes32) (bool, error) {
-	rows, err := tx.Query(`SELECT * FROM "pn_address_transactions" WHERE "entry_hash" = ?;`)
+	rows, err := tx.Query(`SELECT * FROM "pn_address_transactions" WHERE "entry_hash" = ?;`, entryHash[:])
 	if err != nil {
 		return false, err
 	}

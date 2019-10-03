@@ -282,9 +282,18 @@ func (d *Pegnetd) ApplyTransactionBatchesInHolding(ctx context.Context, sqlTx *s
 func (d *Pegnetd) ApplyTransactionBlock(sqlTx *sql.Tx, eblock *factom.EBlock) error {
 	for _, entry := range eblock.Entries {
 		txBatch := fat2.NewTransactionBatch(entry)
+		err := txBatch.UnmarshalEntry()
+		if err != nil {
+			continue // Bad formatted entry
+		}
 		if err := txBatch.Validate(); err != nil {
 			continue
 		}
+		log.WithFields(log.Fields{
+			"height":    eblock.Height,
+			"entryhash": entry.Hash.String(),
+			"txs":       len(txBatch.Transactions)}).Tracef("tx found")
+
 		isReplay, err := d.Pegnet.IsReplayTransaction(sqlTx, txBatch.Hash)
 		if err != nil {
 			return err

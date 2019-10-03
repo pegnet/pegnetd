@@ -54,7 +54,7 @@ func (p *Pegnet) InsertTransactionBatchHolding(tx *sql.Tx, txBatch *fat2.Transac
 // TransactionBatch.HasConversions() returns true.
 func (p *Pegnet) SelectTransactionBatchesInHoldingAtHeight(height uint64) ([]*fat2.TransactionBatch, error) {
 	query := `SELECT "entry_data" FROM "pn_transaction_batch_holding" WHERE "height" == ?;`
-	rows, err := p.DB.Query(query)
+	rows, err := p.DB.Query(query, height)
 	if err != nil {
 		return nil, err
 	}
@@ -73,6 +73,10 @@ func (p *Pegnet) SelectTransactionBatchesInHoldingAtHeight(height uint64) ([]*fa
 			return nil, err
 		}
 		txBatch := fat2.NewTransactionBatch(entry)
+		err := txBatch.UnmarshalEntry()
+		if err != nil {
+			continue // TODO: this should never happen?
+		}
 		txBatches = append(txBatches, txBatch)
 	}
 	return txBatches, nil
