@@ -77,7 +77,7 @@ func always(cmd *cobra.Command, args []string) {
 
 	// Also init some defaults
 	viper.SetDefault(config.DBlockSyncRetryPeriod, time.Second*5)
-	viper.SetDefault(config.SqliteDBPath, "$HOME/pegnetd/mainnet/sql.db")
+	viper.SetDefault(config.SqliteDBPath, "$HOME/.pegnetd/mainnet/sql.db")
 
 	// Catch ctl+c
 	signalChan := make(chan os.Signal, 1)
