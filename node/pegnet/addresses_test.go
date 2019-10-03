@@ -117,7 +117,7 @@ func TestPegnet_SubFromBalance(t *testing.T) {
 	var adr factom.FAAddress
 	_, txErr, err := p.SubFromBalance(tx, &adr, fat2.PTickerPEG, 100)
 	require.NoError(t, err)
-	assert.EqualError(t, txErr, "insufficient balance: FA1y5ZGuHSLmf2TqNf6hVMkPiNGyQpQDTFJvDLRkKQaoPo4bmbgu")
+	assert.EqualError(t, txErr, InsufficientBalanceErr.Error())
 
 	_, err = p.AddToBalance(tx, &adr, fat2.PTickerPEG, 100)
 	require.NoError(t, err)

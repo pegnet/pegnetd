@@ -119,12 +119,12 @@ func (p *Pegnet) SubFromBalance(tx *sql.Tx, adr *factom.FAAddress, ticker fat2.P
 	balance, err := p.SelectPendingBalance(tx, adr, ticker)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return 0, fmt.Errorf("insufficient balance: %v", adr), nil
+			return 0, InsufficientBalanceErr, nil
 		}
 		return 0, nil, err
 	}
 	if balance < value {
-		return 0, fmt.Errorf("insufficient balance: %v", adr), nil
+		return 0, InsufficientBalanceErr, nil
 	}
 
 	stmtStringFmt := `UPDATE pn_addresses SET %[1]s_balance = %[1]s_balance - ? WHERE address = ?;`

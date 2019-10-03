@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/binary"
 	"encoding/json"
+
 	"github.com/Factom-Asset-Tokens/factom"
 	"github.com/pegnet/pegnet/modules/grader"
 	"github.com/pegnet/pegnet/modules/opr"
@@ -50,6 +51,10 @@ const createTableRate = `CREATE TABLE IF NOT EXISTS "pn_rate" (
 
 func (p *Pegnet) InsertRate(tx *sql.Tx, height uint32, rates []opr.AssetUint) error {
 	for _, r := range rates {
+		// TODO: Make this more robust? Check if this is the best place to do this
+		if r.Name != "PEG" {
+			r.Name = "p" + r.Name
+		}
 		_, err := tx.Exec("INSERT INTO pn_rate (height, token, value) VALUES ($1, $2, $3)", height, r.Name, r.Value)
 		if err != nil {
 			return err
@@ -97,6 +102,14 @@ func (p *Pegnet) SelectPreviousWinners(ctx context.Context, height uint32) ([]st
 	}
 
 	return winners, nil
+}
+
+func (p *Pegnet) SelectPendingRates(ctx context.Context, tx *sql.Tx, height uint32) (map[fat2.PTicker]uint64, error) {
+	rows, err := tx.Query("SELECT token, value FROM pn_rate WHERE height = $1", height)
+	if err != nil {
+		return nil, err
+	}
+	return _extractAssets(rows)
 }
 
 func (p *Pegnet) SelectRates(ctx context.Context, height uint32) (map[fat2.PTicker]uint64, error) {

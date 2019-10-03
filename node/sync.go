@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/pegnet/pegnetd/node/pegnet"
+
 	"github.com/Factom-Asset-Tokens/factom"
 	"github.com/pegnet/pegnet/modules/conversions"
 	"github.com/pegnet/pegnet/modules/grader"
@@ -246,11 +248,17 @@ func multiFetch(eblock *factom.EBlock, c *factom.Client) error {
 // blocks that were put into holding because they contained conversions.
 // If an error is returned, the sql.Tx should be rolled back by the caller.
 func (d *Pegnetd) ApplyTransactionBatchesInHolding(ctx context.Context, sqlTx *sql.Tx, currentHeight uint32) error {
-	rates, height, err := d.Pegnet.SelectMostRecentRatesBeforeHeight(ctx, sqlTx, currentHeight+1)
+	_, height, err := d.Pegnet.SelectMostRecentRatesBeforeHeight(ctx, sqlTx, currentHeight)
 	if err != nil {
 		return err
 	}
-	for i := height + 1; i < currentHeight; i++ {
+
+	rates, err := d.Pegnet.SelectPendingRates(ctx, sqlTx, currentHeight)
+	if err != nil {
+		return err
+	}
+
+	for i := height; i < currentHeight; i++ {
 		txBatches, err := d.Pegnet.SelectTransactionBatchesInHoldingAtHeight(uint64(i))
 		if err != nil {
 			return err
@@ -268,7 +276,7 @@ func (d *Pegnetd) ApplyTransactionBatchesInHolding(ctx context.Context, sqlTx *s
 			}
 
 			err = d.applyTransactionBatch(sqlTx, txBatch, rates)
-			if err != nil {
+			if err != nil && err != pegnet.InsufficientBalanceErr {
 				return nil
 			}
 		}
@@ -314,7 +322,7 @@ func (d *Pegnetd) ApplyTransactionBlock(sqlTx *sql.Tx, eblock *factom.EBlock) er
 		}
 
 		// No conversions in the batch, it can be applied immediately
-		if err = d.applyTransactionBatch(sqlTx, txBatch, nil); err != nil {
+		if err = d.applyTransactionBatch(sqlTx, txBatch, nil); err != nil && err != pegnet.InsufficientBalanceErr {
 			return err
 		}
 	}
@@ -344,6 +352,9 @@ func (d *Pegnetd) applyTransactionBatch(sqlTx *sql.Tx, txBatch *fat2.Transaction
 				return err
 			}
 			_, err = d.Pegnet.AddToBalance(sqlTx, &tx.Input.Address, tx.Conversion, uint64(outputAmount))
+			if err != nil {
+				return err
+			}
 		} else {
 			for _, transfer := range tx.Transfers {
 				var outputAdrID int64
