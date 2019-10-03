@@ -275,7 +275,7 @@ func (d *Pegnetd) ApplyTransactionBatchesInHolding(ctx context.Context, sqlTx *s
 				continue
 			}
 
-			err = d.applyTransactionBatch(sqlTx, txBatch, rates)
+			err = d.applyTransactionBatch(sqlTx, txBatch, rates, currentHeight)
 			if err != nil && err != pegnet.InsufficientBalanceErr {
 				return nil
 			}
@@ -322,14 +322,16 @@ func (d *Pegnetd) ApplyTransactionBlock(sqlTx *sql.Tx, eblock *factom.EBlock) er
 		}
 
 		// No conversions in the batch, it can be applied immediately
-		if err = d.applyTransactionBatch(sqlTx, txBatch, nil); err != nil && err != pegnet.InsufficientBalanceErr {
+		if err = d.applyTransactionBatch(sqlTx, txBatch, nil, eblock.Height); err != nil && err != pegnet.InsufficientBalanceErr {
 			return err
 		}
 	}
 	return nil
 }
 
-func (d *Pegnetd) applyTransactionBatch(sqlTx *sql.Tx, txBatch *fat2.TransactionBatch, rates map[fat2.PTicker]uint64) error {
+// applyTransactionBatch
+//	currentHeight is just for tracing
+func (d *Pegnetd) applyTransactionBatch(sqlTx *sql.Tx, txBatch *fat2.TransactionBatch, rates map[fat2.PTicker]uint64, currentHeight uint32) error {
 	for txIndex, tx := range txBatch.Transactions {
 		var inputAdrID int64
 		inputAdrID, txErr, err := d.Pegnet.SubFromBalance(sqlTx, &tx.Input.Address, tx.Input.Type, tx.Input.Amount)
@@ -370,6 +372,10 @@ func (d *Pegnetd) applyTransactionBatch(sqlTx *sql.Tx, txBatch *fat2.Transaction
 					return err
 				}
 			}
+			log.WithFields(log.Fields{
+				"height":    currentHeight, // Just for log traces
+				"entryhash": txBatch.Hash.String(),
+				"txs":       len(txBatch.Transactions)}).Tracef("tx applied")
 		}
 	}
 	return nil
