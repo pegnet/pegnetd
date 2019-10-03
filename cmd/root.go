@@ -33,6 +33,7 @@ func init() {
 
 	// This is for testing purposes
 	rootCmd.PersistentFlags().Bool("testing", false, "If this flag is set, all v2 activations heights are set to 0.")
+	rootCmd.PersistentFlags().Int("act", -1, "Able to manually set the activation heights")
 }
 
 // Execute is cobra's entry point
@@ -74,10 +75,14 @@ func always(cmd *cobra.Command, args []string) {
 	// See if we are in testing mode
 	if ok, _ := cmd.Flags().GetBool("testing"); ok {
 		log.Infof("in testing mode, activation heights are 0")
-		node.PegnetActivation = 0
-		node.GradingV2Activation = 0
-		common.ActivationHeights[common.MainNetwork] = 0
-		common.ActivationHeights[common.TestNetwork] = 0
+		act, _ := cmd.Flags().GetInt("act")
+		if act <= 0 {
+			act = 0
+		}
+		node.PegnetActivation = uint32(act)
+		node.GradingV2Activation = uint32(act)
+		common.ActivationHeights[common.MainNetwork] = int64(act)
+		common.ActivationHeights[common.TestNetwork] = int64(act)
 		common.GradingHeights[common.MainNetwork] = func(height int64) uint8 { return 2 }
 		common.GradingHeights[common.TestNetwork] = func(height int64) uint8 { return 2 }
 	}
