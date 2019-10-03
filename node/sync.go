@@ -131,6 +131,7 @@ OuterSyncLoop:
 // the whole sync should be rolled back and not applied. An error should then be returned.
 // The context should be respected if it is cancelled
 func (d *Pegnetd) SyncBlock(ctx context.Context, tx *sql.Tx, height uint32) error {
+	fLog := log.WithFields(log.Fields{"height": height})
 	if isDone(ctx) { // Just an example about how to handle it being cancelled
 		return context.Canceled
 	}
@@ -171,6 +172,8 @@ func (d *Pegnetd) SyncBlock(ctx context.Context, tx *sql.Tx, height uint32) erro
 			if err != nil {
 				return err
 			}
+		} else {
+			fLog.WithFields(log.Fields{"section": "grading"}).Tracef("no winners")
 		}
 	}
 
@@ -372,12 +375,14 @@ func (d *Pegnetd) applyTransactionBatch(sqlTx *sql.Tx, txBatch *fat2.Transaction
 					return err
 				}
 			}
-			log.WithFields(log.Fields{
-				"height":    currentHeight, // Just for log traces
-				"entryhash": txBatch.Hash.String(),
-				"txs":       len(txBatch.Transactions)}).Tracef("tx applied")
 		}
 	}
+	log.WithFields(log.Fields{
+		"height":     currentHeight, // Just for log traces
+		"entryhash":  txBatch.Hash.String(),
+		"conversion": txBatch.HasConversions(),
+		"txs":        len(txBatch.Transactions)}).Tracef("tx applied")
+
 	return nil
 }
 
