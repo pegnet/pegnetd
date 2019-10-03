@@ -199,7 +199,9 @@ func multiFetch(eblock *factom.EBlock, c *factom.Client) error {
 	}
 
 	work := make(chan int, len(eblock.Entries))
+	defer close(work)
 	errs := make(chan error)
+	defer close(errs)
 
 	for i := 0; i < 8; i++ {
 		go func() {
@@ -217,15 +219,13 @@ func multiFetch(eblock *factom.EBlock, c *factom.Client) error {
 	for e := range errs {
 		count++
 		if e != nil {
-			close(work)
+
 			return e
 		}
 		if count == len(eblock.Entries) {
 			break
 		}
 	}
-	close(work)
-	close(errs)
 
 	return nil
 }
