@@ -144,8 +144,7 @@ func (d *Pegnetd) SyncBlock(ctx context.Context, tx *sql.Tx, height uint32) erro
 	eblocks := make(map[string]*factom.EBlock)
 	for k, v := range d.Tracking {
 		if eblock := dblock.EBlock(v); eblock != nil {
-			// TODO: Multithread this to speed up performance. This is the slowest part
-			if err = eblock.GetEntries(d.FactomClient); err != nil {
+			if err = multiFetch(eblock, d.FactomClient); err != nil {
 				return err
 			}
 			eblocks[k] = eblock
@@ -190,6 +189,44 @@ func (d *Pegnetd) SyncBlock(ctx context.Context, tx *sql.Tx, height uint32) erro
 	}
 
 	// TODO: Handle converts/txs
+	return nil
+}
+
+func multiFetch(eblock *factom.EBlock, c *factom.Client) error {
+	err := eblock.Get(c)
+	if err != nil {
+		return err
+	}
+
+	work := make(chan int, len(eblock.Entries))
+	errs := make(chan error)
+
+	for i := 0; i < 8; i++ {
+		go func() {
+			for j := range work {
+				errs <- eblock.Entries[j].Get(c)
+			}
+		}()
+	}
+
+	for i := range eblock.Entries {
+		work <- i
+	}
+
+	count := 0
+	for e := range errs {
+		count++
+		if e != nil {
+			close(work)
+			return e
+		}
+		if count == len(eblock.Entries) {
+			break
+		}
+	}
+	close(work)
+	close(errs)
+
 	return nil
 }
 
