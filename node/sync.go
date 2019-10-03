@@ -160,7 +160,6 @@ func (d *Pegnetd) SyncBlock(ctx context.Context, tx *sql.Tx, height uint32) erro
 	if err != nil {
 		return err
 	} else if gradedBlock != nil {
-		d.Pegnet.InsertGradedBlock(gradedBlock)
 		err = d.Pegnet.InsertGradeBlock(tx, oprEBlock, gradedBlock)
 		if err != nil {
 			return err

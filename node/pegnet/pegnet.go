@@ -1,14 +1,12 @@
 package pegnet
 
 import (
-	"container/list"
 	"database/sql"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
 
-	"github.com/pegnet/pegnet/modules/grader"
 	"github.com/pegnet/pegnetd/config"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
@@ -17,9 +15,6 @@ import (
 type Pegnet struct {
 	Config *viper.Viper
 
-	// TODO: Make this a database
-	PegnetChain *list.List
-
 	// This is the sqlite db to store state
 	DB *sql.DB
 }
@@ -27,8 +22,6 @@ type Pegnet struct {
 func New(conf *viper.Viper) *Pegnet {
 	p := new(Pegnet)
 	p.Config = conf
-	p.PegnetChain = list.New()
-
 	return p
 }
 
@@ -75,17 +68,4 @@ func (p *Pegnet) createTables() error {
 		}
 	}
 	return nil
-}
-
-func (p *Pegnet) InsertGradedBlock(block grader.GradedBlock) {
-	p.PegnetChain.PushBack(block)
-}
-
-func (p *Pegnet) FetchPreviousBlock() grader.GradedBlock {
-	mark := p.PegnetChain.Back()
-	if mark == nil {
-		return nil
-	}
-
-	return mark.Value.(grader.GradedBlock)
 }
