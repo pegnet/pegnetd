@@ -2,6 +2,7 @@ package pegnet
 
 import (
 	"database/sql"
+	"time"
 
 	"github.com/pegnet/pegnetd/fat/fat2"
 
@@ -9,11 +10,12 @@ import (
 )
 
 const createTableTransactionBatchHolding = `CREATE TABLE IF NOT EXISTS "pn_transaction_batch_holding" (
-        "id"            INTEGER PRIMARY KEY,
-        "entry_hash"    BLOB NOT NULL UNIQUE,
-        "entry_data"    BLOB NOT NULL,
-        "height"        INTEGER NOT NULL,
-        "eblock_keymr"  BLOB NOT NULL
+        "id"            	INTEGER PRIMARY KEY,
+        "entry_hash"    	BLOB NOT NULL UNIQUE,
+        "entry_data"    	BLOB NOT NULL,
+        "height"        	INTEGER NOT NULL,
+        "eblock_keymr"  	BLOB NOT NULL,
+        "unix_timestamp"	INTEGER NOT NULL
 );
 `
 
@@ -27,8 +29,8 @@ const createTableTransactionBatchHolding = `CREATE TABLE IF NOT EXISTS "pn_trans
 // holding to be executed against future asset exchange rates.
 func (p *Pegnet) InsertTransactionBatchHolding(tx *sql.Tx, txBatch *fat2.TransactionBatch, height uint64, eblockKeyMR *factom.Bytes32) (int64, error) {
 	stmt, err := tx.Prepare(`INSERT INTO "pn_transaction_batch_holding"
-                ("entry_hash", "entry_data", "height", "eblock_keymr") VALUES
-                (?, ?, ?, ?)`)
+                ("entry_hash", "entry_data", "height", "eblock_keymr", "unix_timestamp") VALUES
+                (?, ?, ?, ?, ?)`)
 	if err != nil {
 		return -1, err
 	}
@@ -37,7 +39,7 @@ func (p *Pegnet) InsertTransactionBatchHolding(tx *sql.Tx, txBatch *fat2.Transac
 	if err != nil {
 		return -1, err
 	}
-	res, err := stmt.Exec(txBatch.Hash[:], entryData, height, eblockKeyMR)
+	res, err := stmt.Exec(txBatch.Hash[:], entryData, height, eblockKeyMR[:], txBatch.Timestamp.Unix())
 	if err != nil {
 		return -1, err
 	}
@@ -53,8 +55,8 @@ func (p *Pegnet) InsertTransactionBatchHolding(tx *sql.Tx, txBatch *fat2.Transac
 // in the database has already returned nil for TransactionBatch.Validate() and also that
 // TransactionBatch.HasConversions() returns true.
 func (p *Pegnet) SelectTransactionBatchesInHoldingAtHeight(height uint64) ([]*fat2.TransactionBatch, error) {
-	query := `SELECT "entry_data" FROM "pn_transaction_batch_holding" WHERE "height" == ?;`
-	rows, err := p.DB.Query(query)
+	query := `SELECT "entry_data", "unix_timestamp" FROM "pn_transaction_batch_holding" WHERE "height" == ?;`
+	rows, err := p.DB.Query(query, height)
 	if err != nil {
 		return nil, err
 	}
@@ -63,7 +65,8 @@ func (p *Pegnet) SelectTransactionBatchesInHoldingAtHeight(height uint64) ([]*fa
 	var txBatches []*fat2.TransactionBatch
 	for rows.Next() {
 		var entryData []byte
-		err = rows.Scan(&entryData)
+		var unix int64
+		err = rows.Scan(&entryData, &unix)
 		if err != nil {
 			return nil, err
 		}
@@ -73,6 +76,11 @@ func (p *Pegnet) SelectTransactionBatchesInHoldingAtHeight(height uint64) ([]*fa
 			return nil, err
 		}
 		txBatch := fat2.NewTransactionBatch(entry)
+		err := txBatch.UnmarshalEntry()
+		if err != nil {
+			continue // TODO: this should never happen?
+		}
+		txBatch.Timestamp = time.Unix(unix, 0)
 		txBatches = append(txBatches, txBatch)
 	}
 	return txBatches, nil

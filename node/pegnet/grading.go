@@ -9,6 +9,7 @@ import (
 	"github.com/Factom-Asset-Tokens/factom"
 	"github.com/pegnet/pegnet/modules/grader"
 	"github.com/pegnet/pegnet/modules/opr"
+	"github.com/pegnet/pegnetd/fat/fat2"
 )
 
 const createTableGrade = `CREATE TABLE IF NOT EXISTS "pn_grade" (
@@ -50,6 +51,10 @@ const createTableRate = `CREATE TABLE IF NOT EXISTS "pn_rate" (
 
 func (p *Pegnet) InsertRate(tx *sql.Tx, height uint32, rates []opr.AssetUint) error {
 	for _, r := range rates {
+		// TODO: Make this more robust? Check if this is the best place to do this
+		if r.Name != "PEG" {
+			r.Name = "p" + r.Name
+		}
 		_, err := tx.Exec("INSERT INTO pn_rate (height, token, value) VALUES ($1, $2, $3)", height, r.Name, r.Value)
 		if err != nil {
 			return err
@@ -99,7 +104,15 @@ func (p *Pegnet) SelectPreviousWinners(ctx context.Context, height uint32) ([]st
 	return winners, nil
 }
 
-func (p *Pegnet) SelectRates(ctx context.Context, height uint32) ([]opr.AssetUint, error) {
+func (p *Pegnet) SelectPendingRates(ctx context.Context, tx *sql.Tx, height uint32) (map[fat2.PTicker]uint64, error) {
+	rows, err := tx.Query("SELECT token, value FROM pn_rate WHERE height = $1", height)
+	if err != nil {
+		return nil, err
+	}
+	return _extractAssets(rows)
+}
+
+func (p *Pegnet) SelectRates(ctx context.Context, height uint32) (map[fat2.PTicker]uint64, error) {
 	rows, err := p.DB.Query("SELECT token, value FROM pn_rate WHERE height = $1", height)
 	if err != nil {
 		return nil, err
@@ -107,7 +120,7 @@ func (p *Pegnet) SelectRates(ctx context.Context, height uint32) ([]opr.AssetUin
 	return _extractAssets(rows)
 }
 
-func (p *Pegnet) SelectRatesByKeyMR(ctx context.Context, keymr *factom.Bytes32) ([]opr.AssetUint, error) {
+func (p *Pegnet) SelectRatesByKeyMR(ctx context.Context, keymr *factom.Bytes32) (map[fat2.PTicker]uint64, error) {
 	rows, err := p.DB.Query("SELECT token, value FROM pn_rate WHERE height = (SELECT height FROM pn_grade WHERE keymr = $1)", keymr)
 	if err != nil {
 		return nil, err
@@ -115,15 +128,43 @@ func (p *Pegnet) SelectRatesByKeyMR(ctx context.Context, keymr *factom.Bytes32) 
 	return _extractAssets(rows)
 }
 
-func _extractAssets(rows *sql.Rows) ([]opr.AssetUint, error) {
+func (p *Pegnet) SelectMostRecentRatesBeforeHeight(ctx context.Context, tx *sql.Tx, height uint32) (map[fat2.PTicker]uint64, uint32, error) {
+	assets := make(map[fat2.PTicker]uint64)
+	var rateHeight uint32
+	queryString := `SELECT "token", "value", "height"
+                    FROM "pn_rate" WHERE "height" = (
+                        SELECT MAX("height")
+                        FROM "pn_rate" WHERE "height" < ?
+                    );`
+	rows, err := tx.Query(queryString, height)
+	if err != nil {
+		return nil, 0, err
+	}
 	defer rows.Close()
-	var assets []opr.AssetUint
 	for rows.Next() {
-		var a opr.AssetUint
-		if err := rows.Scan(&a.Name, &a.Value); err != nil {
+		var tickerName string
+		var rateValue uint64
+		if err := rows.Scan(&tickerName, &rateValue, &rateHeight); err != nil {
+			return nil, 0, err
+		}
+		assets[fat2.StringToTicker(tickerName)] = rateValue
+	}
+	if rows.Err() != nil {
+		return nil, 0, err
+	}
+	return assets, rateHeight, nil
+}
+
+func _extractAssets(rows *sql.Rows) (map[fat2.PTicker]uint64, error) {
+	defer rows.Close()
+	assets := make(map[fat2.PTicker]uint64)
+	for rows.Next() {
+		var tickerName string
+		var rateValue uint64
+		if err := rows.Scan(&tickerName, &rateValue); err != nil {
 			return nil, err
 		}
-		assets = append(assets, a)
+		assets[fat2.StringToTicker(tickerName)] = rateValue
 	}
 	return assets, nil
 }

@@ -86,12 +86,7 @@ var validPTickers = func() map[string]PTicker {
 }()
 
 func StringToTicker(str string) PTicker {
-	var ticker PTicker
-	err := json.Unmarshal([]byte(fmt.Sprintf(`"%s"`, str)), &ticker)
-	if err != nil {
-		return PTickerInvalid
-	}
-	return ticker
+	return validPTickers[str]
 }
 
 // UnmarshalJSON unmarshals the bytes into a PTicker and returns an error
@@ -122,8 +117,7 @@ func (t PTicker) MarshalJSON() ([]byte, error) {
 	if t <= PTickerInvalid || PTickerMax <= t {
 		return nil, fmt.Errorf("invalid token type")
 	}
-	pTickerString := validPTickerStrings[int(t)]
-	return json.Marshal(pTickerString)
+	return json.Marshal(t.String())
 }
 
 // String returns the string representation of this PTicker

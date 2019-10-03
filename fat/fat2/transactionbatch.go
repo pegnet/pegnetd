@@ -101,10 +101,17 @@ func (t *TransactionBatch) ValidData() error {
 	if len(t.Transactions) == 0 {
 		return fmt.Errorf("at least one output required")
 	}
+	uniqueInputs := make(map[factom.FAAddress]struct{})
 	for i, tx := range t.Transactions {
 		if err := tx.Validate(); err != nil {
 			return fmt.Errorf("invalid transaction at index %d: %v", i, err)
 		}
+		uniqueInputs[tx.Input.Address] = struct{}{}
+	}
+	// There can only be one input address for the batch. This is to make
+	// potential sharding of the pegnet easier (from Paul Snow and Clay Douglass).
+	if len(uniqueInputs) != 1 {
+		return fmt.Errorf("only one input address allowed")
 	}
 	return nil
 }

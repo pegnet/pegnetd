@@ -53,7 +53,7 @@ func signAndSend(tx *fat2.Transaction, cl *factom.Client, payment string) (err e
 		return fmt.Errorf("failed to submit entry: %s\n", err.Error()), nil, nil
 	}
 
-	return nil, txBatch.Hash, txid
+	return nil, txid, txBatch.Hash
 }
 
 func setTransferOutput(tx *fat2.Transaction, cl *factom.Client, dest, amt string) error {
