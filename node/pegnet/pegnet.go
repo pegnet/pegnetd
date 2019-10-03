@@ -47,8 +47,18 @@ func (p *Pegnet) Init() error {
 		return err
 	}
 
+	openmode := path
+	modes := ""
+	if p.Config.GetBool(config.SQLDBWalMode) {
+		modes += "_journal=WAL&"
+	}
+	modes += p.Config.GetString(config.CustomSQLDBMode)
+	if modes != "" {
+		openmode += "?" + modes
+	}
+
 	log.Infof("Opening database from '%s'", path)
-	db, err := sql.Open("sqlite3", path)
+	db, err := sql.Open("sqlite3", openmode)
 	if err != nil {
 		return err
 	}
