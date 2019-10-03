@@ -194,7 +194,7 @@ func (d *Pegnetd) SyncBlock(ctx context.Context, tx *sql.Tx, height uint32) erro
 		return err
 	}
 
-	// 4) Apply effects of graded OPR Block (PEG rewards and updated conversion rates)
+	// 4) Apply effects of graded OPR Block (PEG rewards, if any)
 	//    These funds will be available for transactions and conversions executed in the next block
 	if err := d.ApplyGradedOPRBlock(tx, gradedBlock); err != nil {
 		return err

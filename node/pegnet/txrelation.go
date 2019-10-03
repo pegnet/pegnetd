@@ -61,6 +61,9 @@ func (p *Pegnet) IsReplayTransaction(tx *sql.Tx, entryHash *factom.Bytes32) (boo
 	defer rows.Close()
 	err = rows.Err()
 	if err != nil {
+		if err == sql.ErrNoRows {
+			return false, nil
+		}
 		return false, err
 	}
 	// If there is any result, then we know the transaction has been executed before and thus a replay.
