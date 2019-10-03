@@ -19,5 +19,14 @@ func ArgValidatorAssetOrP(cmd *cobra.Command, arg string) error {
 			return nil
 		}
 	}
-	return fmt.Errorf("not a valid asset. Options include: %v", list)
+
+	errstr := fmt.Sprintf("not a valid asset. Options include: %v", list)
+
+	if strings.Contains(arg, "BTC") {
+		errstr += "\nI see you put in 'BTC', did you mean 'XBT'?"
+	}
+	if strings.Contains(arg, "BCH") {
+		errstr += "\nI see you put in 'BCH', did you mean 'XBC'?"
+	}
+	return fmt.Errorf(errstr)
 }
