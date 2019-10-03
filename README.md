@@ -32,7 +32,7 @@ To exit `pegnetd`, send a `SIGINT` (commonly done by pressing `<ctrl> + <c>` wit
 To run in development, the `--testing` flag will set the activation heights to 0, and grading versions to 2. So if you have a local factomd running, you can do the following:
 
 ```bash
-# Assumuing you have `pegnet` installed for mining and factom + factom-walletd running
+# Assuming you have `pegnet` installed for mining and factom + factom-walletd running
 cd $GOPATH/src/github.com/pegnet/pegnet
 cd initialization
 go build
