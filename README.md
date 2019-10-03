@@ -27,6 +27,26 @@ To start the daemon, run: `$ ./pegnetd --log=debug` using your preferred log ver
 
 To exit `pegnetd`, send a `SIGINT` (commonly done by pressing `<ctrl> + <c>` within the terminal).
 
+## Running in Development
+
+To run in development, the `--testing` flag will set the activation heights to 0, and grading versions to 2. So if you have a local factomd running, you can do the following:
+
+```bash
+# Assuming you have `pegnet` installed for mining and factom + factom-walletd running
+cd $GOPATH/src/github.com/pegnet/pegnet
+cd initialization
+go build
+# Get some entry credits to build the initial chains
+./fundEC.sh
+./initialization
+
+# Now we can run a miner to get us some rates (you will need to configure a miner)
+pegnet --testing --top 50 --miners 1 --log debug
+
+# Now you have a chain to read and can run the node
+pegnetd --testing --log debug
+```
+
 ## RPC API Documentation
 
 `// TODO: add documentation around how to use the RPC API, keeping it as close to fatd as possible`
