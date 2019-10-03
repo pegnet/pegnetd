@@ -22,7 +22,7 @@ import (
 func init() {
 	rootCmd.PersistentFlags().String("log", "info", "Change the logging level. Can choose from 'trace', 'debug', 'info', 'warn', 'error', or 'fatal'")
 	rootCmd.PersistentFlags().StringP("server", "s", "http://localhost:8088/v2", "The url to the factomd endpoint without a trailing slash")
-	rootCmd.PersistentFlags().StringP("wallet", "w", "http://localhost:8089", "The url to the factomd-wallet endpoint without a trailing slash")
+	rootCmd.PersistentFlags().StringP("wallet", "w", "http://localhost:8089/v2", "The url to the factomd-wallet endpoint without a trailing slash")
 	rootCmd.PersistentFlags().StringP("pegnetd", "p", "http://localhost:8070", "The url to the pegnetd endpoint without a trailing slash")
 	rootCmd.PersistentFlags().String("api", "8070", "Change the api listening port for the api")
 }

@@ -123,7 +123,7 @@ func (t PTicker) MarshalJSON() ([]byte, error) {
 		return nil, fmt.Errorf("invalid token type")
 	}
 	pTickerString := validPTickerStrings[int(t)]
-	return []byte(pTickerString), nil
+	return json.Marshal(pTickerString)
 }
 
 // String returns the string representation of this PTicker

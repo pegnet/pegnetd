@@ -31,9 +31,7 @@ type Pegnetd struct {
 func NewPegnetd(ctx context.Context, conf *viper.Viper) (*Pegnetd, error) {
 	// TODO : Update emyrk's factom library
 	n := new(Pegnetd)
-	n.FactomClient = factom.NewClient()
-	n.FactomClient.FactomdServer = conf.GetString(config.Server)
-	n.FactomClient.WalletdServer = conf.GetString(config.Wallet)
+	n.FactomClient = FactomClientFromConfig(conf)
 	n.Config = conf
 
 	// Ignore the factoid chain, as that is tracked separately
@@ -61,4 +59,12 @@ func NewPegnetd(ctx context.Context, conf *viper.Viper) (*Pegnetd, error) {
 
 	grader.InitLX()
 	return n, nil
+}
+
+func FactomClientFromConfig(conf *viper.Viper) *factom.Client {
+	cl := factom.NewClient()
+	cl.FactomdServer = conf.GetString(config.Server)
+	cl.WalletdServer = conf.GetString(config.Wallet)
+
+	return cl
 }
