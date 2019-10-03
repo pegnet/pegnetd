@@ -8,6 +8,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/pegnet/pegnet/common"
+
 	"github.com/pegnet/pegnetd/srv"
 
 	"github.com/pegnet/pegnetd/exit"
@@ -25,6 +27,9 @@ func init() {
 	rootCmd.PersistentFlags().StringP("wallet", "w", "http://localhost:8089/v2", "The url to the factomd-wallet endpoint without a trailing slash")
 	rootCmd.PersistentFlags().StringP("pegnetd", "p", "http://localhost:8070", "The url to the pegnetd endpoint without a trailing slash")
 	rootCmd.PersistentFlags().String("api", "8070", "Change the api listening port for the api")
+
+	// This is for testing purposes
+	rootCmd.PersistentFlags().Bool("testing", false, "If this flag is set, all v2 activations heights are set to 0.")
 }
 
 // Execute is cobra's entry point
@@ -63,6 +68,16 @@ var rootCmd = &cobra.Command{
 
 // always is run before any command
 func always(cmd *cobra.Command, args []string) {
+	// See if we are in testing mode
+	if ok, _ := cmd.Flags().GetBool("testing"); ok {
+		log.Infof("in testing mode, activation heights are 0")
+		node.PegnetActivation = 0
+		common.ActivationHeights[common.MainNetwork] = 0
+		common.ActivationHeights[common.TestNetwork] = 0
+		common.GradingHeights[common.MainNetwork] = func(height int64) uint8 { return 2 }
+		common.GradingHeights[common.TestNetwork] = func(height int64) uint8 { return 2 }
+	}
+
 	// Setup config reading
 	viper.SetConfigName("pegnetd-conf")
 	// Add as many config paths as we want to check
@@ -101,6 +116,17 @@ func ReadConfig(cmd *cobra.Command, args []string) {
 	if err != nil {
 		log.WithError(err).Error("failed to load config")
 		os.Exit(1)
+	}
+
+	initLogger()
+}
+
+// SoftReadConfig will not fail. It can be used for a command that needs the config,
+// but is happy with the defaults
+func SoftReadConfig(cmd *cobra.Command, args []string) {
+	err := viper.ReadInConfig()
+	if err != nil {
+		log.WithError(err).Debugf("failed to load config")
 	}
 
 	initLogger()

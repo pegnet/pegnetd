@@ -33,7 +33,7 @@ var tx = &cobra.Command{
 	Example: "pegnetd newtx EC3eX8VxGH64Xv3NFd9g4Y7PxSMnH3EGz5jQQrrQS8VZGnv4JY2K FA32xV6SoPBSbAZAVyuiHWwyoMYhnSyMmAHZfK29H8dx7bJXFLja" +
 		" FA33kNzXwUt3cn4tLR56kyHEAryazAGPuMC6GjUubSbwrrNv8e7t PEG 200 ",
 	PersistentPreRun: always,
-	PreRun:           ReadConfig,
+	PreRun:           SoftReadConfig,
 	Args: cmd.CombineCobraArgs(
 		cmd.CustomArgOrderValidationBuilder(
 			true,
@@ -147,7 +147,7 @@ var balance = &cobra.Command{
 	Short:            "Fetch the balance for a given asset and address",
 	Example:          "pegnetd balance PEG FA2CEc2JSkhuckEXy42K111MvM9bycUDkbrrHjd9bNkBfvPBSGKd",
 	PersistentPreRun: always,
-	PreRun:           ReadConfig,
+	PreRun:           SoftReadConfig,
 	Args: cmd.CombineCobraArgs(
 		cmd.CustomArgOrderValidationBuilder(false, cmd.ArgValidatorAssetAndAll, cmd.ArgValidatorFCTAddress),
 		cobra.MinimumNArgs(1)),
@@ -167,7 +167,7 @@ var balances = &cobra.Command{
 	Short:            "Fetch all balances for a given factoid address",
 	Example:          "pegnetd balances FA2CEc2JSkhuckEXy42K111MvM9bycUDkbrrHjd9bNkBfvPBSGKd",
 	PersistentPreRun: always,
-	PreRun:           ReadConfig,
+	PreRun:           SoftReadConfig,
 	Args: cmd.CombineCobraArgs(
 		cmd.CustomArgOrderValidationBuilder(false, cmd.ArgValidatorFCTAddress),
 		cobra.MinimumNArgs(1)),

@@ -15,6 +15,7 @@ import (
 
 var OPRChain = *factom.NewBytes32FromString("a642a8674f46696cc47fdb6b65f9c87b2a19c5ea8123b3d2f0c13b6f33a9d5ef")
 var TransactionChain = *factom.NewBytes32FromString("cffce0f409ebba4ed236d49d89c70e4bd1f1367d86402a3363366683265a242d")
+var PegnetActivation uint32 = 206421
 
 type Pegnetd struct {
 	FactomClient *factom.Client
@@ -48,7 +49,7 @@ func NewPegnetd(ctx context.Context, conf *viper.Viper) (*Pegnetd, error) {
 	if sync, err := n.Pegnet.SelectSynced(ctx); err != nil {
 		if err == sql.ErrNoRows {
 			n.Sync = new(pegnet.BlockSync)
-			n.Sync.Synced = 206421
+			n.Sync.Synced = PegnetActivation
 			log.Debug("connected to a fresh database")
 		} else {
 			return nil, err
