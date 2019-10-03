@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/pegnet/pegnetd/node"
 
@@ -40,7 +41,7 @@ var tx = &cobra.Command{
 			cmd.ArgValidatorECAddress,
 			cmd.ArgValidatorFCTAddress,
 			cmd.ArgValidatorFCTAddress,
-			cmd.ArgValidatorAsset,
+			ArgValidatorAssetOrP,
 			cmd.ArgValidatorFCTAmount),
 	),
 	Run: func(cmd *cobra.Command, args []string) {
@@ -50,6 +51,9 @@ var tx = &cobra.Command{
 		// Build the transaction from the args
 		var trans fat2.Transaction
 
+		if strings.ToUpper(asset) != "PEG" {
+			asset = "p" + strings.ToUpper(asset)
+		}
 		aType := fat2.StringToTicker(asset)
 		if aType == fat2.PTickerInvalid {
 			cmd.PrintErrf("invalid ticker type\n")
@@ -71,7 +75,7 @@ var tx = &cobra.Command{
 		// Get out private key
 		priv, err := trans.Input.Address.GetFsAddress(cl)
 		if err != nil {
-			cmd.PrintErrf("unable to get private key : %s\n", err.Error())
+			cmd.PrintErrf("unable to get private key: %s\n", err.Error())
 			os.Exit(1)
 		}
 
@@ -138,7 +142,9 @@ var tx = &cobra.Command{
 			os.Exit(1)
 		}
 
-		fmt.Printf("transaction sent : %s\n", txid)
+		fmt.Printf("transaction sent:\n")
+		fmt.Printf("\t%10s: %s\n", "EntryHash", e.Hash)
+		fmt.Printf("\t%10s: %s\n", "Commit", txid)
 	},
 }
 
@@ -149,7 +155,7 @@ var balance = &cobra.Command{
 	PersistentPreRun: always,
 	PreRun:           SoftReadConfig,
 	Args: cmd.CombineCobraArgs(
-		cmd.CustomArgOrderValidationBuilder(false, cmd.ArgValidatorAssetAndAll, cmd.ArgValidatorFCTAddress),
+		cmd.CustomArgOrderValidationBuilder(false, ArgValidatorAssetOrP, cmd.ArgValidatorFCTAddress),
 		cobra.MinimumNArgs(1)),
 	Run: func(cmd *cobra.Command, args []string) {
 		res, err := queryBalances(args[1])
