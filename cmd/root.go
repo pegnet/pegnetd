@@ -72,6 +72,7 @@ func always(cmd *cobra.Command, args []string) {
 	if ok, _ := cmd.Flags().GetBool("testing"); ok {
 		log.Infof("in testing mode, activation heights are 0")
 		node.PegnetActivation = 0
+		node.GradingV2Activation = 0
 		common.ActivationHeights[common.MainNetwork] = 0
 		common.ActivationHeights[common.TestNetwork] = 0
 		common.GradingHeights[common.MainNetwork] = func(height int64) uint8 { return 2 }
