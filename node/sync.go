@@ -164,7 +164,7 @@ func (d *Pegnetd) SyncBlock(ctx context.Context, tx *sql.Tx, height uint32) erro
 			return err
 		}
 		winners := gradedBlock.Winners()
-		if len(winners) > 0 {
+		if 0 < len(winners) {
 			err = d.Pegnet.InsertRate(tx, height, winners[0].OPR.GetOrderedAssetsUint())
 			if err != nil {
 				return err
@@ -175,15 +175,17 @@ func (d *Pegnetd) SyncBlock(ctx context.Context, tx *sql.Tx, height uint32) erro
 	// At this point, we start making updates to the database in a specific order:
 	// TODO: ensure we rollback the tx when needed
 	// 1) Apply transaction batches that are in holding (conversions are always applied here)
-	err = d.ApplyTransactionBatchesInHolding(ctx, tx, height)
-	if err != nil {
-		return err
+	if gradedBlock != nil && 0 < len(gradedBlock.Winners()) {
+		if err = d.ApplyTransactionBatchesInHolding(ctx, tx, height); err != nil {
+			return err
+		}
 	}
 
 	// 2) Sync transactions in current height and apply transactions
-	err = d.ApplyTransactionBlock(tx, transactionsEBlock)
-	if err != nil {
-		return err
+	if transactionsEBlock != nil {
+		if err = d.ApplyTransactionBlock(tx, transactionsEBlock); err != nil {
+			return err
+		}
 	}
 
 	// 3) Apply FCT --> pFCT burns that happened in this block
@@ -195,8 +197,10 @@ func (d *Pegnetd) SyncBlock(ctx context.Context, tx *sql.Tx, height uint32) erro
 
 	// 4) Apply effects of graded OPR Block (PEG rewards, if any)
 	//    These funds will be available for transactions and conversions executed in the next block
-	if err := d.ApplyGradedOPRBlock(tx, gradedBlock); err != nil {
-		return err
+	if gradedBlock != nil {
+		if err := d.ApplyGradedOPRBlock(tx, gradedBlock); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -412,12 +416,9 @@ func (d *Pegnetd) ApplyFactoidBlock(ctx context.Context, tx *sql.Tx, dblock *fac
 	return nil
 }
 
-// ApplyGradedOPRBlock pays out PEG to the winners of the given GradedBlock (if any).
+// ApplyGradedOPRBlock pays out PEG to the winners of the given GradedBlock.
 // If an error is returned, the sql.Tx should be rolled back by the caller.
 func (d *Pegnetd) ApplyGradedOPRBlock(tx *sql.Tx, gradedBlock grader.GradedBlock) error {
-	if gradedBlock == nil {
-		return nil
-	}
 	winners := gradedBlock.Winners()
 	for i := range winners {
 		addr, err := factom.NewFAAddress(winners[i].OPR.GetAddress())
