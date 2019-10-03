@@ -73,6 +73,7 @@ const createTableAddresses = `CREATE TABLE IF NOT EXISTS "pn_addresses" (
         "pdcr_balance"  INTEGER NOT NULL DEFAULT 0
                         CONSTRAINT "insufficient balance" CHECK ("pdcr_balance" >= 0)
 );
+CREATE INDEX IF NOT EXISTS "idx_address_balances_address_id" ON "pn_addresses"("address");
 `
 
 func (p *Pegnet) CreateTableAddresses() error {

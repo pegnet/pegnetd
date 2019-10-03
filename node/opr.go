@@ -21,7 +21,7 @@ func (d *Pegnetd) Grade(ctx context.Context, block *factom.EBlock) (grader.Grade
 	}
 
 	ver := uint8(1)
-	if block.Height >= 210330 {
+	if block.Height >= GradingV2Activation {
 		ver = 2
 	}
 
