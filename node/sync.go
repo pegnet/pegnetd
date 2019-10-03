@@ -301,9 +301,10 @@ func (d *Pegnetd) ApplyTransactionBlock(sqlTx *sql.Tx, eblock *factom.EBlock) er
 			continue
 		}
 		log.WithFields(log.Fields{
-			"height":    eblock.Height,
-			"entryhash": entry.Hash.String(),
-			"txs":       len(txBatch.Transactions)}).Tracef("tx found")
+			"height":      eblock.Height,
+			"entryhash":   entry.Hash.String(),
+			"conversions": txBatch.HasConversions(),
+			"txs":         len(txBatch.Transactions)}).Tracef("tx found")
 
 		isReplay, err := d.Pegnet.IsReplayTransaction(sqlTx, txBatch.Hash)
 		if err != nil {
