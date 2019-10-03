@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/binary"
 	"encoding/json"
+	"fmt"
 
 	"github.com/Factom-Asset-Tokens/factom"
 	"github.com/pegnet/pegnet/modules/grader"
@@ -75,13 +76,16 @@ func (p *Pegnet) InsertGradeBlock(tx *sql.Tx, eblock *factom.EBlock, graded grad
 		return err
 	}
 
-	for _, o := range graded.Graded() {
-		diff := make([]byte, 8)
-		binary.BigEndian.PutUint64(diff, o.SelfReportedDifficulty)
-		_, err = tx.Exec(`INSERT INTO pn_winners (height, entryhash, oprhash, payout, grade, nonce, difficulty, position, minerid, address) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
-			eblock.Height, o.EntryHash, o.OPRHash, o.Payout(), o.Grade, o.Nonce, diff, o.Position(), o.OPR.GetID(), o.OPR.GetAddress())
-		if err != nil {
-			return err
+	// No winners? Then don't insert
+	if len(graded.Winners()) > 0 {
+		for _, o := range graded.Graded() {
+			diff := make([]byte, 8)
+			binary.BigEndian.PutUint64(diff, o.SelfReportedDifficulty)
+			_, err = tx.Exec(`INSERT INTO pn_winners (height, entryhash, oprhash, payout, grade, nonce, difficulty, position, minerid, address) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+				eblock.Height, o.EntryHash, o.OPRHash, o.Payout(), o.Grade, o.Nonce, diff, o.Position(), o.OPR.GetID(), o.OPR.GetAddress())
+			if err != nil {
+				return fmt.Errorf("ht %d, pos %d :%s", eblock.Height, o.Position(), err)
+			}
 		}
 	}
 
