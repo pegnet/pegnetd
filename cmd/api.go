@@ -18,8 +18,9 @@ import (
 )
 
 func init() {
-	rootCmd.AddCommand(balances)
 	rootCmd.AddCommand(balance)
+	rootCmd.AddCommand(balances)
+	rootCmd.AddCommand(status)
 
 	//tx.Flags()
 	rootCmd.AddCommand(tx)
@@ -178,4 +179,27 @@ func queryBalances(humanAddress string) (srv.ResultGetPegnetBalances, error) {
 	}
 
 	return res, nil
+}
+
+var status = &cobra.Command{
+	Use:              "status",
+	Short:            "Fetch the current sync status for the pegnetd node",
+	PersistentPreRun: always,
+	PreRun:           SoftReadConfig,
+	Run: func(cmd *cobra.Command, args []string) {
+		cl := srv.NewClient()
+		cl.PegnetdServer = viper.GetString(config.Pegnetd)
+		var res srv.ResultGetSyncStatus
+		err := cl.Request("get-sync-status", nil, &res)
+		if err != nil {
+			fmt.Printf("Failed to make RPC request\nDetails:\n%v\n", err)
+			os.Exit(1)
+		}
+
+		data, err := json.Marshal(res)
+		if err != nil {
+			panic(err)
+		}
+		fmt.Println(string(data))
+	},
 }
