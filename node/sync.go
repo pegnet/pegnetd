@@ -9,7 +9,6 @@ import (
 	"github.com/Factom-Asset-Tokens/factom"
 	"github.com/pegnet/pegnet/modules/conversions"
 	"github.com/pegnet/pegnet/modules/grader"
-	"github.com/pegnet/pegnet/modules/opr"
 	"github.com/pegnet/pegnetd/config"
 	"github.com/pegnet/pegnetd/fat/fat2"
 	log "github.com/sirupsen/logrus"
@@ -176,7 +175,7 @@ func (d *Pegnetd) SyncBlock(ctx context.Context, tx *sql.Tx, height uint32) erro
 	// At this point, we start making updates to the database in a specific order:
 	// TODO: ensure we rollback the tx when needed
 	// 1) Apply transaction batches that are in holding (conversions are always applied here)
-	err = d.ApplyTransactionBatchesInHolding(ctx, tx, uint64(height))
+	err = d.ApplyTransactionBatchesInHolding(ctx, tx, height)
 	if err != nil {
 		return err
 	}
@@ -242,34 +241,32 @@ func multiFetch(eblock *factom.EBlock, c *factom.Client) error {
 // ApplyTransactionBatchesInHolding attempts to apply the transaction batches from previous
 // blocks that were put into holding because they contained conversions.
 // If an error is returned, the sql.Tx should be rolled back by the caller.
-func (d *Pegnetd) ApplyTransactionBatchesInHolding(ctx context.Context, sqlTx *sql.Tx, currentHeight uint64) error {
-	// TODO: get other heights that have transaction batches in holding (in case there was
-	//       an OPR Block that couldn't get graded and produce a new set of rates)
-
-	rates, err := d.Pegnet.SelectRates(ctx, uint32(currentHeight))
+func (d *Pegnetd) ApplyTransactionBatchesInHolding(ctx context.Context, sqlTx *sql.Tx, currentHeight uint32) error {
+	rates, height, err := d.Pegnet.SelectMostRecentRatesBeforeHeight(ctx, sqlTx, currentHeight+1)
 	if err != nil {
 		return err
 	}
-
-	txBatches, err := d.Pegnet.SelectTransactionBatchesInHoldingAtHeight(currentHeight - 1)
-	if err != nil {
-		return err
-	}
-	for _, txBatch := range txBatches {
-		// Re-validate transaction batch because timestamp might not be valid anymore
-		if err := txBatch.Validate(); err != nil {
-			continue
-		}
-		isReplay, err := d.Pegnet.IsReplayTransaction(sqlTx, txBatch.Hash)
+	for i := height + 1; i < currentHeight; i++ {
+		txBatches, err := d.Pegnet.SelectTransactionBatchesInHoldingAtHeight(uint64(i))
 		if err != nil {
 			return err
-		} else if isReplay {
-			continue
 		}
+		for _, txBatch := range txBatches {
+			// Re-validate transaction batch because timestamp might not be valid anymore
+			if err := txBatch.Validate(); err != nil {
+				continue
+			}
+			isReplay, err := d.Pegnet.IsReplayTransaction(sqlTx, txBatch.Hash)
+			if err != nil {
+				return err
+			} else if isReplay {
+				continue
+			}
 
-		err = d.applyTransactionBatch(sqlTx, txBatch, rates)
-		if err != nil {
-			return nil
+			err = d.applyTransactionBatch(sqlTx, txBatch, rates)
+			if err != nil {
+				return nil
+			}
 		}
 	}
 	return nil
@@ -311,7 +308,7 @@ func (d *Pegnetd) ApplyTransactionBlock(sqlTx *sql.Tx, eblock *factom.EBlock) er
 	return nil
 }
 
-func (d *Pegnetd) applyTransactionBatch(sqlTx *sql.Tx, txBatch *fat2.TransactionBatch, rates []opr.AssetUint) error {
+func (d *Pegnetd) applyTransactionBatch(sqlTx *sql.Tx, txBatch *fat2.TransactionBatch, rates map[fat2.PTicker]uint64) error {
 	for txIndex, tx := range txBatch.Transactions {
 		var inputAdrID int64
 		inputAdrID, txErr, err := d.Pegnet.SubFromBalance(sqlTx, &tx.Input.Address, tx.Input.Type, tx.Input.Amount)
@@ -326,8 +323,10 @@ func (d *Pegnetd) applyTransactionBatch(sqlTx *sql.Tx, txBatch *fat2.Transaction
 		}
 
 		if tx.IsConversion() {
-			// TODO: make sure that the rates ordering is the same as the fat2.PTicker iotas
-			outputAmount, err := conversions.Convert(int64(tx.Input.Amount), rates[tx.Input.Type].Value, rates[tx.Conversion].Value)
+			if rates == nil {
+				return fmt.Errorf("rates must not be nil if TransactionBatch contains conversions")
+			}
+			outputAmount, err := conversions.Convert(int64(tx.Input.Amount), rates[tx.Input.Type], rates[tx.Conversion])
 			if err != nil {
 				return err
 			}
