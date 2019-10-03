@@ -347,6 +347,10 @@ func (d *Pegnetd) applyTransactionBatch(sqlTx *sql.Tx, txBatch *fat2.Transaction
 			if rates == nil {
 				return fmt.Errorf("rates must not be nil if TransactionBatch contains conversions")
 			}
+
+			if rates[tx.Input.Type] == 0 || rates[tx.Conversion] == 0 {
+				return nil // 0 rates result in an invalid tx. So we drop it
+			}
 			outputAmount, err := conversions.Convert(int64(tx.Input.Amount), rates[tx.Input.Type], rates[tx.Conversion])
 			if err != nil {
 				return err
