@@ -28,6 +28,9 @@ func init() {
 	rootCmd.PersistentFlags().StringP("pegnetd", "p", "http://localhost:8070", "The url to the pegnetd endpoint without a trailing slash")
 	rootCmd.PersistentFlags().String("api", "8070", "Change the api listening port for the api")
 
+	rootCmd.Flags().String("dbmode", "", "Turn on custom sqlite modes")
+	rootCmd.Flags().Bool("wal", false, "Turn on WAL mode for sqlite")
+
 	// This is for testing purposes
 	rootCmd.PersistentFlags().Bool("testing", false, "If this flag is set, all v2 activations heights are set to 0.")
 }
@@ -92,6 +95,8 @@ func always(cmd *cobra.Command, args []string) {
 	_ = viper.BindPFlag(config.Wallet, cmd.Flags().Lookup("wallet"))
 	_ = viper.BindPFlag(config.Pegnetd, cmd.Flags().Lookup("pegnetd"))
 	_ = viper.BindPFlag(config.APIListen, cmd.Flags().Lookup("api"))
+	_ = viper.BindPFlag(config.SQLDBWalMode, cmd.Flags().Lookup("wal"))
+	_ = viper.BindPFlag(config.CustomSQLDBMode, cmd.Flags().Lookup("dbmode"))
 
 	// Also init some defaults
 	viper.SetDefault(config.DBlockSyncRetryPeriod, time.Second*5)

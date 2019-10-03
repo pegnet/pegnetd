@@ -9,6 +9,9 @@ const (
 	// DBlockSync Stuff
 	DBlockSyncRetryPeriod = "dblocksync.retry"
 
+	CustomSQLDBMode = "db.mode"
+	SQLDBWalMode    = "db.wal"
+
 	Server  = "app.Server"
 	Wallet  = "app.Wallet"
 	Pegnetd = "app.Pegnetd"
