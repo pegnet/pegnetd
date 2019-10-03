@@ -65,6 +65,7 @@ func (p *Pegnet) createTables() error {
 		createTableWinners,
 		createTableTransactions,
 		createTableTransactionBatchHolding,
+		createTableStats,
 	} {
 		if _, err := p.DB.Exec(sql); err != nil {
 			return err

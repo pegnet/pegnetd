@@ -6,10 +6,11 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/pegnet/pegnet/modules/grader"
-	"github.com/pegnet/pegnetd/fat/fat2"
 	"github.com/Factom-Asset-Tokens/factom"
+	"github.com/pegnet/pegnet/modules/grader"
 	"github.com/pegnet/pegnetd/config"
+	"github.com/pegnet/pegnetd/fat/fat2"
+	"github.com/pegnet/pegnetd/node/pegnet"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -55,10 +56,13 @@ OuterSyncLoop:
 				hLog.WithError(err).Errorf("failed to start transaction")
 				continue
 			}
+
+			stats := pegnet.NewStats(d.Sync.Synced + 1)
+
 			// We are not synced, so we need to iterate through the dblocks and sync them
 			// one by one. We can only sync our current synced height +1
 			// TODO: This skips the genesis block. I'm sure that is fine
-			if err := d.SyncBlock(ctx, tx, d.Sync.Synced+1); err != nil {
+			if err := d.SyncBlock(ctx, tx, stats, d.Sync.Synced+1); err != nil {
 				hLog.WithError(err).Errorf("failed to sync height")
 				time.Sleep(retryPeriod)
 				// If we fail, we backout to the outer loop. This allows error handling on factomd state to be a bit
@@ -71,8 +75,18 @@ OuterSyncLoop:
 				continue OuterSyncLoop
 			}
 
-			// Bump our sync, and march forward
+			err = d.Pegnet.InsertStats(tx, stats)
+			if err != nil {
+				hLog.WithError(err).Errorf("unable to update stats")
+				err = tx.Rollback()
+				if err != nil {
+					// TODO evaluate if we can recover from this point or not
+					hLog.WithError(err).Fatal("unable to roll back transaction")
+				}
+				continue OuterSyncLoop
+			}
 
+			// Bump our sync, and march forward
 			d.Sync.Synced++
 			err = d.Pegnet.InsertSynced(tx, d.Sync)
 			if err != nil {
@@ -106,7 +120,7 @@ OuterSyncLoop:
 // If SyncBlock returns no error, than that height was synced and saved. If any part of the sync fails,
 // the whole sync should be rolled back and not applied. An error should then be returned.
 // The context should be respected if it is cancelled
-func (d *Pegnetd) SyncBlock(ctx context.Context, tx *sql.Tx, height uint32) error {
+func (d *Pegnetd) SyncBlock(ctx context.Context, tx *sql.Tx, stats *pegnet.Stats, height uint32) error {
 	if isDone(ctx) { // Just an example about how to handle it being cancelled
 		return context.Canceled
 	}
@@ -145,7 +159,7 @@ func (d *Pegnetd) SyncBlock(ctx context.Context, tx *sql.Tx, height uint32) erro
 	// Sync the factoid chain in a transactional way. We should be able to rollback
 	// the burn sync if we need too. We can first populate the eblocks that we care about
 	// TODO: Check the order of operations on this and what block to add burns from.
-	if err := d.SyncFactoidBlock(ctx, tx, dblock); err != nil {
+	if err := d.SyncFactoidBlock(ctx, tx, stats, dblock); err != nil {
 		return err
 	}
 
@@ -164,7 +178,7 @@ func (d *Pegnetd) SyncBlock(ctx context.Context, tx *sql.Tx, height uint32) erro
 			}
 		}
 
-		if err := d.PayWinners(tx, winners); err != nil {
+		if err := d.PayWinners(tx, stats, winners); err != nil {
 			return err
 		}
 
@@ -174,7 +188,7 @@ func (d *Pegnetd) SyncBlock(ctx context.Context, tx *sql.Tx, height uint32) erro
 	return nil
 }
 
-func (d *Pegnetd) PayWinners(tx *sql.Tx, winners []*grader.GradingOPR) error {
+func (d *Pegnetd) PayWinners(tx *sql.Tx, stats *pegnet.Stats, winners []*grader.GradingOPR) error {
 	// Reward the winners
 	for i := range winners {
 		addr, err := factom.NewFAAddress(winners[i].OPR.GetAddress())
@@ -192,12 +206,14 @@ func (d *Pegnetd) PayWinners(tx *sql.Tx, winners []*grader.GradingOPR) error {
 		if _, err := d.Pegnet.AddToBalance(tx, &addr, fat2.PTickerPEG, uint64(winners[i].Payout())); err != nil {
 			return err // The tx should be rolled back by the caller if we return an error during this.
 		}
+
+		stats.Volume[fat2.PTickerPEG.String()] += uint64(winners[i].Payout())
 	}
 	return nil
 }
 
 // SyncFactoidBlock tracks the burns for a specific dblock
-func (d *Pegnetd) SyncFactoidBlock(ctx context.Context, tx *sql.Tx, dblock *factom.DBlock) error {
+func (d *Pegnetd) SyncFactoidBlock(ctx context.Context, tx *sql.Tx, stats *pegnet.Stats, dblock *factom.DBlock) error {
 	fblock := new(factom.FBlock)
 	fblock.Header.Height = dblock.Height
 	if err := fblock.Get(d.FactomClient); err != nil {
@@ -245,6 +261,7 @@ func (d *Pegnetd) SyncFactoidBlock(ctx context.Context, tx *sql.Tx, dblock *fact
 	var _ = burns
 	if totalBurned > 0 { // Just some debugging
 		log.WithFields(log.Fields{"height": dblock.Height, "amount": totalBurned, "quantity": len(burns)}).Debug("fct burned")
+		stats.Burns = totalBurned
 	}
 
 	// All burns are FCT inputs
@@ -254,6 +271,7 @@ func (d *Pegnetd) SyncFactoidBlock(ctx context.Context, tx *sql.Tx, dblock *fact
 		if _, err := d.Pegnet.AddToBalance(tx, &add, fat2.PTickerFCT, burns[i].Amount); err != nil {
 			return err // The tx should be rolled back by the caller if we return an error during this.
 		}
+		stats.Volume[fat2.PTickerFCT.String()] += burns[i].Amount
 	}
 
 	return nil
