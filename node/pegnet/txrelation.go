@@ -14,7 +14,7 @@ import (
 //
 // If the transaction is a conversion, both "to" and "conversion" are set to true
 const createTableTransactions = `CREATE TABLE IF NOT EXISTS "pn_address_transactions" (
-        "entry_hash"    BLOB NOT NULL UNIQUE,
+        "entry_hash"    BLOB NOT NULL,
         "address_id"    INTEGER NOT NULL,
         "tx_index"      INTEGER NOT NULL,
         "to"            BOOL NOT NULL,
@@ -54,6 +54,15 @@ func (p *Pegnet) InsertTransactionRelation(tx *sql.Tx, adrID int64, entryHash *f
 // IsReplayTransaction returns true if there exist any transaction relations in the
 // "pn_address_transactions" table.
 func (p *Pegnet) IsReplayTransaction(tx *sql.Tx, entryHash *factom.Bytes32) (bool, error) {
-	// TODO: implement Pegnet.IsReplayTransaction()
-	return false, nil
+	rows, err := tx.Query(`SELECT * FROM "pn_address_transactions" WHERE "entry_hash" = ?;`)
+	if err != nil {
+		return false, err
+	}
+	defer rows.Close()
+	err = rows.Err()
+	if err != nil {
+		return false, err
+	}
+	// If there is any result, then we know the transaction has been executed before and thus a replay.
+	return rows.Next(), nil
 }

@@ -230,7 +230,6 @@ func multiFetch(eblock *factom.EBlock, c *factom.Client) error {
 	for e := range errs {
 		count++
 		if e != nil {
-
 			return e
 		}
 		if count == len(eblock.Entries) {
@@ -244,7 +243,7 @@ func multiFetch(eblock *factom.EBlock, c *factom.Client) error {
 // ApplyTransactionBatchesInHolding attempts to apply the transaction batches from previous
 // blocks that were put into holding because they contained conversions.
 // If an error is returned, the sql.Tx should be rolled back by the caller.
-func (d *Pegnetd) ApplyTransactionBatchesInHolding(ctx context.Context, tx *sql.Tx, currentHeight uint64) error {
+func (d *Pegnetd) ApplyTransactionBatchesInHolding(ctx context.Context, sqlTx *sql.Tx, currentHeight uint64) error {
 	// TODO: get other heights that have transaction batches in holding (in case there was
 	//       an OPR Block that couldn't get graded and produce a new set of rates)
 
@@ -258,7 +257,18 @@ func (d *Pegnetd) ApplyTransactionBatchesInHolding(ctx context.Context, tx *sql.
 		return err
 	}
 	for _, txBatch := range txBatches {
-		err = d.applyTransactionBatch(tx, txBatch, rates)
+		// Re-validate transaction batch because timestamp might not be valid anymore
+		if err := txBatch.Validate(); err != nil {
+			continue
+		}
+		isReplay, err := d.Pegnet.IsReplayTransaction(sqlTx, txBatch.Hash)
+		if err != nil {
+			return err
+		} else if isReplay {
+			continue
+		}
+
+		err = d.applyTransactionBatch(sqlTx, txBatch, rates)
 		if err != nil {
 			return nil
 		}
