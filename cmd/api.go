@@ -28,8 +28,9 @@ func init() {
 }
 
 var conv = &cobra.Command{
-	Use:   "newcvt <ECAddress> <SOURCE> <SRC-ASSET> <AMOUNT> <DEST-ASSET>",
-	Short: "Builds and submits a pegnet conversion",
+	Use:     "newcvt <ECAddress> <SOURCE> <SRC-ASSET> <AMOUNT> <DEST-ASSET>",
+	Aliases: []string{"newconversion", "newconvert"},
+	Short:   "Builds and submits a pegnet conversion",
 	Example: "pegnetd newcvt EC3eX8VxGH64Xv3NFd9g4Y7PxSMnH3EGz5jQQrrQS8VZGnv4JY2K FA32xV6SoPBSbAZAVyuiHWwyoMYhnSyMmAHZfK29H8dx7bJXFLja" +
 		" pFCT 100 pUSD ",
 	PersistentPreRun: always,
