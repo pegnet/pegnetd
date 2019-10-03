@@ -4,11 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"strings"
 
 	"github.com/pegnet/pegnetd/node"
-
-	"github.com/Factom-Asset-Tokens/fatd/fat"
 
 	"github.com/pegnet/pegnetd/config"
 	"github.com/spf13/viper"
@@ -24,15 +21,16 @@ func init() {
 	rootCmd.AddCommand(balances)
 	rootCmd.AddCommand(balance)
 
-	tx.Flags()
+	//tx.Flags()
 	rootCmd.AddCommand(tx)
+	rootCmd.AddCommand(conv)
 }
 
-var tx = &cobra.Command{
-	Use:   "newtx <ECAddress> <SOURCE> <DESTINATION> <ASSET> <AMOUNT>",
-	Short: "Builds and submits a pegnet transaction",
-	Example: "pegnetd newtx EC3eX8VxGH64Xv3NFd9g4Y7PxSMnH3EGz5jQQrrQS8VZGnv4JY2K FA32xV6SoPBSbAZAVyuiHWwyoMYhnSyMmAHZfK29H8dx7bJXFLja" +
-		" FA33kNzXwUt3cn4tLR56kyHEAryazAGPuMC6GjUubSbwrrNv8e7t PEG 200 ",
+var conv = &cobra.Command{
+	Use:   "newcvt <ECAddress> <SOURCE> <SRC-ASSET> <AMOUNT> <DEST-ASSET>",
+	Short: "Builds and submits a pegnet conversion",
+	Example: "pegnetd newcvt EC3eX8VxGH64Xv3NFd9g4Y7PxSMnH3EGz5jQQrrQS8VZGnv4JY2K FA32xV6SoPBSbAZAVyuiHWwyoMYhnSyMmAHZfK29H8dx7bJXFLja" +
+		" pFCT 100 pUSD ",
 	PersistentPreRun: always,
 	PreRun:           SoftReadConfig,
 	Args: cmd.CombineCobraArgs(
@@ -40,111 +38,80 @@ var tx = &cobra.Command{
 			true,
 			cmd.ArgValidatorECAddress,
 			cmd.ArgValidatorFCTAddress,
-			cmd.ArgValidatorFCTAddress,
 			ArgValidatorAssetOrP,
-			cmd.ArgValidatorFCTAmount),
+			cmd.ArgValidatorFCTAmount,
+			ArgValidatorAssetOrP),
 	),
 	Run: func(cmd *cobra.Command, args []string) {
 		var err error
 		cl := node.FactomClientFromConfig(viper.GetViper())
-		payment, source, dest, asset, amt := args[0], args[1], args[2], args[3], args[4]
+		payment, source, srcAsset, amt, destAsset := args[0], args[1], args[2], args[3], args[4]
+
 		// Build the transaction from the args
 		var trans fat2.Transaction
-
-		if strings.ToUpper(asset) != "PEG" {
-			asset = "p" + strings.ToUpper(asset)
+		if err := setTransactionInput(&trans, cl, source, srcAsset, amt); err != nil {
+			cmd.PrintErrf(err.Error())
+			os.Exit(1)
 		}
-		aType := fat2.StringToTicker(asset)
-		if aType == fat2.PTickerInvalid {
+
+		if trans.Conversion, err = ticker(destAsset); err != nil {
 			cmd.PrintErrf("invalid ticker type\n")
 			os.Exit(1)
 		}
 
-		amount := FactoidToFactoshi(amt)
-		if amount == -1 {
-			cmd.PrintErrf("invalid amount specified\n")
-			os.Exit(1)
-		}
-
-		// Set the input
-		if trans.Input.Address, err = factom.NewFAAddress(source); err != nil {
-			cmd.PrintErrf("failed to parse input: %s\n", err.Error())
-			os.Exit(1)
-		}
-
-		// Get out private key
-		priv, err := trans.Input.Address.GetFsAddress(cl)
+		err, commit, reveal := signAndSend(&trans, cl, payment)
 		if err != nil {
-			cmd.PrintErrf("unable to get private key: %s\n", err.Error())
+			cmd.PrintErrf(err.Error())
 			os.Exit(1)
 		}
 
-		trans.Input.Type = aType
-		trans.Input.Amount = uint64(amount)
+		fmt.Printf("conversion sent:\n")
+		fmt.Printf("\t%10s: %s\n", "EntryHash", reveal)
+		fmt.Printf("\t%10s: %s\n", "Commit", commit)
+	},
+}
 
-		pBals, err := queryBalances(source)
+var tx = &cobra.Command{
+	Use:   "newtx <ECAddress> <SOURCE> <ASSET> <AMOUNT> <DESTINATION>",
+	Short: "Builds and submits a pegnet transaction",
+	Example: "pegnetd newtx EC3eX8VxGH64Xv3NFd9g4Y7PxSMnH3EGz5jQQrrQS8VZGnv4JY2K " +
+		" FA33kNzXwUt3cn4tLR56kyHEAryazAGPuMC6GjUubSbwrrNv8e7t PEG 200 FA32xV6SoPBSbAZAVyuiHWwyoMYhnSyMmAHZfK29H8dx7bJXFLja",
+	PersistentPreRun: always,
+	PreRun:           SoftReadConfig,
+	Args: cmd.CombineCobraArgs(
+		cmd.CustomArgOrderValidationBuilder(
+			true,
+			cmd.ArgValidatorECAddress,
+			cmd.ArgValidatorFCTAddress,
+			ArgValidatorAssetOrP,
+			cmd.ArgValidatorFCTAmount,
+			cmd.ArgValidatorFCTAddress),
+	),
+	Run: func(cmd *cobra.Command, args []string) {
+		cl := node.FactomClientFromConfig(viper.GetViper())
+		payment, source, asset, amt, dest := args[0], args[1], args[2], args[3], args[4]
+
+		// Build the transaction from the args
+		var trans fat2.Transaction
+		if err := setTransactionInput(&trans, cl, source, asset, amt); err != nil {
+			cmd.PrintErrf(err.Error())
+			os.Exit(1)
+		}
+
+		if err := setTransferOutput(&trans, cl, dest, amt); err != nil {
+			cmd.PrintErrf(err.Error())
+			os.Exit(1)
+		}
+
+		err, commit, reveal := signAndSend(&trans, cl, payment)
 		if err != nil {
-			cmd.PrintErrf("failed to get asset balance: %s", err.Error())
-			os.Exit(1)
-		}
-
-		if pBals[aType] < trans.Input.Amount {
-			cmd.PrintErrf("not enough %s to cover the transaction", aType.String())
-			os.Exit(1)
-		}
-
-		// Set the output
-		trans.Transfers = make([]fat2.AddressAmountTuple, 1)
-		trans.Transfers[0].Amount = uint64(amount)
-		if trans.Transfers[0].Address, err = factom.NewFAAddress(dest); err != nil {
-			cmd.PrintErrf("failed to parse input: %s\n", err.Error())
-			os.Exit(1)
-		}
-
-		// Sign the tx and make an entry
-		var e fat.Entry
-		content, err := json.Marshal(trans)
-		if err != nil {
-			cmd.PrintErrf("failed to marshal tx: %s", err.Error())
-			os.Exit(1)
-		}
-
-		e.Content = content
-		e.ChainID = &node.TransactionChain
-		e.Sign(priv)
-
-		ec, err := factom.NewECAddress(payment)
-		if err != nil {
-			cmd.PrintErrf("failed to parse input: %s\n", err.Error())
-			os.Exit(1)
-		}
-
-		bal, err := ec.GetBalance(cl)
-		if err != nil {
-			cmd.PrintErrf("failed to get ec balance: %s\n", err.Error())
-			os.Exit(1)
-		}
-
-		if cost, err := e.Cost(false); err != nil || uint64(cost) > bal {
-			cmd.PrintErrf("not enough ec balance for the transaction")
-			os.Exit(1)
-		}
-
-		es, err := ec.GetEsAddress(cl)
-		if err != nil {
-			cmd.PrintErrf("failed to parse input: %s\n", err.Error())
-			os.Exit(1)
-		}
-
-		txid, err := e.ComposeCreate(cl, es, false)
-		if err != nil {
-			cmd.PrintErrf("failed to submit entry: %s\n", err.Error())
+			cmd.PrintErrf(err.Error())
 			os.Exit(1)
 		}
 
 		fmt.Printf("transaction sent:\n")
-		fmt.Printf("\t%10s: %s\n", "EntryHash", e.Hash)
-		fmt.Printf("\t%10s: %s\n", "Commit", txid)
+		fmt.Printf("\t%10s: %s\n", "EntryHash", reveal)
+		fmt.Printf("\t%10s: %s\n", "Commit", commit)
 	},
 }
 
