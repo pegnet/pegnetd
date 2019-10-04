@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/pegnet/pegnetd/node"
 
@@ -133,7 +134,10 @@ var balance = &cobra.Command{
 			os.Exit(1)
 		}
 
-		fmt.Println(res[fat2.StringToTicker(args[0])])
+		ticker := fat2.StringToTicker(toP(args[0]))
+		balance := res[ticker]
+		humanBal := FactoshiToFactoid(int64(balance))
+		fmt.Printf("%s %s\n", humanBal, ticker.String())
 	},
 }
 
@@ -153,7 +157,13 @@ var balances = &cobra.Command{
 			os.Exit(1)
 		}
 
-		data, err := json.Marshal(res)
+		// Change the units to be human readable
+		humanBals := make(map[string]string)
+		for k, bal := range res {
+			humanBals[k.String()] = FactoshiToFactoid(int64(bal))
+		}
+
+		data, err := json.Marshal(humanBals)
 		if err != nil {
 			panic(err)
 		}
@@ -203,4 +213,15 @@ var status = &cobra.Command{
 		}
 		fmt.Println(string(data))
 	},
+}
+
+func toP(asset string) string {
+	if strings.ToLower(asset) == "PEG" {
+		return "PEG"
+	}
+
+	if strings.ToLower(asset)[0] != 'p' {
+		return "p" + strings.ToUpper(asset)
+	}
+	return asset
 }
