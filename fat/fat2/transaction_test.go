@@ -238,6 +238,13 @@ var transactionValidationTests = []struct {
 		"input": {"address": "FA2jK2HcLnRdS94dEcU27rF3meoJfpUcZPSinpb7AwQvPRY6RL1Q", "type": "PEG", "amount": 99},
 		"transfers": [{"address": "FA1zT4aFpEvcnPqPCigB3fvGu4Q4mTXY22iiuV69DqE1pNhdF2MC", "amount": 50}, {"address": "FA1zT4aFpEvcnPqPCigB3fvGu4Q4mTXY22iiuV69DqE1pNhdF2MC", "amount": 50}]
 	}`,
+}, {
+	Name:  "input != sum of transfers",
+	Error: "input amount must equal sum of transfer amounts",
+	TxJSON: `{
+		"input": {"address": "FA2jK2HcLnRdS94dEcU27rF3meoJfpUcZPSinpb7AwQvPRY6RL1Q", "type": "PEG", "amount": 50},
+		"transfers": [{"address": "FA1zT4aFpEvcnPqPCigB3fvGu4Q4mTXY22iiuV69DqE1pNhdF2MC", "amount": 25}]
+	}`,
 }}
 
 // TestTransaction_Validate tests that the Validate function on a Transaction struct is able to catch all
