@@ -38,4 +38,6 @@ var (
 		"fatd is not tracking pending transactions")
 	ErrorAddressNotFound = jrpc.NewError(-32808, "Address Not Found",
 		"address may be invalid, or not yet tracked")
+	ErrorNotFound = jrpc.NewError(-32809, "Not Found",
+		"could not find what you were looking for")
 )

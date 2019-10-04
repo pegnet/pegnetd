@@ -24,6 +24,7 @@ package srv
 
 import (
 	"bytes"
+	"context"
 	"database/sql"
 	"encoding/json"
 
@@ -45,6 +46,8 @@ func (s *APIServer) jrpcMethods() jrpc.MethodMap {
 		"send-transaction": sendTransaction,
 
 		"get-sync-status": s.getSyncStatus,
+
+		"get-pegnet-rates": s.getPegnetRates,
 	}
 
 }
@@ -107,16 +110,16 @@ func (s *APIServer) getTransaction(getEntry bool) jrpc.MethodFunc {
 }
 
 // TODO: This is incompatible with FAT.
-type ResultGetPegnetBalances map[fat2.PTicker]uint64
+type ResultPegnetTickerMap map[fat2.PTicker]uint64
 
-func (r ResultGetPegnetBalances) MarshalJSON() ([]byte, error) {
+func (r ResultPegnetTickerMap) MarshalJSON() ([]byte, error) {
 	strMap := make(map[string]uint64, len(r))
 	for ticker, balance := range r {
 		strMap[ticker.String()] = balance
 	}
 	return json.Marshal(strMap)
 }
-func (r *ResultGetPegnetBalances) UnmarshalJSON(data []byte) error {
+func (r *ResultPegnetTickerMap) UnmarshalJSON(data []byte) error {
 	var strMap map[string]uint64
 	if err := json.Unmarshal(data, &strMap); err != nil {
 		return err
@@ -147,7 +150,24 @@ func (s *APIServer) getPegnetBalances(data json.RawMessage) interface{} {
 	if err != nil {
 		return jsonrpc2.InternalError
 	}
-	return ResultGetPegnetBalances(bals)
+	return ResultPegnetTickerMap(bals)
+}
+
+func (s *APIServer) getPegnetRates(data json.RawMessage) interface{} {
+	params := ParamsGetPegnetRates{}
+	if _, _, err := validate(data, &params); err != nil {
+		return err
+	}
+	rates, err := s.Node.Pegnet.SelectRates(context.Background(), *params.Height)
+	if err == sql.ErrNoRows || rates == nil || len(rates) == 0 {
+		return ErrorNotFound
+	}
+	if err != nil {
+		return jsonrpc2.InternalError
+	}
+
+	// The balance results actually works for rates too
+	return ResultPegnetTickerMap(rates)
 }
 
 func sendTransaction(data json.RawMessage) interface{} {
