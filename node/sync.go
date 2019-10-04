@@ -336,13 +336,18 @@ func (d *Pegnetd) ApplyTransactionBlock(sqlTx *sql.Tx, eblock *factom.EBlock) er
 // applyTransactionBatch
 //	currentHeight is just for tracing
 func (d *Pegnetd) applyTransactionBatch(sqlTx *sql.Tx, txBatch *fat2.TransactionBatch, rates map[fat2.PTicker]uint64, currentHeight uint32) error {
+	balances := make(map[factom.FAAddress]map[fat2.PTicker]uint64)
+
 	// We need to do all checks up front, then apply the tx
 	for _, tx := range txBatch.Transactions {
 		// First check the input address has the funds
-		bal, err := d.Pegnet.SelectPendingBalance(sqlTx, &tx.Input.Address, tx.Input.Type)
+		bals, err := d.Pegnet.SelectPendingBalances(sqlTx, &tx.Input.Address)
 		if err != nil {
 			return err
 		}
+
+		balances[tx.Input.Address] = bals
+		bal := bals[tx.Input.Type]
 
 		if tx.Input.Amount > bal {
 			return pegnet.InsufficientBalanceErr // This error is safe to pass, and it is handled to skip this batch
@@ -358,14 +363,38 @@ func (d *Pegnetd) applyTransactionBatch(sqlTx *sql.Tx, txBatch *fat2.Transaction
 				// This error will not fail the block, skip the tx
 				return nil // 0 rates result in an invalid tx. So we drop it
 			}
-			// This can catch an integer overflow. We should fail the block, as a code update
-			// would be needed to handle it
+			// TODO: For now any bogus amounts will be tossed. Someone can fake an overflow for example,
+			// 		and hold us up forever.
 			_, err := conversions.Convert(int64(tx.Input.Amount), rates[tx.Input.Type], rates[tx.Conversion])
 			if err != nil {
-				return err
+				return nil
 			}
 		} else {
 			// There are no additional transfer checks
+		}
+	}
+
+	// Now check the batch does not drive an input negative
+	// TODO: A nested tx would be much easier, since we have to literally implement the same loop twice
+	for _, tx := range txBatch.Transactions {
+		if balances[tx.Input.Address][tx.Input.Type] < tx.Input.Amount {
+			return pegnet.InsufficientBalanceErr
+		}
+		balances[tx.Input.Address][tx.Input.Type] -= tx.Input.Amount
+
+		if tx.IsConversion() {
+			outputAmount, err := conversions.Convert(int64(tx.Input.Amount), rates[tx.Input.Type], rates[tx.Conversion])
+			if err != nil {
+				return err
+			}
+			balances[tx.Input.Address][tx.Conversion] += uint64(outputAmount)
+		} else {
+			for _, transfer := range tx.Transfers {
+				// If it is one of our inputs
+				if _, ok := balances[transfer.Address]; ok {
+					balances[transfer.Address][tx.Input.Type] += transfer.Amount
+				}
+			}
 		}
 	}
 
