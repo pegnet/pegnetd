@@ -19,7 +19,9 @@ If successful, there will now be a `pegnetd` executable file in the working dire
 
 ## Configuration
 
-`// TODO: add documentation around config options here`
+By default `pegnetd` will search `$HOME/pegnetd/pegnetd-conf.toml` or `./pegnetd-conf.toml` for your config file. The default config file is in the root directory of this repo, and can be copied to your home folder. Alternatively the `--config pegnetd-conf.toml` can also be specified. 
+
+Once you have your config in place, running `pegnetd` will begin syncing to the current network your factomd is on.
 
 ## Running
 
