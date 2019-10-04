@@ -173,8 +173,10 @@ func (d *Pegnetd) SyncBlock(ctx context.Context, tx *sql.Tx, height uint32) erro
 				return err
 			}
 		} else {
-			fLog.WithFields(log.Fields{"section": "grading"}).Tracef("no winners")
+			fLog.WithFields(log.Fields{"section": "grading", "reason": "no winners"}).Tracef("block not graded")
 		}
+	} else {
+		fLog.WithFields(log.Fields{"section": "grading", "reason": "no graded block"}).Tracef("block not graded")
 	}
 
 	// Only apply transactions if we crossed the activation
