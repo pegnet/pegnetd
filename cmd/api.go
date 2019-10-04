@@ -29,7 +29,7 @@ func init() {
 }
 
 var conv = &cobra.Command{
-	Use:     "newcvt <ECAddress> <SOURCE> <SRC-ASSET> <AMOUNT> <DEST-ASSET>",
+	Use:     "newcvt <ECAddress> <FA-SOURCE> <SRC-ASSET> <AMOUNT> <DEST-ASSET>",
 	Aliases: []string{"newconversion", "newconvert"},
 	Short:   "Builds and submits a pegnet conversion",
 	Example: "pegnetd newcvt EC3eX8VxGH64Xv3NFd9g4Y7PxSMnH3EGz5jQQrrQS8VZGnv4JY2K FA32xV6SoPBSbAZAVyuiHWwyoMYhnSyMmAHZfK29H8dx7bJXFLja" +
@@ -75,7 +75,7 @@ var conv = &cobra.Command{
 }
 
 var tx = &cobra.Command{
-	Use:   "newtx <ECAddress> <SOURCE> <ASSET> <AMOUNT> <DESTINATION>",
+	Use:   "newtx <ECAddress> <FA-SOURCE> <ASSET> <AMOUNT> <FA-DESTINATION>",
 	Short: "Builds and submits a pegnet transaction",
 	Example: "pegnetd newtx EC3eX8VxGH64Xv3NFd9g4Y7PxSMnH3EGz5jQQrrQS8VZGnv4JY2K " +
 		" FA33kNzXwUt3cn4tLR56kyHEAryazAGPuMC6GjUubSbwrrNv8e7t PEG 200 FA32xV6SoPBSbAZAVyuiHWwyoMYhnSyMmAHZfK29H8dx7bJXFLja",
@@ -119,7 +119,7 @@ var tx = &cobra.Command{
 }
 
 var balance = &cobra.Command{
-	Use:              "balance",
+	Use:              "balance <asset> <factoid-address>",
 	Short:            "Fetch the balance for a given asset and address",
 	Example:          "pegnetd balance PEG FA2CEc2JSkhuckEXy42K111MvM9bycUDkbrrHjd9bNkBfvPBSGKd",
 	PersistentPreRun: always,
@@ -142,7 +142,7 @@ var balance = &cobra.Command{
 }
 
 var balances = &cobra.Command{
-	Use:              "balances",
+	Use:              "balances <factoid-address>",
 	Short:            "Fetch all balances for a given factoid address",
 	Example:          "pegnetd balances FA2CEc2JSkhuckEXy42K111MvM9bycUDkbrrHjd9bNkBfvPBSGKd",
 	PersistentPreRun: always,
