@@ -183,10 +183,24 @@ func (p *Pegnet) SelectBalance(adr *factom.FAAddress, ticker fat2.PTicker) (uint
 	return balance, nil
 }
 
+// SelectPendingBalances returns a map of all valid PTickers and their associated
+// balances for the given address. If the address is not in the database,
+// the map will contain 0 for all valid PTickers. This works on the pending tx
+func (p *Pegnet) SelectPendingBalances(tx *sql.Tx, adr *factom.FAAddress) (map[fat2.PTicker]uint64, error) {
+	return p.selectBalances(tx, adr)
+}
+
 // SelectBalances returns a map of all valid PTickers and their associated
 // balances for the given address. If the address is not in the database,
 // the map will contain 0 for all valid PTickers.
 func (p *Pegnet) SelectBalances(adr *factom.FAAddress) (map[fat2.PTicker]uint64, error) {
+	return p.selectBalances(p.DB, adr)
+}
+
+// SelectPendingBalances returns a map of all valid PTickers and their associated
+// balances for the given address. If the address is not in the database,
+// the map will contain 0 for all valid PTickers. This works on the pending tx
+func (Pegnet) selectBalances(q QueryAble, adr *factom.FAAddress) (map[fat2.PTicker]uint64, error) {
 	balanceMap := make(map[fat2.PTicker]uint64, int(fat2.PTickerMax))
 	for i := fat2.PTickerInvalid + 1; i < fat2.PTickerMax; i++ {
 		balanceMap[i] = 0
@@ -195,7 +209,7 @@ func (p *Pegnet) SelectBalances(adr *factom.FAAddress) (map[fat2.PTicker]uint64,
 	balances := make([]uint64, int(fat2.PTickerMax))
 	var id int
 	var address []byte
-	err := p.DB.QueryRow(`SELECT * FROM pn_addresses WHERE address = ?;`, adr[:]).Scan(
+	err := q.QueryRow(`SELECT * FROM pn_addresses WHERE address = ?;`, adr[:]).Scan(
 		&id,
 		&address,
 		&balances[fat2.PTickerPEG],
