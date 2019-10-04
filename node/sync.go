@@ -226,6 +226,12 @@ func multiFetch(eblock *factom.EBlock, c *factom.Client) error {
 
 	for i := 0; i < 8; i++ {
 		go func() {
+			// TODO: Fix the channels such that a write on a closed channel never happens.
+			//		For now, just kill the worker go routine
+			defer func() {
+				recover()
+			}()
+
 			for j := range work {
 				errs <- eblock.Entries[j].Get(c)
 			}
@@ -240,6 +246,8 @@ func multiFetch(eblock *factom.EBlock, c *factom.Client) error {
 	for e := range errs {
 		count++
 		if e != nil {
+			// If we return, we close the errs channel, and the working go routine will
+			// still try to write to it.
 			return e
 		}
 		if count == len(eblock.Entries) {
