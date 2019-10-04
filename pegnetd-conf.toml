@@ -4,5 +4,8 @@
   # Hardcoding the mainnet path, but allowing for future net support
   dbpath   = "$HOME/.pegnetd/mainnet/node.db"
 
+  # EC3TsJHUs8bzbbVnratBafub6toRYdgzgbR7kWwCW4tqbmyySRmg
+  ecPrivateKey = "Es2XT3jSxi1xqrDvS5JERM3W3jh1awRHuyoahn3hbQLyfEi1jvbq"
+
 [dblocksync]
   retry = "5s"
