@@ -92,8 +92,6 @@ func (s *APIServer) getTransaction(getEntry bool) jrpc.MethodFunc {
 		//res.TxIndex
 
 		if getEntry {
-			// TODO: What format do you want?
-			res.Tx = e
 			return e
 		}
 
