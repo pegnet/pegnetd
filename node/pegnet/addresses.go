@@ -66,8 +66,8 @@ const createTableAddresses = `CREATE TABLE IF NOT EXISTS "pn_addresses" (
                         CONSTRAINT "insufficient balance" CHECK ("pada_balance" >= 0),
         "pxmr_balance"  INTEGER NOT NULL DEFAULT 0
                         CONSTRAINT "insufficient balance" CHECK ("pxmr_balance" >= 0),
-        "pdas_balance"  INTEGER NOT NULL DEFAULT 0
-                        CONSTRAINT "insufficient balance" CHECK ("pdas_balance" >= 0),
+        "pdash_balance"  INTEGER NOT NULL DEFAULT 0
+                        CONSTRAINT "insufficient balance" CHECK ("pdash_balance" >= 0),
         "pzec_balance"  INTEGER NOT NULL DEFAULT 0
                         CONSTRAINT "insufficient balance" CHECK ("pzec_balance" >= 0),
         "pdcr_balance"  INTEGER NOT NULL DEFAULT 0
@@ -225,7 +225,7 @@ func (p *Pegnet) SelectBalances(adr *factom.FAAddress) (map[fat2.PTicker]uint64,
 		&balances[fat2.PTickerXLM],
 		&balances[fat2.PTickerADA],
 		&balances[fat2.PTickerXMR],
-		&balances[fat2.PTickerDAS],
+		&balances[fat2.PTickerDASH],
 		&balances[fat2.PTickerZEC],
 		&balances[fat2.PTickerDCR],
 	)
