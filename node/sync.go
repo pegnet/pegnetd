@@ -336,13 +336,48 @@ func (d *Pegnetd) ApplyTransactionBlock(sqlTx *sql.Tx, eblock *factom.EBlock) er
 // applyTransactionBatch
 //	currentHeight is just for tracing
 func (d *Pegnetd) applyTransactionBatch(sqlTx *sql.Tx, txBatch *fat2.TransactionBatch, rates map[fat2.PTicker]uint64, currentHeight uint32) error {
+	// We need to do all checks up front, then apply the tx
+	for _, tx := range txBatch.Transactions {
+		// First check the input address has the funds
+		bal, err := d.Pegnet.SelectPendingBalance(sqlTx, &tx.Input.Address, tx.Input.Type)
+		if err != nil {
+			return err
+		}
+
+		if tx.Input.Amount > bal {
+			return pegnet.InsufficientBalanceErr // This error is safe to pass, and it is handled to skip this batch
+		}
+
+		// conversion checks
+		if tx.IsConversion() {
+			if rates == nil || len(rates) == 0 {
+				// This error will fail the block
+				return fmt.Errorf("rates must exist if TransactionBatch contains conversions")
+			}
+			if rates[tx.Input.Type] == 0 || rates[tx.Conversion] == 0 {
+				// This error will not fail the block, skip the tx
+				return nil // 0 rates result in an invalid tx. So we drop it
+			}
+			// This can catch an integer overflow. We should fail the block, as a code update
+			// would be needed to handle it
+			_, err := conversions.Convert(int64(tx.Input.Amount), rates[tx.Input.Type], rates[tx.Conversion])
+			if err != nil {
+				return err
+			}
+		} else {
+			// There are no additional transfer checks
+		}
+	}
+
+	// The tx batch should be 100% valid to apply
 	for txIndex, tx := range txBatch.Transactions {
 		var inputAdrID int64
 		inputAdrID, txErr, err := d.Pegnet.SubFromBalance(sqlTx, &tx.Input.Address, tx.Input.Type, tx.Input.Amount)
 		if err != nil {
 			return err
 		} else if txErr != nil {
-			return txErr
+			// This should fail the block
+			return fmt.Errorf("uncaught: %s", txErr.Error())
 		}
 		_, err = d.Pegnet.InsertTransactionRelation(sqlTx, inputAdrID, txBatch.Hash, uint64(txIndex), false, tx.IsConversion())
 		if err != nil {
@@ -350,12 +385,6 @@ func (d *Pegnetd) applyTransactionBatch(sqlTx *sql.Tx, txBatch *fat2.Transaction
 		}
 
 		if tx.IsConversion() {
-			if rates == nil || len(rates) == 0 {
-				return fmt.Errorf("rates must exist if TransactionBatch contains conversions")
-			}
-			if rates[tx.Input.Type] == 0 || rates[tx.Conversion] == 0 {
-				return nil // 0 rates result in an invalid tx. So we drop it
-			}
 			outputAmount, err := conversions.Convert(int64(tx.Input.Amount), rates[tx.Input.Type], rates[tx.Conversion])
 			if err != nil {
 				return err
