@@ -86,9 +86,9 @@ func (s *APIServer) getTransaction(getEntry bool) jrpc.MethodFunc {
 
 		var res ResultGetTransaction
 		res.Hash = e.Hash
-		// TODO: Save timestamp?
+		// TODO: Save timestamp? We'd have to save it to the db
 		//res.Timestamp = e.Timestamp.Unix()
-		// TODO: What is a tx index?
+		// TODO: Fill out the txid field
 		//res.TxIndex
 
 		if getEntry {
@@ -106,39 +106,6 @@ func (s *APIServer) getTransaction(getEntry bool) jrpc.MethodFunc {
 		res.Tx = txBatch
 		return res
 	}
-
-	//return func(data json.RawMessage) interface{} {
-	//params := ParamsGetTransaction{}
-	//chain, put, err := validate(data, &params)
-	//if err != nil {
-	//	return err
-	//}
-	//defer put()
-
-	// TODO: use pegnet specific database code here to fetch an entry
-	//entry, err := entries.SelectValidByHash(chain.Conn, params.Hash)
-	//if err != nil {
-	//	panic(err)
-	//}
-	//if !entry.IsPopulated() {
-	//	return ErrorTransactionNotFound
-	//}
-	//
-	//if getEntry {
-	//	return entry
-	//}
-	//
-	//result := ResultGetTransaction{
-	//	Hash:      entry.Hash,
-	//	Timestamp: entry.Timestamp.Unix(),
-	//}
-	//
-	//tx := fat2.NewTransactionBatch(entry)
-	//if err := tx.UnmarshalEntry(); err != nil {
-	//	panic(err)
-	//}
-	//result.Tx = tx
-	//return result
 }
 
 // TODO: This is incompatible with FAT.
