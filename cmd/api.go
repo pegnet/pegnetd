@@ -53,18 +53,18 @@ var conv = &cobra.Command{
 		// Build the transaction from the args
 		var trans fat2.Transaction
 		if err := setTransactionInput(&trans, cl, source, srcAsset, amt); err != nil {
-			cmd.PrintErrf(err.Error())
+			cmd.PrintErrln(err.Error())
 			os.Exit(1)
 		}
 
 		if trans.Conversion, err = ticker(destAsset); err != nil {
-			cmd.PrintErrf("invalid ticker type\n")
+			cmd.PrintErrln("invalid ticker type")
 			os.Exit(1)
 		}
 
 		err, commit, reveal := signAndSend(&trans, cl, payment)
 		if err != nil {
-			cmd.PrintErrf(err.Error())
+			cmd.PrintErrln(err.Error())
 			os.Exit(1)
 		}
 
@@ -97,18 +97,18 @@ var tx = &cobra.Command{
 		// Build the transaction from the args
 		var trans fat2.Transaction
 		if err := setTransactionInput(&trans, cl, source, asset, amt); err != nil {
-			cmd.PrintErrf(err.Error())
+			cmd.PrintErrln(err.Error())
 			os.Exit(1)
 		}
 
 		if err := setTransferOutput(&trans, cl, dest, amt); err != nil {
-			cmd.PrintErrf(err.Error())
+			cmd.PrintErrln(err.Error())
 			os.Exit(1)
 		}
 
 		err, commit, reveal := signAndSend(&trans, cl, payment)
 		if err != nil {
-			cmd.PrintErrf(err.Error())
+			cmd.PrintErrln(err.Error())
 			os.Exit(1)
 		}
 
