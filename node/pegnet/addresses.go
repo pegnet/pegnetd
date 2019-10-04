@@ -254,3 +254,63 @@ func (Pegnet) selectBalances(q QueryAble, adr *factom.FAAddress) (map[fat2.PTick
 	}
 	return balanceMap, nil
 }
+
+func (p *Pegnet) SelectIssuances() (map[fat2.PTicker]uint64, error) {
+	issuanceMap := make(map[fat2.PTicker]uint64, int(fat2.PTickerMax))
+	for i := fat2.PTickerInvalid + 1; i < fat2.PTickerMax; i++ {
+		issuanceMap[i] = 0
+	}
+	// Can't make pointers of map elements, so a temporary array must be used
+	issuances := make([]uint64, int(fat2.PTickerMax))
+	queryFmt := `SELECT %v FROM pn_addresses`
+	var sb strings.Builder
+	for i := fat2.PTickerInvalid + 1; i < fat2.PTickerMax-1; i++ {
+		tickerLower := strings.ToLower(i.String())
+		sb.WriteString(fmt.Sprintf("SUM(%s_balance), ", tickerLower))
+	}
+	tickerLower := strings.ToLower((fat2.PTickerMax - 1).String())
+	sb.WriteString(fmt.Sprintf("SUM(%s_balance) ", tickerLower))
+
+	err := p.DB.QueryRow(fmt.Sprintf(queryFmt, sb.String())).Scan(
+		&issuances[fat2.PTickerPEG],
+		&issuances[fat2.PTickerUSD],
+		&issuances[fat2.PTickerEUR],
+		&issuances[fat2.PTickerJPY],
+		&issuances[fat2.PTickerGBP],
+		&issuances[fat2.PTickerCAD],
+		&issuances[fat2.PTickerCHF],
+		&issuances[fat2.PTickerINR],
+		&issuances[fat2.PTickerSGD],
+		&issuances[fat2.PTickerCNY],
+		&issuances[fat2.PTickerHKD],
+		&issuances[fat2.PTickerKRW],
+		&issuances[fat2.PTickerBRL],
+		&issuances[fat2.PTickerPHP],
+		&issuances[fat2.PTickerMXN],
+		&issuances[fat2.PTickerXAU],
+		&issuances[fat2.PTickerXAG],
+		&issuances[fat2.PTickerXBT],
+		&issuances[fat2.PTickerETH],
+		&issuances[fat2.PTickerLTC],
+		&issuances[fat2.PTickerRVN],
+		&issuances[fat2.PTickerXBC],
+		&issuances[fat2.PTickerFCT],
+		&issuances[fat2.PTickerBNB],
+		&issuances[fat2.PTickerXLM],
+		&issuances[fat2.PTickerADA],
+		&issuances[fat2.PTickerXMR],
+		&issuances[fat2.PTickerDAS],
+		&issuances[fat2.PTickerZEC],
+		&issuances[fat2.PTickerDCR],
+	)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return issuanceMap, nil
+		}
+		return nil, err
+	}
+	for i := fat2.PTickerInvalid + 1; i < fat2.PTickerMax; i++ {
+		issuanceMap[i] = issuances[i]
+	}
+	return issuanceMap, nil
+}
