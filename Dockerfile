@@ -1,11 +1,6 @@
 # Use >=1.13.1 for the ed25519 update
 FROM golang:1.13.1-alpine
 
-# Get git
-#RUN apt-get update \
-#    && apt-get -y install curl git \
-#    && apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
-
 # For `gcc`
 RUN apk add build-base
 
