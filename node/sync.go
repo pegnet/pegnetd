@@ -177,19 +177,22 @@ func (d *Pegnetd) SyncBlock(ctx context.Context, tx *sql.Tx, height uint32) erro
 		}
 	}
 
-	// At this point, we start making updates to the database in a specific order:
-	// TODO: ensure we rollback the tx when needed
-	// 1) Apply transaction batches that are in holding (conversions are always applied here)
-	if gradedBlock != nil && 0 < len(gradedBlock.Winners()) {
-		if err = d.ApplyTransactionBatchesInHolding(ctx, tx, height); err != nil {
-			return err
+	// Only apply transactions if we crossed the activation
+	if height >= TransactionConversionActivation {
+		// At this point, we start making updates to the database in a specific order:
+		// TODO: ensure we rollback the tx when needed
+		// 1) Apply transaction batches that are in holding (conversions are always applied here)
+		if gradedBlock != nil && 0 < len(gradedBlock.Winners()) {
+			if err = d.ApplyTransactionBatchesInHolding(ctx, tx, height); err != nil {
+				return err
+			}
 		}
-	}
 
-	// 2) Sync transactions in current height and apply transactions
-	if transactionsEBlock != nil {
-		if err = d.ApplyTransactionBlock(tx, transactionsEBlock); err != nil {
-			return err
+		// 2) Sync transactions in current height and apply transactions
+		if transactionsEBlock != nil {
+			if err = d.ApplyTransactionBlock(tx, transactionsEBlock); err != nil {
+				return err
+			}
 		}
 	}
 
