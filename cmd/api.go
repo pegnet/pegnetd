@@ -6,16 +6,14 @@ import (
 	"os"
 	"strings"
 
-	"github.com/pegnet/pegnetd/node"
-
-	"github.com/pegnet/pegnetd/config"
-	"github.com/spf13/viper"
-
 	"github.com/Factom-Asset-Tokens/factom"
 	"github.com/pegnet/pegnet/cmd"
+	"github.com/pegnet/pegnetd/config"
 	"github.com/pegnet/pegnetd/fat/fat2"
+	"github.com/pegnet/pegnetd/node"
 	"github.com/pegnet/pegnetd/srv"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 func init() {
@@ -26,6 +24,7 @@ func init() {
 	//tx.Flags()
 	rootCmd.AddCommand(tx)
 	rootCmd.AddCommand(conv)
+	rootCmd.AddCommand(getTX)
 }
 
 var conv = &cobra.Command{
@@ -202,6 +201,35 @@ var status = &cobra.Command{
 		cl.PegnetdServer = viper.GetString(config.Pegnetd)
 		var res srv.ResultGetSyncStatus
 		err := cl.Request("get-sync-status", nil, &res)
+		if err != nil {
+			fmt.Printf("Failed to make RPC request\nDetails:\n%v\n", err)
+			os.Exit(1)
+		}
+
+		data, err := json.Marshal(res)
+		if err != nil {
+			panic(err)
+		}
+		fmt.Println(string(data))
+	},
+}
+
+var getTX = &cobra.Command{
+	Use:              "gettx <entryhash>",
+	Short:            "Fetch the transaction by the given entryhash",
+	PersistentPreRun: always,
+	PreRun:           SoftReadConfig,
+	Args:             cobra.ExactArgs(1),
+	Run: func(cmd *cobra.Command, args []string) {
+		ehash := factom.NewBytes32FromString(args[0])
+		if ehash.IsZero() {
+			cmd.PrintErrf("entryhash must be a 64 character hex string")
+		}
+
+		cl := srv.NewClient()
+		cl.PegnetdServer = viper.GetString(config.Pegnetd)
+		var res srv.ResultGetTransaction
+		err := cl.Request("get-transaction", srv.ParamsGetTransaction{ParamsToken: srv.ParamsToken{ChainID: &node.TransactionChain}, Hash: ehash}, &res)
 		if err != nil {
 			fmt.Printf("Failed to make RPC request\nDetails:\n%v\n", err)
 			os.Exit(1)

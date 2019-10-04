@@ -85,3 +85,16 @@ func (p *Pegnet) SelectTransactionBatchesInHoldingAtHeight(height uint64) ([]*fa
 	}
 	return txBatches, nil
 }
+
+func (p *Pegnet) DoesTransactionExist(entryhash factom.Bytes32) (bool, error) {
+	var found []byte
+	query := `SELECT "entry_hash" FROM "pn_address_transactions" WHERE "entry_hash" == ?;`
+	err := p.DB.QueryRow(query, entryhash[:]).Scan(&found)
+	if err == sql.ErrNoRows {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	return found != nil && len(found) > 0, nil
+}

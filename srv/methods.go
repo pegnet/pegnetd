@@ -26,7 +26,6 @@ import (
 	"bytes"
 	"database/sql"
 	"encoding/json"
-	"fmt"
 
 	"github.com/pegnet/pegnetd/node"
 
@@ -59,39 +58,87 @@ type ResultGetTransaction struct {
 
 func (s *APIServer) getTransaction(getEntry bool) jrpc.MethodFunc {
 	return func(data json.RawMessage) interface{} {
-		//params := ParamsGetTransaction{}
-		//chain, put, err := validate(data, &params)
-		//if err != nil {
-		//	return err
-		//}
-		//defer put()
+		params := ParamsGetTransaction{}
+		_, _, err := validate(data, &params)
+		if err != nil {
+			return err
+		}
 
-		// TODO: use pegnet specific database code here to fetch an entry
-		//entry, err := entries.SelectValidByHash(chain.Conn, params.Hash)
-		//if err != nil {
-		//	panic(err)
-		//}
-		//if !entry.IsPopulated() {
-		//	return ErrorTransactionNotFound
-		//}
-		//
-		//if getEntry {
-		//	return entry
-		//}
-		//
-		//result := ResultGetTransaction{
-		//	Hash:      entry.Hash,
-		//	Timestamp: entry.Timestamp.Unix(),
-		//}
-		//
-		//tx := fat2.NewTransactionBatch(entry)
-		//if err := tx.UnmarshalEntry(); err != nil {
-		//	panic(err)
-		//}
-		//result.Tx = tx
-		//return result
-		return nil
+		found, err := s.Node.Pegnet.DoesTransactionExist(*params.Hash)
+		if err != nil {
+			return err
+		}
+
+		if !found {
+			return ErrorTransactionNotFound
+		}
+
+		var e factom.Entry
+		e.Hash = params.Hash
+		err = e.Get(s.Node.FactomClient)
+		if err != nil {
+			return jsonrpc2.InternalError
+		}
+
+		if !e.IsPopulated() {
+			return ErrorTransactionNotFound
+		}
+
+		var res ResultGetTransaction
+		res.Hash = e.Hash
+		// TODO: Save timestamp?
+		//res.Timestamp = e.Timestamp.Unix()
+		// TODO: What is a tx index?
+		//res.TxIndex
+
+		if getEntry {
+			// TODO: What format do you want?
+			res.Tx = e
+			return e
+		}
+
+		txBatch := fat2.NewTransactionBatch(e)
+		err = txBatch.UnmarshalEntry()
+		if err != nil {
+			return jsonrpc2.InternalError
+		}
+
+		res.Tx = txBatch
+		return res
 	}
+
+	//return func(data json.RawMessage) interface{} {
+	//params := ParamsGetTransaction{}
+	//chain, put, err := validate(data, &params)
+	//if err != nil {
+	//	return err
+	//}
+	//defer put()
+
+	// TODO: use pegnet specific database code here to fetch an entry
+	//entry, err := entries.SelectValidByHash(chain.Conn, params.Hash)
+	//if err != nil {
+	//	panic(err)
+	//}
+	//if !entry.IsPopulated() {
+	//	return ErrorTransactionNotFound
+	//}
+	//
+	//if getEntry {
+	//	return entry
+	//}
+	//
+	//result := ResultGetTransaction{
+	//	Hash:      entry.Hash,
+	//	Timestamp: entry.Timestamp.Unix(),
+	//}
+	//
+	//tx := fat2.NewTransactionBatch(entry)
+	//if err := tx.UnmarshalEntry(); err != nil {
+	//	panic(err)
+	//}
+	//result.Tx = tx
+	//return result
 }
 
 // TODO: This is incompatible with FAT.
@@ -249,7 +296,6 @@ func validate(data json.RawMessage, params Params) (interface{}, func(), error) 
 	//}
 	chainID := params.ValidChainID()
 	if chainID != nil {
-		fmt.Printf("%x\n", chainID)
 		if *chainID != node.TransactionChain {
 			return nil, nil, ErrorTokenNotFound
 		}
