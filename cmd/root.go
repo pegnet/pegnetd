@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -27,6 +28,7 @@ func init() {
 	rootCmd.PersistentFlags().StringP("wallet", "w", "http://localhost:8089/v2", "The url to the factomd-wallet endpoint without a trailing slash")
 	rootCmd.PersistentFlags().StringP("pegnetd", "p", "http://localhost:8070", "The url to the pegnetd endpoint without a trailing slash")
 	rootCmd.PersistentFlags().String("api", "8070", "Change the api listening port for the api")
+	rootCmd.PersistentFlags().String("config", "", "Optional file location of the config file")
 
 	rootCmd.Flags().String("dbmode", "", "Turn on custom sqlite modes")
 	rootCmd.Flags().Bool("wal", false, "Turn on WAL mode for sqlite")
@@ -89,10 +91,17 @@ func always(cmd *cobra.Command, args []string) {
 	}
 
 	// Setup config reading
-	viper.SetConfigName("pegnetd-conf")
-	// Add as many config paths as we want to check
-	viper.AddConfigPath("$HOME/.pegnetd")
-	viper.AddConfigPath(".")
+	if cFilePath, _ := cmd.Flags().GetString("config"); cFilePath != "" {
+		base := filepath.Base(cFilePath)
+		dir := filepath.Dir(cFilePath)
+		viper.SetConfigFile(base)
+		viper.AddConfigPath(dir)
+	} else {
+		viper.SetConfigName("pegnetd-conf")
+		// Add as many config paths as we want to check
+		viper.AddConfigPath("$HOME/.pegnetd")
+		viper.AddConfigPath(".")
+	}
 
 	// Setup global command line flag overrides
 	// This gets run before any command executes. It will init global flags to the config
