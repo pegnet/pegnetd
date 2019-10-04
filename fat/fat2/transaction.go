@@ -156,6 +156,9 @@ func (t *Transaction) Validate() error {
 		}
 		remainingInputAmount -= transfer.Amount
 	}
+	if t.IsConversion() == false && remainingInputAmount != 0 {
+		return fmt.Errorf("input amount must equal sum of transfer amounts")
+	}
 	return nil
 }
 
