@@ -12,7 +12,8 @@ const (
 	CustomSQLDBMode = "db.mode"
 	SQLDBWalMode    = "db.wal"
 
-	Server  = "app.Server"
-	Wallet  = "app.Wallet"
-	Pegnetd = "app.Pegnetd"
+	Server       = "app.Server"
+	Wallet       = "app.Wallet"
+	Pegnetd      = "app.Pegnetd"
+	ECPrivateKey = "app.ECPrivateKey"
 )

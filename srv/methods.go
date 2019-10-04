@@ -27,13 +27,12 @@ import (
 	"database/sql"
 	"encoding/json"
 
-	"github.com/pegnet/pegnetd/node"
-
 	"github.com/AdamSLevy/jsonrpc2"
-
 	jrpc "github.com/AdamSLevy/jsonrpc2/v11"
 	"github.com/Factom-Asset-Tokens/factom"
+	"github.com/pegnet/pegnetd/config"
 	"github.com/pegnet/pegnetd/fat/fat2"
+	"github.com/pegnet/pegnetd/node"
 )
 
 func (s *APIServer) jrpcMethods() jrpc.MethodMap {
@@ -42,7 +41,7 @@ func (s *APIServer) jrpcMethods() jrpc.MethodMap {
 		"get-transaction-entry": s.getTransaction(true),
 		"get-pegnet-balances":   s.getPegnetBalances,
 
-		"send-transaction": sendTransaction,
+		"send-transaction": s.sendTransaction,
 
 		"get-sync-status": s.getSyncStatus,
 	}
@@ -150,20 +149,23 @@ func (s *APIServer) getPegnetBalances(data json.RawMessage) interface{} {
 	return ResultGetPegnetBalances(bals)
 }
 
-func sendTransaction(data json.RawMessage) interface{} {
-	//params := ParamsSendTransaction{}
-	//chain, put, err := validate(data, &params)
-	//if err != nil {
-	//	return err
-	//}
-	//defer put()
-	//
-	//// TODO: srv.sendTransaction(): use EC address from a config file
-	//if !params.DryRun && factom.Bytes32(flag.EsAdr).IsZero() {
-	//	return ErrorNoEC
-	//}
-	//
-	//entry := params.Entry()
+func (s *APIServer) sendTransaction(data json.RawMessage) interface{} {
+	params := ParamsSendTransaction{}
+	_, _, err := validate(data, &params)
+	if err != nil {
+		return err
+	}
+	// defer put()
+
+	ecPrivateKeyString := s.Config.GetString(config.ECPrivateKey)
+	var ecPrivateKey factom.EsAddress
+	if err = ecPrivateKey.Set(ecPrivateKeyString); err != nil {
+		return jsonrpc2.InternalError
+	}
+
+	entry := params.Entry()
+	entry.ChainID = &node.TransactionChain
+	// TODO: attempt to apply
 	//txErr, err := attemptApplyFAT2TxBatch(chain, entry)
 	//if err != nil {
 	//	panic(err)
@@ -173,34 +175,33 @@ func sendTransaction(data json.RawMessage) interface{} {
 	//	err.Data = txErr.Error()
 	//	return err
 	//}
-	//
-	//var txID *factom.Bytes32
-	//if !params.DryRun {
-	//	balance, err := flag.ECAdr.GetBalance(c)
-	//	if err != nil {
-	//		panic(err)
-	//	}
-	//	cost, err := entry.Cost()
-	//	if err != nil {
-	//		rerr := ErrorInvalidTransaction
-	//		rerr.Data = err.Error()
-	//		return rerr
-	//	}
-	//	if balance < uint64(cost) {
-	//		return ErrorNoEC
-	//	}
-	//	txID, err = entry.ComposeCreate(c, flag.EsAdr)
-	//	if err != nil {
-	//		panic(err)
-	//	}
-	//}
 
-	//return struct {
-	//	ChainID *factom.Bytes32 `json:"chainid"`
-	//	TxID    *factom.Bytes32 `json:"txid,omitempty"`
-	//	Hash    *factom.Bytes32 `json:"entryhash"`
-	//}{ChainID: chain.ID, TxID: txID, Hash: entry.Hash}
-	// TODO: Implement this, and probably allow the user to provide a self signed commit for a shared node
+	var txID *factom.Bytes32
+	if !params.DryRun {
+		balance, err := ecPrivateKey.ECAddress().GetBalance(s.Node.FactomClient)
+		if err != nil {
+			panic(err)
+		}
+		cost, err := entry.Cost(false)
+		if err != nil {
+			rerr := ErrorInvalidTransaction
+			rerr.Data = err.Error()
+			return rerr
+		}
+		if balance < uint64(cost) {
+			return ErrorNoEC
+		}
+		txID, err = entry.ComposeCreate(s.Node.FactomClient, ecPrivateKey, false)
+		if err != nil {
+			panic(err)
+		}
+	}
+
+	return struct {
+		ChainID *factom.Bytes32 `json:"chainid"`
+		TxID    *factom.Bytes32 `json:"txid,omitempty"`
+		Hash    *factom.Bytes32 `json:"entryhash"`
+	}{ChainID: entry.ChainID, TxID: txID, Hash: entry.Hash}
 	return nil
 }
 
