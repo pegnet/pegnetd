@@ -14,8 +14,16 @@ func TestStringToTicker(t *testing.T) {
 		t.Error("wrong ticker")
 	}
 
+	if PTickerDASH != StringToTicker("pDASH") {
+		t.Error("wrong ticker")
+	}
+
+	if PTickerDASH.String() != "pDASH" {
+		t.Error("wrong ticker")
+	}
+
 	d, _ := StringToTicker("pFCT").MarshalJSON()
-	if string(d) != "pFCT" {
+	if string(d) != `"pFCT"` {
 		t.Error("Marshal function was wrong")
 	}
 }

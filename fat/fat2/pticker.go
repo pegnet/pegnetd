@@ -38,7 +38,7 @@ const (
 	PTickerXLM
 	PTickerADA
 	PTickerXMR
-	PTickerDAS
+	PTickerDASH
 	PTickerZEC
 	PTickerDCR
 	PTickerMax
@@ -72,7 +72,7 @@ var validPTickerStrings = []string{
 	"pXLM",
 	"pADA",
 	"pXMR",
-	"pDAS",
+	"pDASH",
 	"pZEC",
 	"pDCR",
 }
