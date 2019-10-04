@@ -159,6 +159,9 @@ func (t *Transaction) Validate() error {
 	if t.IsConversion() == false && remainingInputAmount != 0 {
 		return fmt.Errorf("input amount must equal sum of transfer amounts")
 	}
+	if t.IsConversion() && t.Input.Type == t.Conversion {
+		return fmt.Errorf("conversion cannot to be the same type")
+	}
 	return nil
 }
 

@@ -29,6 +29,10 @@ func signAndSend(tx *fat2.Transaction, cl *factom.Client, payment string) (err e
 
 	txBatch.Sign(priv)
 
+	if err := txBatch.Validate(); err != nil {
+		return fmt.Errorf("invalid tx: %s", err.Error()), nil, nil
+	}
+
 	ec, err := factom.NewECAddress(payment)
 	if err != nil {
 		return fmt.Errorf("failed to parse input: %s\n", err.Error()), nil, nil
