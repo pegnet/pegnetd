@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/Factom-Asset-Tokens/factom"
@@ -21,10 +22,14 @@ func init() {
 	rootCmd.AddCommand(balances)
 	rootCmd.AddCommand(status)
 
+	get.AddCommand(getTX)
+	get.AddCommand(getRates)
+	rootCmd.AddCommand(get)
+
 	//tx.Flags()
 	rootCmd.AddCommand(tx)
 	rootCmd.AddCommand(conv)
-	rootCmd.AddCommand(getTX)
+
 }
 
 var conv = &cobra.Command{
@@ -170,7 +175,7 @@ var balances = &cobra.Command{
 	},
 }
 
-func queryBalances(humanAddress string) (srv.ResultGetPegnetBalances, error) {
+func queryBalances(humanAddress string) (srv.ResultPegnetTickerMap, error) {
 	cl := srv.NewClient()
 	cl.PegnetdServer = viper.GetString(config.Pegnetd)
 	addr, err := factom.NewFAAddress(humanAddress)
@@ -180,7 +185,7 @@ func queryBalances(humanAddress string) (srv.ResultGetPegnetBalances, error) {
 		os.Exit(1)
 	}
 
-	var res srv.ResultGetPegnetBalances
+	var res srv.ResultPegnetTickerMap
 	err = cl.Request("get-pegnet-balances", srv.ParamsGetPegnetBalances{&addr}, &res)
 	if err != nil {
 		// TODO: Better error
@@ -214,8 +219,13 @@ var status = &cobra.Command{
 	},
 }
 
+var get = &cobra.Command{
+	Use:   "get <subcommand>",
+	Short: "Able to read pegnet related information from the daemon.",
+}
+
 var getTX = &cobra.Command{
-	Use:              "gettx <entryhash>",
+	Use:              "tx <entryhash>",
 	Short:            "Fetch the transaction by the given entryhash",
 	PersistentPreRun: always,
 	PreRun:           SoftReadConfig,
@@ -236,6 +246,43 @@ var getTX = &cobra.Command{
 		}
 
 		data, err := json.Marshal(res)
+		if err != nil {
+			panic(err)
+		}
+		fmt.Println(string(data))
+	},
+}
+
+var getRates = &cobra.Command{
+	Use:              "rates <height>",
+	Short:            "Fetch the pegnet quotes for the assets at a given height (if their are quotes)",
+	PersistentPreRun: always,
+	PreRun:           SoftReadConfig,
+	Args:             cobra.ExactArgs(1),
+	Run: func(cmd *cobra.Command, args []string) {
+		height, err := strconv.Atoi(args[0])
+		if height <= 0 || err != nil {
+			cmd.PrintErrf("height must be a number greater than 0")
+			os.Exit(1)
+		}
+
+		cl := srv.NewClient()
+		cl.PegnetdServer = viper.GetString(config.Pegnetd)
+		var res srv.ResultPegnetTickerMap
+		uH := uint32(height)
+		err = cl.Request("get-pegnet-rates", srv.ParamsGetPegnetRates{Height: &uH}, &res)
+		if err != nil {
+			fmt.Printf("Failed to make RPC request\nDetails:\n%v\n", err)
+			os.Exit(1)
+		}
+
+		// Change the units to be human readable
+		humanBals := make(map[string]string)
+		for k, bal := range res {
+			humanBals[k.String()] = FactoshiToFactoid(int64(bal))
+		}
+
+		data, err := json.Marshal(humanBals)
 		if err != nil {
 			panic(err)
 		}
