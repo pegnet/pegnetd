@@ -538,6 +538,7 @@ func (d *Pegnetd) ApplyFactoidBlock(ctx context.Context, tx *sql.Tx, stats *pegn
 		if _, err := d.Pegnet.AddToBalance(tx, &add, fat2.PTickerFCT, burns[i].Amount); err != nil {
 			return err
 		}
+		stats.VolumeIn[fat2.PTickerFCT.String()] += burns[i].Amount
 		stats.Volume[fat2.PTickerFCT.String()] += burns[i].Amount
 		stats.Burns += burns[i].Amount
 	}
@@ -567,6 +568,7 @@ func (d *Pegnetd) ApplyGradedOPRBlock(tx *sql.Tx, stats *pegnet.Stats, gradedBlo
 		}
 
 		stats.Volume[fat2.PTickerPEG.String()] += uint64(winners[i].Payout())
+		stats.VolumeIn[fat2.PTickerPEG.String()] += uint64(winners[i].Payout())
 	}
 	return nil
 }

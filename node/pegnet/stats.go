@@ -1,6 +1,7 @@
 package pegnet
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 
@@ -67,4 +68,20 @@ FROM pn_addresses
 	}
 
 	return nil
+}
+
+func (p *Pegnet) SelectStats(ctx context.Context, height uint32) (*Stats, error) {
+	var raw []byte
+	err := p.DB.QueryRowContext(ctx, "SELECT data FROM pn_stats WHERE height = $1", height).Scan(&raw)
+	if err != nil {
+		return nil, err
+	}
+
+	stats := new(Stats)
+	err = json.Unmarshal(raw, stats)
+	if err != nil {
+		return nil, err
+	}
+
+	return stats, nil
 }

@@ -12,6 +12,7 @@ import (
 	"github.com/pegnet/pegnetd/config"
 	"github.com/pegnet/pegnetd/fat/fat2"
 	"github.com/pegnet/pegnetd/node"
+	"github.com/pegnet/pegnetd/node/pegnet"
 	"github.com/pegnet/pegnetd/srv"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -24,6 +25,7 @@ func init() {
 
 	get.AddCommand(getTX)
 	get.AddCommand(getRates)
+	get.AddCommand(getStats)
 	rootCmd.AddCommand(get)
 
 	//tx.Flags()
@@ -287,6 +289,33 @@ var getRates = &cobra.Command{
 			panic(err)
 		}
 		fmt.Println(string(data))
+	},
+}
+
+var getStats = &cobra.Command{
+	Use:              "stats <height>",
+	Short:            "Fetch the pegnet stats at the height",
+	PersistentPreRun: always,
+	PreRun:           SoftReadConfig,
+	Args:             cobra.ExactArgs(1),
+	Run: func(cmd *cobra.Command, args []string) {
+		height, err := strconv.Atoi(args[0])
+		if height <= 0 || err != nil {
+			cmd.PrintErrf("height must be a number greater than 0")
+			os.Exit(1)
+		}
+
+		cl := srv.NewClient()
+		cl.PegnetdServer = viper.GetString(config.Pegnetd)
+		var res pegnet.Stats
+		uH := uint32(height)
+		err = cl.Request("get-stats", srv.ParamsGetStats{Height: &uH}, &res)
+		if err != nil {
+			fmt.Printf("Failed to make RPC request\nDetails:\n%v\n", err)
+			os.Exit(1)
+		}
+
+		fmt.Println(res)
 	},
 }
 
