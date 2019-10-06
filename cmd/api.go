@@ -257,7 +257,7 @@ var getTX = &cobra.Command{
 
 var getRates = &cobra.Command{
 	Use:              "rates <height>",
-	Short:            "Fetch the pegnet quotes for the assets at a given height (if their are quotes)",
+	Short:            "Fetch the pegnet quotes for the assets at a given height (if there are quotes)",
 	PersistentPreRun: always,
 	PreRun:           SoftReadConfig,
 	Args:             cobra.ExactArgs(1),
@@ -270,7 +270,7 @@ var getRates = &cobra.Command{
 
 		cl := srv.NewClient()
 		cl.PegnetdServer = viper.GetString(config.Pegnetd)
-		var res srv.ResultPegnetTickerMap
+		var res map[string]uint64
 		uH := uint32(height)
 		err = cl.Request("get-pegnet-rates", srv.ParamsGetPegnetRates{Height: &uH}, &res)
 		if err != nil {
@@ -278,13 +278,7 @@ var getRates = &cobra.Command{
 			os.Exit(1)
 		}
 
-		// Change the units to be human readable
-		humanBals := make(map[string]string)
-		for k, bal := range res {
-			humanBals[k.String()] = FactoshiToFactoid(int64(bal))
-		}
-
-		data, err := json.Marshal(humanBals)
+		data, err := json.Marshal(res)
 		if err != nil {
 			panic(err)
 		}
