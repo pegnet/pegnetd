@@ -212,7 +212,13 @@ var issuance = &cobra.Command{
 			os.Exit(1)
 		}
 
-		data, err := json.Marshal(res)
+		// Change the units to be human readable
+		humanIssuance := make(map[string]string)
+		for k, bal := range res {
+			humanIssuance[k.String()] = FactoshiToFactoid(int64(bal))
+		}
+
+		data, err := json.Marshal(humanIssuance)
 		if err != nil {
 			panic(err)
 		}
