@@ -299,7 +299,7 @@ func (p *Pegnet) SelectIssuances() (map[fat2.PTicker]uint64, error) {
 		&issuances[fat2.PTickerXLM],
 		&issuances[fat2.PTickerADA],
 		&issuances[fat2.PTickerXMR],
-		&issuances[fat2.PTickerDAS],
+		&issuances[fat2.PTickerDASH],
 		&issuances[fat2.PTickerZEC],
 		&issuances[fat2.PTickerDCR],
 	)
