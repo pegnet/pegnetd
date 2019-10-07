@@ -6,7 +6,7 @@ A light weight daemon that executes the PegNet protocol on Factom chains and mai
 
 ## Building From Source
 
-Ensure that [Golang](https://golang.org/) or later is installed. The latest official release of Golang is always recommended.
+Ensure that [Golang 1.13](https://golang.org/) or later is installed. The latest official release of Golang is always recommended.
 
 Clone the project and build the binary:
 ```
@@ -19,7 +19,7 @@ If successful, there will now be a `pegnetd` executable file in the working dire
 
 ## Configuration
 
-By default `pegnetd` will search `$HOME/pegnetd/pegnetd-conf.toml` or `./pegnetd-conf.toml` for your config file. The default config file is in the root directory of this repo, and can be copied to your home folder. Alternatively the `--config pegnetd-conf.toml` can also be specified. 
+By default `pegnetd` will search `$HOME/.pegnetd/pegnetd-conf.toml` or `./pegnetd-conf.toml` for your config file. The default config file is in the root directory of this repo, and can be copied to your home folder. Alternatively the `--config pegnetd-conf.toml` can also be specified. 
 
 Once you have your config in place, running `pegnetd` will begin syncing to the current network your factomd is on.
 
