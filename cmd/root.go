@@ -10,12 +10,9 @@ import (
 	"time"
 
 	"github.com/pegnet/pegnet/common"
-
 	"github.com/pegnet/pegnetd/srv"
-
-	"github.com/pegnet/pegnetd/exit"
-
 	"github.com/pegnet/pegnetd/config"
+	"github.com/pegnet/pegnetd/exit"
 	"github.com/pegnet/pegnetd/node"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -41,7 +38,7 @@ func init() {
 // Execute is cobra's entry point
 func Execute() {
 	if err := rootCmd.Execute(); err != nil {
-		fmt.Println(err)
+		//fmt.Println(err)
 		os.Exit(1)
 	}
 }
@@ -85,10 +82,6 @@ func always(cmd *cobra.Command, args []string) {
 		node.GradingV2Activation = uint32(act)
 		node.TransactionConversionActivation = uint32(act)
 		node.PEGPricingActivation = uint32(act)
-		common.ActivationHeights[common.MainNetwork] = int64(act)
-		common.ActivationHeights[common.TestNetwork] = int64(act)
-		common.GradingHeights[common.MainNetwork] = func(height int64) uint8 { return 2 }
-		common.GradingHeights[common.TestNetwork] = func(height int64) uint8 { return 2 }
 	}
 
 	// Setup config reading
