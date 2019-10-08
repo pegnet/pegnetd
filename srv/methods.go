@@ -153,6 +153,11 @@ func (s *APIServer) getPegnetBalances(data json.RawMessage) interface{} {
 	return ResultPegnetTickerMap(bals)
 }
 
+type ResultGetIssuance struct {
+	SyncStatus ResultGetSyncStatus   `json:"sync-status"`
+	Issuance   ResultPegnetTickerMap `json:"issuance"`
+}
+
 func (s *APIServer) getPegnetIssuance(data json.RawMessage) interface{} {
 	issuance, err := s.Node.Pegnet.SelectIssuances()
 	if err == sql.ErrNoRows {
@@ -161,7 +166,12 @@ func (s *APIServer) getPegnetIssuance(data json.RawMessage) interface{} {
 	if err != nil {
 		return jsonrpc2.InternalError
 	}
-	return ResultPegnetTickerMap(issuance)
+
+	syncStatus := s.getSyncStatus(nil)
+	return ResultGetIssuance{
+		SyncStatus: syncStatus.(ResultGetSyncStatus),
+		Issuance:   issuance,
+	}
 }
 
 func (s *APIServer) getPegnetRates(data json.RawMessage) interface{} {

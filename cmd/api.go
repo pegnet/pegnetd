@@ -205,7 +205,7 @@ var issuance = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		cl := srv.NewClient()
 		cl.PegnetdServer = viper.GetString(config.Pegnetd)
-		var res srv.ResultPegnetTickerMap
+		var res srv.ResultGetIssuance
 		err := cl.Request("get-pegnet-issuance", nil, &res)
 		if err != nil {
 			fmt.Printf("Failed to make RPC request\nDetails:\n%v\n", err)
@@ -214,11 +214,18 @@ var issuance = &cobra.Command{
 
 		// Change the units to be human readable
 		humanIssuance := make(map[string]string)
-		for k, bal := range res {
+		for k, bal := range res.Issuance {
 			humanIssuance[k.String()] = FactoshiToFactoid(int64(bal))
 		}
+		humanResult := struct {
+			SyncStatus srv.ResultGetSyncStatus `json:"sync-status"`
+			Issuance   map[string]string       `json:"issuance"`
+		}{
+			SyncStatus: res.SyncStatus,
+			Issuance:   humanIssuance,
+		}
 
-		data, err := json.Marshal(humanIssuance)
+		data, err := json.Marshal(humanResult)
 		if err != nil {
 			panic(err)
 		}
