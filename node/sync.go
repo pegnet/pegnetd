@@ -413,15 +413,14 @@ func (d *Pegnetd) applyTransactionBatch(sqlTx *sql.Tx, txBatch *fat2.Transaction
 
 	// The tx batch should be 100% valid to apply
 	for txIndex, tx := range txBatch.Transactions {
-		var inputAdrID int64
-		inputAdrID, txErr, err := d.Pegnet.SubFromBalance(sqlTx, &tx.Input.Address, tx.Input.Type, tx.Input.Amount)
+		_, txErr, err := d.Pegnet.SubFromBalance(sqlTx, &tx.Input.Address, tx.Input.Type, tx.Input.Amount)
 		if err != nil {
 			return err
 		} else if txErr != nil {
 			// This should fail the block
 			return fmt.Errorf("uncaught: %s", txErr.Error())
 		}
-		_, err = d.Pegnet.InsertTransactionRelation(sqlTx, inputAdrID, txBatch.Hash, uint64(txIndex), false, tx.IsConversion())
+		_, err = d.Pegnet.InsertTransactionRelation(sqlTx, tx.Input.Address, txBatch.Hash, uint64(txIndex), false, tx.IsConversion())
 		if err != nil {
 			return err
 		}
@@ -437,12 +436,11 @@ func (d *Pegnetd) applyTransactionBatch(sqlTx *sql.Tx, txBatch *fat2.Transaction
 			}
 		} else {
 			for _, transfer := range tx.Transfers {
-				var outputAdrID int64
-				outputAdrID, err = d.Pegnet.AddToBalance(sqlTx, &transfer.Address, tx.Input.Type, transfer.Amount)
+				_, err = d.Pegnet.AddToBalance(sqlTx, &transfer.Address, tx.Input.Type, transfer.Amount)
 				if err != nil {
 					return err
 				}
-				_, err = d.Pegnet.InsertTransactionRelation(sqlTx, outputAdrID, txBatch.Hash, uint64(txIndex), true, false)
+				_, err = d.Pegnet.InsertTransactionRelation(sqlTx, transfer.Address, txBatch.Hash, uint64(txIndex), true, false)
 				if err != nil {
 					return err
 				}
