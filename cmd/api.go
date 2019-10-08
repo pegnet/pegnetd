@@ -21,6 +21,7 @@ import (
 func init() {
 	rootCmd.AddCommand(balance)
 	rootCmd.AddCommand(balances)
+	rootCmd.AddCommand(issuance)
 	rootCmd.AddCommand(status)
 
 	get.AddCommand(getTX)
@@ -196,6 +197,42 @@ func queryBalances(humanAddress string) (srv.ResultPegnetTickerMap, error) {
 	}
 
 	return res, nil
+}
+
+var issuance = &cobra.Command{
+	Use:              "issuance",
+	Short:            "Fetch the current issuance of all assets",
+	PersistentPreRun: always,
+	PreRun:           SoftReadConfig,
+	Run: func(cmd *cobra.Command, args []string) {
+		cl := srv.NewClient()
+		cl.PegnetdServer = viper.GetString(config.Pegnetd)
+		var res srv.ResultGetIssuance
+		err := cl.Request("get-pegnet-issuance", nil, &res)
+		if err != nil {
+			fmt.Printf("Failed to make RPC request\nDetails:\n%v\n", err)
+			os.Exit(1)
+		}
+
+		// Change the units to be human readable
+		humanIssuance := make(map[string]string)
+		for k, bal := range res.Issuance {
+			humanIssuance[k.String()] = FactoshiToFactoid(int64(bal))
+		}
+		humanResult := struct {
+			SyncStatus srv.ResultGetSyncStatus `json:"sync-status"`
+			Issuance   map[string]string       `json:"issuance"`
+		}{
+			SyncStatus: res.SyncStatus,
+			Issuance:   humanIssuance,
+		}
+
+		data, err := json.Marshal(humanResult)
+		if err != nil {
+			panic(err)
+		}
+		fmt.Println(string(data))
+	},
 }
 
 var status = &cobra.Command{

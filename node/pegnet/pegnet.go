@@ -32,6 +32,10 @@ func (p *Pegnet) Init() error {
 		rawpath = strings.Replace(rawpath, "$HOME", "$USERPROFILE", -1)
 	}
 	path := os.ExpandEnv(rawpath)
+	// TODO: Come up with actual migrations.
+	// 		until then, we can just bump this version number
+	//		and make the database reset when we need to.
+	path += ".v2"
 
 	// Ensure the path exists
 	dir := filepath.Dir(path)
