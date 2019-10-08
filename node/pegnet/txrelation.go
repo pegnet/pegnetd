@@ -34,9 +34,12 @@ CREATE INDEX IF NOT EXISTS "idx_address_transactions_address" ON "pn_address_tra
 //
 // If isConversion is true, the to field will automatically be set to true.
 func (p *Pegnet) InsertTransactionRelation(tx *sql.Tx, adr factom.FAAddress, entryHash *factom.Bytes32, txIndex uint64, to bool, isConversion bool) (int64, error) {
+	// If an address is the sender and the receiver, then we only record the sender side, not the receiver.
+	// This is some loss of information, but for the use case of getting all related transactions,
+	// it is fine.
 	stmt, err := tx.Prepare(`INSERT INTO "pn_address_transactions"
                 ("entry_hash", "address", "tx_index", "to", "conversion") VALUES
-                (?, ?, ?, ?, ?)`)
+                (?, ?, ?, ?, ?) ON CONFLICT DO NOTHING`)
 	if err != nil {
 		return -1, err
 	}
