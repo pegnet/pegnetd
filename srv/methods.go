@@ -41,6 +41,7 @@ func (s *APIServer) jrpcMethods() jrpc.MethodMap {
 		"get-transaction":       s.getTransaction(false),
 		"get-transaction-entry": s.getTransaction(true),
 		"get-pegnet-balances":   s.getPegnetBalances,
+		"get-pegnet-issuance":   s.getPegnetIssuance,
 
 		"send-transaction": s.sendTransaction,
 
@@ -150,6 +151,27 @@ func (s *APIServer) getPegnetBalances(data json.RawMessage) interface{} {
 		return jsonrpc2.InternalError
 	}
 	return ResultPegnetTickerMap(bals)
+}
+
+type ResultGetIssuance struct {
+	SyncStatus ResultGetSyncStatus   `json:"sync-status"`
+	Issuance   ResultPegnetTickerMap `json:"issuance"`
+}
+
+func (s *APIServer) getPegnetIssuance(data json.RawMessage) interface{} {
+	issuance, err := s.Node.Pegnet.SelectIssuances()
+	if err == sql.ErrNoRows {
+		return ErrorAddressNotFound
+	}
+	if err != nil {
+		return jsonrpc2.InternalError
+	}
+
+	syncStatus := s.getSyncStatus(nil)
+	return ResultGetIssuance{
+		SyncStatus: syncStatus.(ResultGetSyncStatus),
+		Issuance:   issuance,
+	}
 }
 
 func (s *APIServer) getPegnetRates(data json.RawMessage) interface{} {
