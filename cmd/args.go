@@ -4,7 +4,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/pegnet/pegnet/modules/factoidaddress"
+	"github.com/FactomProject/factom"
+
 	"github.com/pegnet/pegnet/modules/opr"
 	"github.com/spf13/cobra"
 )
@@ -82,8 +83,8 @@ func ArgValidatorECAddress(cmd *cobra.Command, arg string) error {
 	if len(arg) > 2 && arg[:2] != "EC" {
 		return fmt.Errorf("EC addresses start with EC")
 	}
-	if err := factoidaddress.ValidEC(arg); err != nil {
-		return fmt.Errorf("%s is not a valid EC address: %s", arg, err.Error())
+	if !factom.IsValidAddress(arg) {
+		return fmt.Errorf("%s is not a valid EC address", arg)
 	}
 	return nil
 }
@@ -93,8 +94,8 @@ func ArgValidatorFCTAddress(cmd *cobra.Command, arg string) error {
 	if len(arg) > 2 && arg[:2] != "FA" {
 		return fmt.Errorf("FCT addresses start with FA")
 	}
-	if err := factoidaddress.ValidFCT(arg); err != nil {
-		return fmt.Errorf("%s is not a valid FCT address: %s", arg, err.Error())
+	if !factom.IsValidAddress(arg) {
+		return fmt.Errorf("%s is not a valid FCT address", arg)
 	}
 	return nil
 }

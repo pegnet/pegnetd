@@ -46,7 +46,9 @@ func (s *APIServer) jrpcMethods() jrpc.MethodMap {
 		"get-pegnet-balances": s.getPegnetBalances,
 		"get-pegnet-issuance": s.getPegnetIssuance,
 		"send-transaction": s.sendTransaction,
+
 		"get-sync-status": s.getSyncStatus,
+
 		"get-pegnet-rates": s.getPegnetRates,
 	}
 
