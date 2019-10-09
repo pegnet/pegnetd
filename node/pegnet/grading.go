@@ -50,22 +50,53 @@ const createTableRate = `CREATE TABLE IF NOT EXISTS "pn_rate" (
 );
 `
 
-func (p *Pegnet) InsertRate(tx *sql.Tx, height uint32, rates []opr.AssetUint) error {
+func (p *Pegnet) insertRate(tx *sql.Tx, height uint32, ticker fat2.PTicker, rate uint64) error {
+	_, err := tx.Exec("INSERT INTO pn_rate (height, token, value) VALUES ($1, $2, $3)", height, ticker.String(), rate)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// InsertRates adds all asset rates as rows, computing the rate for PEG if necessary
+func (p *Pegnet) InsertRates(tx *sql.Tx, height uint32, rates []opr.AssetUint, pricePEG bool) error {
 	for _, r := range rates {
-		// TODO: Make this more robust? Check if this is the best place to do this
-		if r.Name != "PEG" {
-			r.Name = "p" + r.Name
+		if r.Name == "PEG" {
+			continue
 		}
-		_, err := tx.Exec("INSERT INTO pn_rate (height, token, value) VALUES ($1, $2, $3)", height, r.Name, r.Value)
+		r.Name = "p" + r.Name
+		err := p.insertRate(tx, height, fat2.StringToTicker(r.Name), r.Value)
 		if err != nil {
 			return err
 		}
+	}
+	var ratePEG uint64
+	if pricePEG {
+		// PEG price = (total capitalization of all other assets) / (total supply of all other assets at height - 1)
+		issuance, err := p.SelectIssuances()
+		if err != nil {
+			return err
+		}
+		var totalIssuance uint64
+		var totalCapitalization uint64
+		for _, r := range rates {
+			if r.Name == "PEG" {
+				continue
+			}
+			assetIssuance := issuance[fat2.StringToTicker(r.Name)]
+			totalIssuance += assetIssuance
+			totalCapitalization += assetIssuance * r.Value
+		}
+		ratePEG = totalCapitalization / totalIssuance
+	}
+	err := p.insertRate(tx, height, fat2.PTickerPEG, ratePEG)
+	if err != nil {
+		return err
 	}
 	return nil
 }
 
 func (p *Pegnet) InsertGradeBlock(tx *sql.Tx, eblock *factom.EBlock, graded grader.GradedBlock) error {
-
 	data, err := json.Marshal(graded.WinnersShortHashes())
 	if err != nil {
 		return err
