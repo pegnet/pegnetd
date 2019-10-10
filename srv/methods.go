@@ -154,7 +154,7 @@ func (s *APIServer) getPegnetBalances(data json.RawMessage) interface{} {
 }
 
 type ResultGetIssuance struct {
-	SyncStatus ResultGetSyncStatus   `json:"sync-status"`
+	SyncStatus ResultGetSyncStatus   `json:"syncstatus"`
 	Issuance   ResultPegnetTickerMap `json:"issuance"`
 }
 
