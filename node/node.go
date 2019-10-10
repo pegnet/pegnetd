@@ -22,8 +22,8 @@ var GradingV2Activation uint32 = 210330
 // Target Activation Height is Oct 7, 2019 15 UTC
 var TransactionConversionActivation uint32 = 213237
 
-// TODO: determine when we want PEG pricing to go live
-var PEGPricingActivation uint32 = 214000
+// Estimated to be Oct 14 2019, 15:00:00 UTC
+var PEGPricingActivation uint32 = 214287
 
 type Pegnetd struct {
 	FactomClient *factom.Client
