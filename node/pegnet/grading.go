@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
+	"math/big"
 
 	"github.com/Factom-Asset-Tokens/factom"
 	"github.com/pegnet/pegnet/modules/grader"
@@ -70,26 +71,28 @@ func (p *Pegnet) InsertRates(tx *sql.Tx, height uint32, rates []opr.AssetUint, p
 			return err
 		}
 	}
-	var ratePEG uint64
+	ratePEG := new(big.Int)
 	if pricePEG {
 		// PEG price = (total capitalization of all other assets) / (total supply of all other assets at height - 1)
 		issuance, err := p.SelectIssuances()
 		if err != nil {
 			return err
 		}
-		var totalIssuance uint64
-		var totalCapitalization uint64
+		totalCapitalization := new(big.Int)
 		for _, r := range rates {
 			if r.Name == "PEG" {
 				continue
 			}
-			assetIssuance := issuance[fat2.StringToTicker(r.Name)]
-			totalIssuance += assetIssuance
-			totalCapitalization += assetIssuance * r.Value
+			assetCapitalization := new(big.Int).Mul(new(big.Int).SetUint64(issuance[fat2.StringToTicker(r.Name)]), new(big.Int).SetUint64(r.Value))
+			totalCapitalization.Add(totalCapitalization, assetCapitalization)
 		}
-		ratePEG = totalCapitalization / totalIssuance
+		if issuance[fat2.PTickerPEG] == 0 {
+			ratePEG.Set(totalCapitalization)
+		} else {
+			ratePEG.Div(totalCapitalization, new(big.Int).SetUint64(issuance[fat2.PTickerPEG]))
+		}
 	}
-	err := p.insertRate(tx, height, fat2.PTickerPEG, ratePEG)
+	err := p.insertRate(tx, height, fat2.PTickerPEG, ratePEG.Uint64())
 	if err != nil {
 		return err
 	}
