@@ -84,6 +84,7 @@ func always(cmd *cobra.Command, args []string) {
 		node.PegnetActivation = uint32(act)
 		node.GradingV2Activation = uint32(act)
 		node.TransactionConversionActivation = uint32(act)
+		node.PEGPricingActivation = uint32(act)
 		common.ActivationHeights[common.MainNetwork] = int64(act)
 		common.ActivationHeights[common.TestNetwork] = int64(act)
 		common.GradingHeights[common.MainNetwork] = func(height int64) uint8 { return 2 }
