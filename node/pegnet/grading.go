@@ -51,8 +51,8 @@ const createTableRate = `CREATE TABLE IF NOT EXISTS "pn_rate" (
 );
 `
 
-func (p *Pegnet) insertRate(tx *sql.Tx, height uint32, ticker fat2.PTicker, rate uint64) error {
-	_, err := tx.Exec("INSERT INTO pn_rate (height, token, value) VALUES ($1, $2, $3)", height, ticker.String(), rate)
+func (p *Pegnet) insertRate(tx *sql.Tx, height uint32, tickerString string, rate uint64) error {
+	_, err := tx.Exec("INSERT INTO pn_rate (height, token, value) VALUES ($1, $2, $3)", height, tickerString, rate)
 	if err != nil {
 		return err
 	}
@@ -67,7 +67,7 @@ func (p *Pegnet) InsertRates(tx *sql.Tx, height uint32, rates []opr.AssetUint, p
 		}
 		// Correct rates to use `pAsset`
 		rates[i].Name = "p" + rates[i].Name
-		err := p.insertRate(tx, height, fat2.StringToTicker(rates[i].Name), rates[i].Value)
+		err := p.insertRate(tx, height, rates[i].Name, rates[i].Value)
 		if err != nil {
 			return err
 		}
@@ -94,7 +94,7 @@ func (p *Pegnet) InsertRates(tx *sql.Tx, height uint32, rates []opr.AssetUint, p
 			ratePEG.Div(totalCapitalization, new(big.Int).SetUint64(issuance[fat2.PTickerPEG]))
 		}
 	}
-	err := p.insertRate(tx, height, fat2.PTickerPEG, ratePEG.Uint64())
+	err := p.insertRate(tx, height, fat2.PTickerPEG.String(), ratePEG.Uint64())
 	if err != nil {
 		return err
 	}
