@@ -266,11 +266,10 @@ func (p *Pegnet) SelectIssuances() (map[fat2.PTicker]uint64, error) {
 	var sb strings.Builder
 	for i := fat2.PTickerInvalid + 1; i < fat2.PTickerMax-1; i++ {
 		tickerLower := strings.ToLower(i.String())
-		sb.WriteString(fmt.Sprintf("SUM(%s_balance), ", tickerLower))
+		sb.WriteString(fmt.Sprintf("IFNULL(SUM(%s_balance), 0), ", tickerLower))
 	}
 	tickerLower := strings.ToLower((fat2.PTickerMax - 1).String())
-	sb.WriteString(fmt.Sprintf("SUM(%s_balance) ", tickerLower))
-
+	sb.WriteString(fmt.Sprintf("IFNULL(SUM(%s_balance), 0) ", tickerLower))
 	err := p.DB.QueryRow(fmt.Sprintf(queryFmt, sb.String())).Scan(
 		&issuances[fat2.PTickerPEG],
 		&issuances[fat2.PTickerUSD],

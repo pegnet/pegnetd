@@ -61,12 +61,13 @@ func (p *Pegnet) insertRate(tx *sql.Tx, height uint32, ticker fat2.PTicker, rate
 
 // InsertRates adds all asset rates as rows, computing the rate for PEG if necessary
 func (p *Pegnet) InsertRates(tx *sql.Tx, height uint32, rates []opr.AssetUint, pricePEG bool) error {
-	for _, r := range rates {
-		if r.Name == "PEG" {
+	for i := range rates {
+		if rates[i].Name == "PEG" {
 			continue
 		}
-		r.Name = "p" + r.Name
-		err := p.insertRate(tx, height, fat2.StringToTicker(r.Name), r.Value)
+		// Correct rates to use `pAsset`
+		rates[i].Name = "p" + rates[i].Name
+		err := p.insertRate(tx, height, fat2.StringToTicker(rates[i].Name), rates[i].Value)
 		if err != nil {
 			return err
 		}
@@ -83,6 +84,7 @@ func (p *Pegnet) InsertRates(tx *sql.Tx, height uint32, rates []opr.AssetUint, p
 			if r.Name == "PEG" {
 				continue
 			}
+
 			assetCapitalization := new(big.Int).Mul(new(big.Int).SetUint64(issuance[fat2.StringToTicker(r.Name)]), new(big.Int).SetUint64(r.Value))
 			totalCapitalization.Add(totalCapitalization, assetCapitalization)
 		}
