@@ -134,10 +134,49 @@ func always(cmd *cobra.Command, args []string) {
 // ReadConfig can be put as a PreRun for a command that uses the config file
 func ReadConfig(cmd *cobra.Command, args []string) {
 	err := viper.ReadInConfig()
-	if err != nil {
-		log.WithError(err).Error("failed to load config")
-		os.Exit(1)
+
+	// If no config is found, we will attempt to make one
+	if _, ok := err.(viper.ConfigFileNotFoundError); ok {
+		// No config found? We will write the default config for the user
+		// If the custom config path is set, then we should not write a new config.
+		if custom, _ := cmd.Flags().GetString("config"); custom == "" {
+			home, err := os.UserHomeDir()
+			if err != nil {
+				log.WithError(err).Fatal("failed to create config path")
+			}
+
+			// Create the pegnetd directory if it is not already
+			err = os.MkdirAll(filepath.Join(home, ".pegnetd"), 0777)
+			if err != nil {
+				log.WithError(err).Fatal("failed to create config path")
+			}
+
+			configpath := filepath.Join(home, ".pegnetd", "pegnetd-conf.toml")
+			_, err = os.Stat(configpath)
+			if os.IsExist(err) { // Double check a file does not already exist. Don't overwrite a config
+				log.WithField("path", configpath).Fatal("config exists, but unable to read")
+			}
+
+			// Attempt to write a new config file
+			err = viper.WriteConfigAs(configpath)
+			if err != nil {
+				log.WithField("path", configpath).WithError(err).Fatal("failed to create config")
+			}
+			// Inform the user we made a config
+			log.WithField("path", configpath).Infof("no config file, one was created")
+
+			// Try to read it again
+			err = viper.ReadInConfig()
+			if err != nil {
+				log.WithError(err).Fatal("failed to load config")
+			}
+		}
+	} else if err != nil {
+		log.WithError(err).Fatal("failed to load config")
 	}
+
+	// Indicate which config was used
+	log.Infof("Using config from %s", viper.ConfigFileUsed())
 
 	initLogger()
 }
