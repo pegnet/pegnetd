@@ -253,7 +253,7 @@ var balance = &cobra.Command{
 	PersistentPreRun: always,
 	PreRun:           SoftReadConfig,
 	Args: CombineCobraArgs(
-		CustomArgOrderValidationBuilder(false, ArgValidatorAssetOrP, ArgValidatorFCTAddress),
+		CustomArgOrderValidationBuilder(true, ArgValidatorAssetOrP, ArgValidatorFCTAddress),
 		cobra.MinimumNArgs(1)),
 	Run: func(cmd *cobra.Command, args []string) {
 		res, err := queryBalances(args[1])
@@ -276,7 +276,7 @@ var balances = &cobra.Command{
 	PersistentPreRun: always,
 	PreRun:           SoftReadConfig,
 	Args: CombineCobraArgs(
-		CustomArgOrderValidationBuilder(false, ArgValidatorFCTAddress),
+		CustomArgOrderValidationBuilder(true, ArgValidatorFCTAddress),
 		cobra.MinimumNArgs(1)),
 	Run: func(cmd *cobra.Command, args []string) {
 		res, err := queryBalances(args[0])
