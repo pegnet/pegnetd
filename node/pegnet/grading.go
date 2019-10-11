@@ -204,7 +204,9 @@ func _extractAssets(rows *sql.Rows) (map[fat2.PTicker]uint64, error) {
 		if err := rows.Scan(&tickerName, &rateValue); err != nil {
 			return nil, err
 		}
-		assets[fat2.StringToTicker(tickerName)] = rateValue
+		if ticker := fat2.StringToTicker(tickerName); ticker != fat2.PTickerInvalid {
+			assets[ticker] = rateValue
+		}
 	}
 	return assets, nil
 }
