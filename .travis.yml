@@ -56,6 +56,7 @@ deploy:
     - pegnetd-darwin-10.6-amd64
     - pegnetd-linux-amd64
     - pegnetd-windows-4.0-amd64.exe
+  skip_cleanup: true
   on:
 #    repo: pegnet/pegnetd
      tags: true
