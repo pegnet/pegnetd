@@ -35,7 +35,7 @@ func (p *Pegnet) Init() error {
 	// TODO: Come up with actual migrations.
 	// 		until then, we can just bump this version number
 	//		and make the database reset when we need to.
-	path += ".v2"
+	path += ".v3"
 
 	// Ensure the path exists
 	dir := filepath.Dir(path)

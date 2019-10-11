@@ -168,7 +168,8 @@ func (d *Pegnetd) SyncBlock(ctx context.Context, tx *sql.Tx, height uint32) erro
 		}
 		winners := gradedBlock.Winners()
 		if 0 < len(winners) {
-			err = d.Pegnet.InsertRate(tx, height, winners[0].OPR.GetOrderedAssetsUint())
+			shouldPricePEG := PEGPricingActivation <= height
+			err = d.Pegnet.InsertRates(tx, height, winners[0].OPR.GetOrderedAssetsUint(), shouldPricePEG)
 			if err != nil {
 				return err
 			}

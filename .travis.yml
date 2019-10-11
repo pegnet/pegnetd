@@ -1,0 +1,62 @@
+language: go
+
+# Use latest go version
+go:
+  - 1.x
+
+services:
+  - docker
+
+os:
+  - osx
+  - windows
+
+# Run gofmt only on linux
+matrix:
+  fast_finish: true
+  include:
+    - os: linux
+      script:
+        - ./.gofmt.sh
+        - go test -v -timeout 45m ./...
+  allow_failures:
+    - os: windows
+
+script:
+  - go test -v -timeout 45m ./...
+
+# GO111MODULE will force Go modules
+# This will be unnecessary when Go 1.13 lands.
+# Also set the bit size to 10 so we can build the hashtable quick
+env:
+  - GO111MODULE=on LXRBITSIZE=10
+
+
+# Modifies go get flags
+# Can be removed when factom@v1-rollup is merged into master
+install: true
+
+# No spam
+notifications:
+  email: false
+
+# Build with gox
+before_deploy:
+  - go get github.com/karalabe/xgo
+  - docker build --tag xgo-builder xgo
+  - xgo -image xgo-builder --targets=windows/amd64,darwin/amd64,linux/amd64 .
+  - ls
+
+
+deploy:
+  provider: releases
+  api_key:
+    secure: olgjR93AxZChmTriGo4DkofTJIhCqymhRPl1qGcO3uD3xBMsmX760kQhGjkMUcgzenhOhtqxiRB9acYPoqPb2LGYNU2Ff8sMXfx5Oa3JMb9yEnosLbPDwM5D0nTdWhgn+VzQlA6QwqzZUejft7qUtDBDwYnLL6AwRaM0BjjvpXHeoyXq2KZGX9VZRijkq0rPFaGhsLHv/2ebfs+adJi/UUzNBO6/AQQrXBI5Bbr6t3ELbkGpEHzjr91ZgCsQiGDxv/JuZKeMEgUuTLM/9b8a9vqqEpzjthfbzuWtrxNCEaVwS/jUPFik+7agXCg9bJzthVHFxcQyFfP/evkm9+OWLpJrKAQc9LieYxgySesZRxzlqLj9zU9WBdoAE46YlOQUvTYuN6pUAD4bhNoR+enLVvYZVn6jSuRF/ggvUqE7kw537GpnaA9qGepGBuvYdFcuIo/EUddc3i24e9FYhgOWxjaBf7SR/G/G/b7jCqCows6SSOtalZP06fcgk/yXG4x654crjxAphgOd9aKHHs8xKRc6YiuJmqw5XVWLePXkXgrum7vzmuEMaLD8ubrPv9OZ9DI8qyXnWhONSPdaYzF8bRKGQLA1/6OvaK7CPH8/a/gL/IzgJwHLngiHJ/sBwrweX+gp7dKW9SeYzS9ojphYwMDlNMju5i2fGZQO862tBx0=
+  file:
+    - pegnetd-darwin-10.6-amd64
+    - pegnetd-linux-amd64
+    - pegnetd-windows-4.0-amd64.exe
+  on:
+#    repo: pegnet/pegnetd
+     tags: true
+     condition: $TRAVIS_OS_NAME = linux
