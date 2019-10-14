@@ -137,7 +137,7 @@ func (t TransactionBatch) ValidExtIDs() error {
 		includedRCDHashes[t.FAAddress(i)] = struct{}{}
 	}
 	// Ensure that for all unique inputs there is a corresponding RCD in the ExtIDs
-	for address, _ := range uniqueInputs {
+	for address := range uniqueInputs {
 		if _, ok := includedRCDHashes[address]; !ok {
 			return fmt.Errorf("invalid RCDs")
 		}

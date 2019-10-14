@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
+	"math/big"
 
 	"github.com/Factom-Asset-Tokens/factom"
 	"github.com/pegnet/pegnet/modules/grader"
@@ -50,22 +51,57 @@ const createTableRate = `CREATE TABLE IF NOT EXISTS "pn_rate" (
 );
 `
 
-func (p *Pegnet) InsertRate(tx *sql.Tx, height uint32, rates []opr.AssetUint) error {
-	for _, r := range rates {
-		// TODO: Make this more robust? Check if this is the best place to do this
-		if r.Name != "PEG" {
-			r.Name = "p" + r.Name
+func (p *Pegnet) insertRate(tx *sql.Tx, height uint32, tickerString string, rate uint64) error {
+	_, err := tx.Exec("INSERT INTO pn_rate (height, token, value) VALUES ($1, $2, $3)", height, tickerString, rate)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// InsertRates adds all asset rates as rows, computing the rate for PEG if necessary
+func (p *Pegnet) InsertRates(tx *sql.Tx, height uint32, rates []opr.AssetUint, pricePEG bool) error {
+	for i := range rates {
+		if rates[i].Name == "PEG" {
+			continue
 		}
-		_, err := tx.Exec("INSERT INTO pn_rate (height, token, value) VALUES ($1, $2, $3)", height, r.Name, r.Value)
+		// Correct rates to use `pAsset`
+		rates[i].Name = "p" + rates[i].Name
+		err := p.insertRate(tx, height, rates[i].Name, rates[i].Value)
 		if err != nil {
 			return err
 		}
+	}
+	ratePEG := new(big.Int)
+	if pricePEG {
+		// PEG price = (total capitalization of all other assets) / (total supply of all other assets at height - 1)
+		issuance, err := p.SelectIssuances()
+		if err != nil {
+			return err
+		}
+		totalCapitalization := new(big.Int)
+		for _, r := range rates {
+			if r.Name == "PEG" {
+				continue
+			}
+
+			assetCapitalization := new(big.Int).Mul(new(big.Int).SetUint64(issuance[fat2.StringToTicker(r.Name)]), new(big.Int).SetUint64(r.Value))
+			totalCapitalization.Add(totalCapitalization, assetCapitalization)
+		}
+		if issuance[fat2.PTickerPEG] == 0 {
+			ratePEG.Set(totalCapitalization)
+		} else {
+			ratePEG.Div(totalCapitalization, new(big.Int).SetUint64(issuance[fat2.PTickerPEG]))
+		}
+	}
+	err := p.insertRate(tx, height, fat2.PTickerPEG.String(), ratePEG.Uint64())
+	if err != nil {
+		return err
 	}
 	return nil
 }
 
 func (p *Pegnet) InsertGradeBlock(tx *sql.Tx, eblock *factom.EBlock, graded grader.GradedBlock) error {
-
 	data, err := json.Marshal(graded.WinnersShortHashes())
 	if err != nil {
 		return err
@@ -185,7 +221,9 @@ func _extractAssets(rows *sql.Rows) (map[fat2.PTicker]uint64, error) {
 		if err := rows.Scan(&tickerName, &rateValue); err != nil {
 			return nil, err
 		}
-		assets[fat2.StringToTicker(tickerName)] = rateValue
+		if ticker := fat2.StringToTicker(tickerName); ticker != fat2.PTickerInvalid {
+			assets[ticker] = rateValue
+		}
 	}
 	return assets, nil
 }
