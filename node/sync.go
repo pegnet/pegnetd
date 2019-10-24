@@ -305,7 +305,7 @@ func (d *Pegnetd) ApplyTransactionBatchesInHolding(ctx context.Context, sqlTx *s
 // and applys the balance updates for all transaction batches able to be executed
 // immediately. If an error is returned, the sql.Tx should be rolled back by the caller.
 func (d *Pegnetd) ApplyTransactionBlock(sqlTx *sql.Tx, eblock *factom.EBlock) error {
-	for _, entry := range eblock.Entries {
+	for blockorder, entry := range eblock.Entries {
 		txBatch := fat2.NewTransactionBatch(entry)
 		err := txBatch.UnmarshalEntry()
 		if err != nil {
@@ -328,7 +328,7 @@ func (d *Pegnetd) ApplyTransactionBlock(sqlTx *sql.Tx, eblock *factom.EBlock) er
 		}
 		// At this point, we know that the transaction batch is valid and able to be executed.
 
-		if err = d.Pegnet.InsertTransactionHistoryTxBatch(sqlTx, txBatch, eblock.Height); err != nil {
+		if err = d.Pegnet.InsertTransactionHistoryTxBatch(sqlTx, blockorder, txBatch, eblock.Height); err != nil {
 			return err
 		}
 
@@ -439,6 +439,10 @@ func (d *Pegnetd) applyTransactionBatch(sqlTx *sql.Tx, txBatch *fat2.Transaction
 		if tx.IsConversion() {
 			outputAmount, err := conversions.Convert(int64(tx.Input.Amount), rates[tx.Input.Type], rates[tx.Conversion])
 			if err != nil {
+				return err
+			}
+
+			if err = d.Pegnet.SetTransactionHistoryConvertedAmount(sqlTx, txBatch, txIndex, outputAmount); err != nil {
 				return err
 			}
 			_, err = d.Pegnet.AddToBalance(sqlTx, &tx.Input.Address, tx.Conversion, uint64(outputAmount))
