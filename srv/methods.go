@@ -117,7 +117,7 @@ func (s *APIServer) getTransactions(data json.RawMessage) interface{} {
 	}
 
 	var res ResultGetTransactions
-	res.Count = len(actions)
+	res.Count = count
 	if params.Offset+len(actions) < count {
 		res.NextOffset = params.Offset + len(actions)
 	}
