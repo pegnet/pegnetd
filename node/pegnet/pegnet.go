@@ -35,7 +35,7 @@ func (p *Pegnet) Init() error {
 	// TODO: Come up with actual migrations.
 	// 		until then, we can just bump this version number
 	//		and make the database reset when we need to.
-	path += ".v3"
+	path += ".v4"
 
 	// Ensure the path exists
 	dir := filepath.Dir(path)
@@ -76,6 +76,9 @@ func (p *Pegnet) createTables() error {
 		createTableWinners,
 		createTableTransactions,
 		createTableTransactionBatchHolding,
+		createTableTxHistory,
+		createTableTxHistoryAction,
+		createTableTxHistoryActionData,
 	} {
 		if _, err := p.DB.Exec(sql); err != nil {
 			return err

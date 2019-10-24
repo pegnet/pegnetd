@@ -328,6 +328,10 @@ func (d *Pegnetd) ApplyTransactionBlock(sqlTx *sql.Tx, eblock *factom.EBlock) er
 		}
 		// At this point, we know that the transaction batch is valid and able to be executed.
 
+		if err = d.Pegnet.InsertTransactionHistoryTxBatch(sqlTx, txBatch, eblock.Height); err != nil {
+			return err
+		}
+
 		// A transaction batch that contains conversions must be put into holding to be executed
 		// in a future block. This prevents gaming of conversions where an actor
 		// can know the exchange rates of the future ahead of time.
@@ -342,6 +346,8 @@ func (d *Pegnetd) ApplyTransactionBlock(sqlTx *sql.Tx, eblock *factom.EBlock) er
 		// No conversions in the batch, it can be applied immediately
 		if err = d.applyTransactionBatch(sqlTx, txBatch, nil, eblock.Height); err != nil && err != pegnet.InsufficientBalanceErr {
 			return err
+		} else if err == pegnet.InsufficientBalanceErr {
+			d.Pegnet.SetTransactionHistoryExecuted(sqlTx, txBatch, -1)
 		}
 	}
 	return nil
@@ -423,6 +429,10 @@ func (d *Pegnetd) applyTransactionBatch(sqlTx *sql.Tx, txBatch *fat2.Transaction
 		}
 		_, err = d.Pegnet.InsertTransactionRelation(sqlTx, tx.Input.Address, txBatch.Hash, uint64(txIndex), false, tx.IsConversion())
 		if err != nil {
+			return err
+		}
+
+		if err = d.Pegnet.SetTransactionHistoryExecuted(sqlTx, txBatch, int64(currentHeight)); err != nil {
 			return err
 		}
 
