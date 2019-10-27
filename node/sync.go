@@ -209,7 +209,7 @@ func (d *Pegnetd) SyncBlock(ctx context.Context, tx *sql.Tx, height uint32) erro
 	// 4) Apply effects of graded OPR Block (PEG rewards, if any)
 	//    These funds will be available for transactions and conversions executed in the next block
 	if gradedBlock != nil {
-		if err := d.ApplyGradedOPRBlock(tx, gradedBlock); err != nil {
+		if err := d.ApplyGradedOPRBlock(tx, gradedBlock, dblock.Timestamp); err != nil {
 			return err
 		}
 	}
@@ -481,7 +481,7 @@ func (d *Pegnetd) ApplyFactoidBlock(ctx context.Context, tx *sql.Tx, dblock *fac
 	}
 
 	var totalBurned uint64
-	var burns []factom.FactoidTransactionIO
+	var burns []*factom.FactoidTransaction
 
 	// Register all burns. Burns have a few requirements
 	// - Only 1 output, and that output must be the EC burn address
@@ -515,7 +515,7 @@ func (d *Pegnetd) ApplyFactoidBlock(ctx context.Context, tx *sql.Tx, dblock *fac
 
 		in := tx.FCTInputs[0]
 		totalBurned += in.Amount
-		burns = append(burns, in)
+		burns = append(burns, tx)
 	}
 
 	var _ = burns
@@ -526,8 +526,12 @@ func (d *Pegnetd) ApplyFactoidBlock(ctx context.Context, tx *sql.Tx, dblock *fac
 	// All burns are FCT inputs
 	for i := range burns {
 		var add factom.FAAddress
-		copy(add[:], burns[i].Address[:])
-		if _, err := d.Pegnet.AddToBalance(tx, &add, fat2.PTickerFCT, burns[i].Amount); err != nil {
+		copy(add[:], burns[i].FCTInputs[0].Address[:])
+		if _, err := d.Pegnet.AddToBalance(tx, &add, fat2.PTickerFCT, burns[i].FCTInputs[0].Amount); err != nil {
+			return err
+		}
+
+		if err := d.Pegnet.InsertFCTBurn(tx, fblock.KeyMR, burns[i], dblock.Height); err != nil {
 			return err
 		}
 	}
@@ -537,7 +541,7 @@ func (d *Pegnetd) ApplyFactoidBlock(ctx context.Context, tx *sql.Tx, dblock *fac
 
 // ApplyGradedOPRBlock pays out PEG to the winners of the given GradedBlock.
 // If an error is returned, the sql.Tx should be rolled back by the caller.
-func (d *Pegnetd) ApplyGradedOPRBlock(tx *sql.Tx, gradedBlock grader.GradedBlock) error {
+func (d *Pegnetd) ApplyGradedOPRBlock(tx *sql.Tx, gradedBlock grader.GradedBlock, timestamp time.Time) error {
 	winners := gradedBlock.Winners()
 	for i := range winners {
 		addr, err := factom.NewFAAddress(winners[i].OPR.GetAddress())
@@ -553,6 +557,10 @@ func (d *Pegnetd) ApplyGradedOPRBlock(tx *sql.Tx, gradedBlock grader.GradedBlock
 		}
 
 		if _, err := d.Pegnet.AddToBalance(tx, &addr, fat2.PTickerPEG, uint64(winners[i].Payout())); err != nil {
+			return err
+		}
+
+		if err := d.Pegnet.InsertCoinbase(tx, winners[i], addr[:], timestamp); err != nil {
 			return err
 		}
 	}

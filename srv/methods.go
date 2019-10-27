@@ -96,7 +96,7 @@ func (s *APIServer) getTransactions(data json.RawMessage) interface{} {
 		return err
 	}
 
-	var actions []pegnet.TxAction
+	var actions []pegnet.HistoryTransaction
 	var count int
 
 	if params.Hash != nil {
