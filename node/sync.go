@@ -453,6 +453,9 @@ func (d *Pegnetd) applyTransactionBatch(sqlTx *sql.Tx, txBatch *fat2.Transaction
 			stats.Volume[tx.Conversion.String()] += uint64(outputAmount)
 			stats.VolumeIn[tx.Conversion.String()] += uint64(outputAmount)
 		} else {
+			// one input, multiple outputs
+			stats.Volume[tx.Input.Type.String()] += tx.Input.Amount
+			stats.VolumeTx[tx.Input.Type.String()] += tx.Input.Amount
 			for _, transfer := range tx.Transfers {
 				_, err = d.Pegnet.AddToBalance(sqlTx, &transfer.Address, tx.Input.Type, transfer.Amount)
 				if err != nil {
@@ -462,9 +465,6 @@ func (d *Pegnetd) applyTransactionBatch(sqlTx *sql.Tx, txBatch *fat2.Transaction
 				if err != nil {
 					return err
 				}
-
-				stats.Volume[tx.Input.Type.String()] += tx.Input.Amount
-				stats.VolumeTx[tx.Input.Type.String()] += tx.Input.Amount
 			}
 		}
 	}
