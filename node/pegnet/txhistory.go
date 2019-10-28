@@ -47,8 +47,8 @@ type HistoryTransaction struct {
 
 // HistoryTransactionOutput is an entry of a transfer's outputs
 type HistoryTransactionOutput struct {
-	Address *factom.FAAddress `json:"address"`
-	Amount  int64             `json:"amount"`
+	Address factom.FAAddress `json:"address"`
+	Amount  int64            `json:"amount"`
 }
 
 // in the context of tables, `history_txbatch` is the table that holds the unique reference hash
@@ -349,7 +349,7 @@ func (p *Pegnet) InsertTransactionHistoryTxBatch(tx *sql.Tx, blockorder int, txb
 			// json encode the outputs
 			outputs := make([]HistoryTransactionOutput, len(action.Transfers))
 			for i, transfer := range action.Transfers {
-				outputs[i] = HistoryTransactionOutput{Address: &transfer.Address, Amount: int64(transfer.Amount)}
+				outputs[i] = HistoryTransactionOutput{Address: transfer.Address, Amount: int64(transfer.Amount)}
 				if _, err = lookup.Exec(txbatch.Entry.Hash[:], index, transfer.Address[:]); err != nil {
 					return err
 				}
