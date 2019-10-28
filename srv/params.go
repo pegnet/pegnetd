@@ -106,6 +106,11 @@ func (p ParamsGetPegnetTransactionStatus) ValidChainID() *factom.Bytes32 {
 	return nil
 }
 
+// ParamsGetPegnetTransaction are the parameters for retrieving transactions from
+// the history system.
+// You need to specify exactly one of either `hash`, `address`, or `height`.
+// `offset` is the value from a previous query's `nextoffset`.
+// `desc` returns transactions in newest->oldest order
 type ParamsGetPegnetTransaction struct {
 	Hash    *factom.Bytes32 `json:"entryhash,omitempty"`
 	Address string          `json:"address,omitempty"`

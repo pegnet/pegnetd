@@ -83,6 +83,11 @@ func (s *APIServer) getTransactionStatus(data json.RawMessage) interface{} {
 	return res
 }
 
+// ResultGetTransactions returns history entries.
+// `Actions` contains []pegnet.HistoryTransaction.
+// `Count` is the total number of possible transactions
+// `NextOffset` returns the offset to use to get the next set of records.
+//  0 means no more records available
 type ResultGetTransactions struct {
 	Actions    interface{} `json:"actions"`
 	Count      int         `json:"count"`

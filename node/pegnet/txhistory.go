@@ -11,15 +11,54 @@ import (
 	"github.com/pegnet/pegnetd/fat/fat2"
 )
 
+// HistoryAction are the different types of actions inside the history
 type HistoryAction int32
 
 const (
+	// Invalid is used for debugging
 	Invalid HistoryAction = iota
+	// Transfer is a 1:n transfer of pegged assets from one address to another
 	Transfer
+	// Conversion is a conversion of pegged assets
 	Conversion
+	// Coinbase is a miner reward payout
 	Coinbase
+	// FCTBurn is a pFCT payout for burning FCT on factom
 	FCTBurn
 )
+
+// HistoryTransaction is a flattened entry of the history table structure.
+// It contains several actions: transfers, conversions, coinbases, and fct burns
+type HistoryTransaction struct {
+	Hash      *factom.Bytes32 `json:"hash"`
+	Height    int64           `json:"height"`
+	Timestamp time.Time       `json:"timestamp"`
+	Executed  int32           `json:"executed"`
+	TxIndex   int             `json:"txindex"`
+	TxAction  HistoryAction   `json:"txaction"`
+
+	FromAddress *factom.FAAddress          `json:"fromaddress"`
+	FromAsset   string                     `json:"fromasset"`
+	FromAmount  int64                      `json:"fromamount"`
+	ToAsset     string                     `json:"toasset,omitempty"`
+	ToAmount    int64                      `json:"toamount,omitempty"`
+	Outputs     []HistoryTransactionOutput `json:"outputs,omitempty"`
+}
+
+// HistoryTransactionOutput is an entry of a transfer's outputs
+type HistoryTransactionOutput struct {
+	Address *factom.FAAddress `json:"address"`
+	Amount  int64             `json:"amount"`
+}
+
+// in the context of tables, `history_txbatch` is the table that holds the unique reference hash
+// and `transaction` is the table that holds the actions associated with that unique reference hash
+// `lookup` is an outside reference that indexes the addresses involved in the actions
+//
+// associations are:
+// 	* history_txbach : history_transaction is `1:n`
+// 	* history_transaction : lookup is `1:n`
+//	* lookup : (transaction.outputs + transaction.inputs) is `1:n` (unique addresses only)
 const createTableTxHistoryBatch = `CREATE TABLE IF NOT EXISTS "pn_history_txbatch" (
 	"history_id"	INTEGER PRIMARY KEY,
 	"entry_hash"    BLOB NOT NULL,
@@ -66,26 +105,19 @@ CREATE INDEX IF NOT EXISTS "idx_history_lookup_entry_index" ON "pn_history_looku
 
 const insertLookupQuery = `INSERT INTO pn_history_lookup (entry_hash, tx_index, address) VALUES (?, ?, ?) ON CONFLICT DO NOTHING;`
 
-type HistoryTransaction struct {
-	Hash      *factom.Bytes32 `json:"hash"`
-	Height    int64           `json:"height"`
-	Timestamp time.Time       `json:"timestamp"`
-	Executed  int32           `json:"executed"`
-	TxIndex   int             `json:"txindex"`
-	TxAction  HistoryAction   `json:"txaction"`
+const baseTxCountQuery = `SELECT COUNT(*) FROM pn_history_txbatch batch, pn_history_transaction tx
+WHERE batch.entry_hash = tx.entry_hash AND (%s)`
 
-	FromAddress *factom.FAAddress          `json:"fromaddress"`
-	FromAsset   string                     `json:"fromasset"`
-	FromAmount  int64                      `json:"fromamount"`
-	ToAsset     string                     `json:"toasset,omitempty"`
-	ToAmount    int64                      `json:"toamount,omitempty"`
-	Outputs     []HistoryTransactionOutput `json:"outputs,omitempty"`
-}
-type HistoryTransactionOutput struct {
-	Address *factom.FAAddress `json:"address"`
-	Amount  int64             `json:"amount"`
-}
+const baseTxActionQuery = `SELECT 
+	batch.history_id, batch.entry_hash, batch.height, batch.timestamp, batch.executed,
+	tx.tx_index, tx.action_type, tx.from_address, tx.from_asset, tx.from_amount, tx.outputs,
+	tx.to_asset, tx.to_amount
+FROM pn_history_txbatch batch, pn_history_transaction tx
+WHERE batch.entry_hash = tx.entry_hash AND (%s)
+ORDER BY batch.history_id %s
+LIMIT 50 OFFSET %d`
 
+// helper function for sql results of `baseTxActionQuery`
 func _turnRowsIntoHistoryTransactions(rows *sql.Rows) ([]HistoryTransaction, error) {
 	var actions []HistoryTransaction
 	for rows.Next() {
@@ -118,18 +150,8 @@ func _turnRowsIntoHistoryTransactions(rows *sql.Rows) ([]HistoryTransaction, err
 	return actions, nil
 }
 
-const baseTxCountQuery = `SELECT COUNT(*) FROM pn_history_txbatch batch, pn_history_transaction tx
-WHERE batch.entry_hash = tx.entry_hash AND (%s)`
-
-const baseTxActionQuery = `SELECT 
-	batch.history_id, batch.entry_hash, batch.height, batch.timestamp, batch.executed,
-	tx.tx_index, tx.action_type, tx.from_address, tx.from_asset, tx.from_amount, tx.outputs,
-	tx.to_asset, tx.to_amount
-FROM pn_history_txbatch batch, pn_history_transaction tx
-WHERE batch.entry_hash = tx.entry_hash AND (%s)
-ORDER BY batch.history_id %s
-LIMIT 50 OFFSET %d`
-
+// SelectTransactionHistoryActionsByHash returns the specified amount of transactions based on the hash.
+// Hash can be an entry hash from the opr and transaction chains, or a transaction hash from an fblock.
 func (p *Pegnet) SelectTransactionHistoryActionsByHash(hash *factom.Bytes32, offset int, descending bool) ([]HistoryTransaction, int, error) {
 	var count int
 	err := p.DB.QueryRow(fmt.Sprintf(baseTxCountQuery, "batch.entry_hash = ?"), hash[:]).Scan(&count)
@@ -162,6 +184,7 @@ func (p *Pegnet) SelectTransactionHistoryActionsByHash(hash *factom.Bytes32, off
 	return a, count, e
 }
 
+// this has the identical selected fields to baseTxActionQuery
 const addressQuery = `SELECT 
 	batch.history_id, batch.entry_hash, batch.height, batch.timestamp, batch.executed,
 	tx.tx_index, tx.action_type, tx.from_address, tx.from_asset, tx.from_amount, tx.outputs,
@@ -172,6 +195,8 @@ ORDER BY batch.history_id %s
 LIMIT 50 OFFSET %d`
 const addressQueryCount = `SELECT COUNT(*) FROM pn_history_lookup lookup WHERE lookup.address = ?`
 
+// SelectTransactionHistoryActionsByAddress uses the lookup table to retrieve all transactions that have
+// the specified address in either inputs or outputs
 func (p *Pegnet) SelectTransactionHistoryActionsByAddress(addr *factom.FAAddress, offset int, descending bool) ([]HistoryTransaction, int, error) {
 	var count int
 	err := p.DB.QueryRow(addressQueryCount, addr[:]).Scan(&count)
@@ -201,6 +226,7 @@ func (p *Pegnet) SelectTransactionHistoryActionsByAddress(addr *factom.FAAddress
 	return a, count, e
 }
 
+// SelectTransactionHistoryActionsByHeight returns all transactions that were **entered** at the specified height.
 func (p *Pegnet) SelectTransactionHistoryActionsByHeight(height uint32, offset int, descending bool) ([]HistoryTransaction, int, error) {
 	var count int
 	err := p.DB.QueryRow(fmt.Sprintf(baseTxCountQuery, "batch.height = ?"), height).Scan(&count)
@@ -233,6 +259,9 @@ func (p *Pegnet) SelectTransactionHistoryActionsByHeight(height uint32, offset i
 	return a, count, e
 }
 
+// SelectTransactionHistoryStatus returns the status of a transaction:
+// `-1` for a failed transaction, `0` for a pending transactions,
+// `height` for the block in which it was applied otherwise
 func (p *Pegnet) SelectTransactionHistoryStatus(hash *factom.Bytes32) (uint32, uint32, error) {
 	var height, executed uint32
 	err := p.DB.QueryRow("SELECT height, executed FROM pn_history_txbatch WHERE entry_hash = ?", hash[:]).Scan(&height, &executed)
@@ -245,6 +274,7 @@ func (p *Pegnet) SelectTransactionHistoryStatus(hash *factom.Bytes32) (uint32, u
 	return height, executed, nil
 }
 
+// SetTransactionHistoryExecuted updates a transaction's executed status
 func (p *Pegnet) SetTransactionHistoryExecuted(tx *sql.Tx, txbatch *fat2.TransactionBatch, executed int64) error {
 	stmt, err := tx.Prepare(`UPDATE "pn_history_txbatch" SET executed = ? WHERE entry_hash = ?`)
 	if err != nil {
@@ -257,6 +287,8 @@ func (p *Pegnet) SetTransactionHistoryExecuted(tx *sql.Tx, txbatch *fat2.Transac
 	return nil
 }
 
+// SetTransactionHistoryConvertedAmount updates a conversion with the actual conversion value.
+// This is done in the same SQL Transaction as updating its executed status
 func (p *Pegnet) SetTransactionHistoryConvertedAmount(tx *sql.Tx, txbatch *fat2.TransactionBatch, index int, amount int64) error {
 	stmt, err := tx.Prepare(`UPDATE "pn_history_transaction" SET to_amount = ? WHERE entry_hash = ? AND tx_index = ?`)
 	if err != nil {
@@ -269,6 +301,7 @@ func (p *Pegnet) SetTransactionHistoryConvertedAmount(tx *sql.Tx, txbatch *fat2.
 	return nil
 }
 
+// InsertTransactionHistoryTxBatch inserts a transaction from the transaction chain into the history system
 func (p *Pegnet) InsertTransactionHistoryTxBatch(tx *sql.Tx, blockorder int, txbatch *fat2.TransactionBatch, height uint32) error {
 	stmt, err := tx.Prepare(`INSERT INTO "pn_history_txbatch"
                 (entry_hash, height, blockorder, timestamp, executed) VALUES
@@ -313,6 +346,7 @@ func (p *Pegnet) InsertTransactionHistoryTxBatch(tx *sql.Tx, blockorder int, txb
 				return err
 			}
 		} else {
+			// json encode the outputs
 			outputs := make([]HistoryTransactionOutput, len(action.Transfers))
 			for i, transfer := range action.Transfers {
 				outputs[i] = HistoryTransactionOutput{Address: &transfer.Address, Amount: int64(transfer.Amount)}
@@ -336,6 +370,8 @@ func (p *Pegnet) InsertTransactionHistoryTxBatch(tx *sql.Tx, blockorder int, txb
 	return nil
 }
 
+// InsertFCTBurn inserts a payout for an FCT burn into the system.
+// Note that from_asset and to_asset are hardcoded
 func (p *Pegnet) InsertFCTBurn(tx *sql.Tx, fBlockHash *factom.Bytes32, burn *factom.FactoidTransaction, height uint32) error {
 	stmt, err := tx.Prepare(`INSERT INTO "pn_history_txbatch"
                 (entry_hash, height, blockorder, timestamp, executed) VALUES
@@ -372,6 +408,8 @@ func (p *Pegnet) InsertFCTBurn(tx *sql.Tx, fBlockHash *factom.Bytes32, burn *fac
 	return nil
 }
 
+// InsertCoinbase inserts the payouts from mining into the history system.
+// There is one transaction per winning OPR, with the entry hash pointing to that specific opr
 func (p *Pegnet) InsertCoinbase(tx *sql.Tx, winner *grader.GradingOPR, addr []byte, timestamp time.Time) error {
 	stmt, err := tx.Prepare(`INSERT INTO "pn_history_txbatch"
                 (entry_hash, height, blockorder, timestamp, executed) VALUES
