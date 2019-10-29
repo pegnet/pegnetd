@@ -91,6 +91,63 @@ func (ParamsGetPegnetRates) ValidChainID() *factom.Bytes32 {
 	return nil
 }
 
+type ParamsGetPegnetTransactionStatus struct {
+	Hash *factom.Bytes32 `json:"entryhash,omitempty"`
+}
+
+func (p ParamsGetPegnetTransactionStatus) HasIncludePending() bool { return false }
+func (p ParamsGetPegnetTransactionStatus) IsValid() error {
+	if p.Hash == nil {
+		return jrpc.InvalidParams(`required: "entryhash"`)
+	}
+	return nil
+}
+func (p ParamsGetPegnetTransactionStatus) ValidChainID() *factom.Bytes32 {
+	return nil
+}
+
+// ParamsGetPegnetTransaction are the parameters for retrieving transactions from
+// the history system.
+// You need to specify exactly one of either `hash`, `address`, or `height`.
+// `offset` is the value from a previous query's `nextoffset`.
+// `desc` returns transactions in newest->oldest order
+type ParamsGetPegnetTransaction struct {
+	Hash       *factom.Bytes32 `json:"entryhash,omitempty"`
+	Address    string          `json:"address,omitempty"`
+	Height     int             `json:"height,omitempty"`
+	Offset     int             `json:"offset,omitempty"`
+	Desc       bool            `json:"desc,omitempty"`
+	Transfer   bool            `json:"transfer,omitempty"`
+	Conversion bool            `json:"conversion,omitempty"`
+	Coinbase   bool            `json:"coinbase,omitempty"`
+	Burn       bool            `json:"burn,omitempty"`
+}
+
+func (p ParamsGetPegnetTransaction) HasIncludePending() bool { return false }
+func (p ParamsGetPegnetTransaction) IsValid() error {
+	if p.Offset < 0 {
+		return jrpc.InvalidParams(`offset must be >= 0`)
+	}
+	if p.Hash != nil && p.Address != "" && p.Height > 0 {
+		return jrpc.InvalidParams(`required: only set hash or address`)
+	}
+	if p.Hash != nil {
+		return nil
+	} else if p.Address != "" {
+		_, err := factom.NewFAAddress(p.Address)
+		if err != nil {
+			return err
+		}
+		return nil
+	} else if p.Height > 0 {
+		return nil
+	}
+	return jrpc.InvalidParams(`required: "entryhash" or "address"`)
+}
+func (p ParamsGetPegnetTransaction) ValidChainID() *factom.Bytes32 {
+	return nil
+}
+
 type ParamsGetPegnetBalances struct {
 	Address *factom.FAAddress `json:"address,omitempty"`
 }

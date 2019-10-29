@@ -209,7 +209,7 @@ func (d *Pegnetd) SyncBlock(ctx context.Context, tx *sql.Tx, height uint32) erro
 	// 4) Apply effects of graded OPR Block (PEG rewards, if any)
 	//    These funds will be available for transactions and conversions executed in the next block
 	if gradedBlock != nil {
-		if err := d.ApplyGradedOPRBlock(tx, gradedBlock); err != nil {
+		if err := d.ApplyGradedOPRBlock(tx, gradedBlock, dblock.Timestamp); err != nil {
 			return err
 		}
 	}
@@ -305,7 +305,7 @@ func (d *Pegnetd) ApplyTransactionBatchesInHolding(ctx context.Context, sqlTx *s
 // and applys the balance updates for all transaction batches able to be executed
 // immediately. If an error is returned, the sql.Tx should be rolled back by the caller.
 func (d *Pegnetd) ApplyTransactionBlock(sqlTx *sql.Tx, eblock *factom.EBlock) error {
-	for _, entry := range eblock.Entries {
+	for blockorder, entry := range eblock.Entries {
 		txBatch := fat2.NewTransactionBatch(entry)
 		err := txBatch.UnmarshalEntry()
 		if err != nil {
@@ -328,6 +328,10 @@ func (d *Pegnetd) ApplyTransactionBlock(sqlTx *sql.Tx, eblock *factom.EBlock) er
 		}
 		// At this point, we know that the transaction batch is valid and able to be executed.
 
+		if err = d.Pegnet.InsertTransactionHistoryTxBatch(sqlTx, blockorder, txBatch, eblock.Height); err != nil {
+			return err
+		}
+
 		// A transaction batch that contains conversions must be put into holding to be executed
 		// in a future block. This prevents gaming of conversions where an actor
 		// can know the exchange rates of the future ahead of time.
@@ -342,6 +346,8 @@ func (d *Pegnetd) ApplyTransactionBlock(sqlTx *sql.Tx, eblock *factom.EBlock) er
 		// No conversions in the batch, it can be applied immediately
 		if err = d.applyTransactionBatch(sqlTx, txBatch, nil, eblock.Height); err != nil && err != pegnet.InsufficientBalanceErr {
 			return err
+		} else if err == pegnet.InsufficientBalanceErr {
+			d.Pegnet.SetTransactionHistoryExecuted(sqlTx, txBatch, -1)
 		}
 	}
 	return nil
@@ -426,9 +432,17 @@ func (d *Pegnetd) applyTransactionBatch(sqlTx *sql.Tx, txBatch *fat2.Transaction
 			return err
 		}
 
+		if err = d.Pegnet.SetTransactionHistoryExecuted(sqlTx, txBatch, int64(currentHeight)); err != nil {
+			return err
+		}
+
 		if tx.IsConversion() {
 			outputAmount, err := conversions.Convert(int64(tx.Input.Amount), rates[tx.Input.Type], rates[tx.Conversion])
 			if err != nil {
+				return err
+			}
+
+			if err = d.Pegnet.SetTransactionHistoryConvertedAmount(sqlTx, txBatch, txIndex, outputAmount); err != nil {
 				return err
 			}
 			_, err = d.Pegnet.AddToBalance(sqlTx, &tx.Input.Address, tx.Conversion, uint64(outputAmount))
@@ -467,7 +481,7 @@ func (d *Pegnetd) ApplyFactoidBlock(ctx context.Context, tx *sql.Tx, dblock *fac
 	}
 
 	var totalBurned uint64
-	var burns []factom.FactoidTransactionIO
+	var burns []*factom.FactoidTransaction
 
 	// Register all burns. Burns have a few requirements
 	// - Only 1 output, and that output must be the EC burn address
@@ -501,7 +515,7 @@ func (d *Pegnetd) ApplyFactoidBlock(ctx context.Context, tx *sql.Tx, dblock *fac
 
 		in := tx.FCTInputs[0]
 		totalBurned += in.Amount
-		burns = append(burns, in)
+		burns = append(burns, tx)
 	}
 
 	var _ = burns
@@ -512,8 +526,12 @@ func (d *Pegnetd) ApplyFactoidBlock(ctx context.Context, tx *sql.Tx, dblock *fac
 	// All burns are FCT inputs
 	for i := range burns {
 		var add factom.FAAddress
-		copy(add[:], burns[i].Address[:])
-		if _, err := d.Pegnet.AddToBalance(tx, &add, fat2.PTickerFCT, burns[i].Amount); err != nil {
+		copy(add[:], burns[i].FCTInputs[0].Address[:])
+		if _, err := d.Pegnet.AddToBalance(tx, &add, fat2.PTickerFCT, burns[i].FCTInputs[0].Amount); err != nil {
+			return err
+		}
+
+		if err := d.Pegnet.InsertFCTBurn(tx, fblock.KeyMR, burns[i], dblock.Height); err != nil {
 			return err
 		}
 	}
@@ -523,7 +541,7 @@ func (d *Pegnetd) ApplyFactoidBlock(ctx context.Context, tx *sql.Tx, dblock *fac
 
 // ApplyGradedOPRBlock pays out PEG to the winners of the given GradedBlock.
 // If an error is returned, the sql.Tx should be rolled back by the caller.
-func (d *Pegnetd) ApplyGradedOPRBlock(tx *sql.Tx, gradedBlock grader.GradedBlock) error {
+func (d *Pegnetd) ApplyGradedOPRBlock(tx *sql.Tx, gradedBlock grader.GradedBlock, timestamp time.Time) error {
 	winners := gradedBlock.Winners()
 	for i := range winners {
 		addr, err := factom.NewFAAddress(winners[i].OPR.GetAddress())
@@ -539,6 +557,10 @@ func (d *Pegnetd) ApplyGradedOPRBlock(tx *sql.Tx, gradedBlock grader.GradedBlock
 		}
 
 		if _, err := d.Pegnet.AddToBalance(tx, &addr, fat2.PTickerPEG, uint64(winners[i].Payout())); err != nil {
+			return err
+		}
+
+		if err := d.Pegnet.InsertCoinbase(tx, winners[i], addr[:], timestamp); err != nil {
 			return err
 		}
 	}

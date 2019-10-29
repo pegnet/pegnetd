@@ -34,14 +34,17 @@ import (
 	"github.com/pegnet/pegnetd/config"
 	"github.com/pegnet/pegnetd/fat/fat2"
 	"github.com/pegnet/pegnetd/node"
+	"github.com/pegnet/pegnetd/node/pegnet"
 )
 
 func (s *APIServer) jrpcMethods() jrpc.MethodMap {
 	return jrpc.MethodMap{
-		"get-transaction":       s.getTransaction(false),
-		"get-transaction-entry": s.getTransaction(true),
-		"get-pegnet-balances":   s.getPegnetBalances,
-		"get-pegnet-issuance":   s.getPegnetIssuance,
+		"get-transactions":       s.getTransactions,
+		"get-transaction-status": s.getTransactionStatus,
+		"get-transaction":        s.getTransaction(false),
+		"get-transaction-entry":  s.getTransaction(true),
+		"get-pegnet-balances":    s.getPegnetBalances,
+		"get-pegnet-issuance":    s.getPegnetIssuance,
 
 		"send-transaction": s.sendTransaction,
 
@@ -52,11 +55,95 @@ func (s *APIServer) jrpcMethods() jrpc.MethodMap {
 
 }
 
+type ResultGetTransactionStatus struct {
+	Height   uint32 `json:"height"`
+	Executed uint32 `json:"executed"`
+}
+
+func (s *APIServer) getTransactionStatus(data json.RawMessage) interface{} {
+	params := ParamsGetPegnetTransactionStatus{}
+	_, _, err := validate(data, &params)
+	if err != nil {
+		return err
+	}
+
+	height, executed, err := s.Node.Pegnet.SelectTransactionHistoryStatus(params.Hash)
+	if err != nil {
+		return jrpc.InvalidParams(err.Error())
+	}
+
+	if height == 0 {
+		return ErrorTransactionNotFound
+	}
+
+	var res ResultGetTransactionStatus
+	res.Height = height
+	res.Executed = executed
+
+	return res
+}
+
+// ResultGetTransactions returns history entries.
+// `Actions` contains []pegnet.HistoryTransaction.
+// `Count` is the total number of possible transactions
+// `NextOffset` returns the offset to use to get the next set of records.
+//  0 means no more records available
+type ResultGetTransactions struct {
+	Actions    interface{} `json:"actions"`
+	Count      int         `json:"count"`
+	NextOffset int         `json:"nextoffset"`
+}
+
+func (s *APIServer) getTransactions(data json.RawMessage) interface{} {
+	params := ParamsGetPegnetTransaction{}
+	_, _, err := validate(data, &params)
+	if err != nil {
+		return err
+	}
+
+	// using a separate options struct due to golang's circular import restrictions
+	var options pegnet.HistoryQueryOptions
+	options.Offset = params.Offset
+	options.Desc = params.Desc
+	options.Transfer = params.Transfer
+	options.Conversion = params.Conversion
+	options.Coinbase = params.Coinbase
+	options.FCTBurn = params.Burn
+
+	var actions []pegnet.HistoryTransaction
+	var count int
+
+	if params.Hash != nil {
+		actions, count, err = s.Node.Pegnet.SelectTransactionHistoryActionsByHash(params.Hash, options)
+	} else if params.Address != "" {
+		addr, _ := factom.NewFAAddress(params.Address) // verified in param
+		actions, count, err = s.Node.Pegnet.SelectTransactionHistoryActionsByAddress(&addr, options)
+	} else {
+		actions, count, err = s.Node.Pegnet.SelectTransactionHistoryActionsByHeight(uint32(params.Height), options)
+	}
+
+	if err != nil {
+		return jrpc.InvalidParams(err.Error())
+	}
+
+	if len(actions) == 0 {
+		return ErrorTransactionNotFound
+	}
+
+	var res ResultGetTransactions
+	res.Count = count
+	if params.Offset+len(actions) < count {
+		res.NextOffset = params.Offset + len(actions)
+	}
+	res.Actions = actions
+
+	return res
+}
+
 type ResultGetTransaction struct {
 	Hash      *factom.Bytes32 `json:"entryhash"`
 	Timestamp int64           `json:"timestamp"`
-	TxIndex   uint64          `json:"txindex,omitempty"`
-	Tx        interface{}     `json:"data"`
+	Tx        interface{}     `json:"actions"`
 }
 
 func (s *APIServer) getTransaction(getEntry bool) jrpc.MethodFunc {
