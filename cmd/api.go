@@ -1,11 +1,13 @@
 package cmd
 
 import (
+	"crypto/ed25519"
 	"encoding/json"
 	"fmt"
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/Factom-Asset-Tokens/factom"
 	"github.com/pegnet/pegnet/cmd"
@@ -22,6 +24,7 @@ func init() {
 	rootCmd.AddCommand(balances)
 	rootCmd.AddCommand(issuance)
 	rootCmd.AddCommand(status)
+	rootCmd.AddCommand(burn)
 
 	get.AddCommand(getTX)
 	get.AddCommand(getRates)
@@ -31,6 +34,119 @@ func init() {
 	rootCmd.AddCommand(tx)
 	rootCmd.AddCommand(conv)
 
+}
+
+var burn = &cobra.Command{
+	Use:              "burn <FA-SOURCE> <AMOUNT>",
+	Short:            "Converts FCT into pFCT",
+	Example:          "pegnetd burn FA2jK2HcLnRdS94dEcU27rF3meoJfpUcZPSinpb7AwQvPRY6RL1Q 50",
+	PersistentPreRun: always,
+	PreRun:           SoftReadConfig,
+	Args: cmd.CombineCobraArgs(
+		cmd.CustomArgOrderValidationBuilder(
+			true,
+			cmd.ArgValidatorFCTAddress,
+			cmd.ArgValidatorFCTAmount,
+		),
+	),
+	Run: func(cmd *cobra.Command, args []string) {
+		var err error
+		cl := node.FactomClientFromConfig(viper.GetViper())
+		source, amt := args[0], args[1]
+
+		amount := FactoidToFactoshi(amt)
+		if amount == -1 {
+			cmd.PrintErrln(fmt.Errorf("invalid amount specified"))
+			os.Exit(1)
+		}
+
+		addr, err := factom.NewFAAddress(source)
+		if err != nil {
+			cmd.PrintErrln("invalid input address specified")
+			os.Exit(1)
+		}
+		faddr := factom.Bytes32(addr)
+
+		priv, err := addr.GetFsAddress(cl)
+		if err != nil {
+			cmd.PrintErrf("unable to get private key: %s\n", err.Error())
+			os.Exit(1)
+		}
+
+		rcd, _, err := factom.DecodeRCD(priv.RCD())
+		if err != nil {
+			cmd.PrintErrf("unable to decode private key: %s\n", err.Error())
+			os.Exit(1)
+		}
+
+		balance, err := addr.GetBalance(cl)
+		if err != nil {
+			cmd.PrintErrln("unable to retrieve balance:" + err.Error())
+			os.Exit(1)
+		}
+
+		if balance < uint64(amount) {
+			cmd.PrintErrf("not enough balance to cover the amount. balance = %s\n", FactoshiToFactoid(int64(balance)))
+			os.Exit(1)
+		}
+
+		burnAddress, _ := factom.NewECAddress(node.BurnAddress)
+		fBurnAddress := factom.Bytes32(burnAddress)
+
+		var trans factom.FactoidTransaction
+		trans.Version = 2
+		trans.Timestamp = time.Now()
+		trans.InputCount = 1
+		trans.ECOutputCount = 1
+		trans.FCTInputs = append(trans.FCTInputs, factom.FactoidTransactionIO{
+			Amount:  uint64(amount),
+			Address: &faddr,
+		})
+		trans.ECOutputs = append(trans.ECOutputs, factom.FactoidTransactionIO{
+			Amount:  0,
+			Address: &fBurnAddress,
+		})
+
+		// the library requires at least one signature to "be populated"
+		// fill in below with real sig
+		trans.Signatures = append(trans.Signatures, factom.FactoidTransactionSignature{
+			ReedeemCondition: rcd,
+			SignatureBlock:   nil,
+		})
+
+		data, err := trans.MarshalLedgerBinary()
+		if err != nil { // should not happen
+			cmd.PrintErrf("unable to marshal for signature: %s\n", err.Error())
+			os.Exit(1)
+		}
+
+		sig := ed25519.Sign(priv.PrivateKey(), data)
+		trans.Signatures[0].SignatureBlock = sig
+
+		raw, err := trans.MarshalBinary()
+		if err != nil { // should not happen
+			cmd.PrintErrf("unable to marshal transaction: %s\n", err.Error())
+			os.Exit(1)
+		}
+
+		params := struct {
+			Hex string `json:"transaction"`
+		}{Hex: fmt.Sprintf("%x", raw)}
+
+		var result struct {
+			Message string `json:"message"`
+			TXID    string `json:"txid"`
+		}
+
+		err = cl.FactomdRequest("factoid-submit", params, &result)
+		if err != nil {
+			cmd.PrintErrf("unable to submit transaction: %s\n", err.Error())
+			os.Exit(1)
+		}
+
+		fmt.Println(result.Message)
+		fmt.Printf("Transaction ID: %s\n", result.TXID)
+	},
 }
 
 var conv = &cobra.Command{
