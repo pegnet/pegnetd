@@ -101,16 +101,25 @@ func (s *APIServer) getTransactions(data json.RawMessage) interface{} {
 		return err
 	}
 
+	// using a separate options struct due to golang's circular import restrictions
+	var options pegnet.HistoryQueryOptions
+	options.Offset = params.Offset
+	options.Desc = params.Desc
+	options.Transfer = params.Transfer
+	options.Conversion = params.Conversion
+	options.Coinbase = params.Coinbase
+	options.FCTBurn = params.Burn
+
 	var actions []pegnet.HistoryTransaction
 	var count int
 
 	if params.Hash != nil {
-		actions, count, err = s.Node.Pegnet.SelectTransactionHistoryActionsByHash(params.Hash, params.Offset, params.Desc)
+		actions, count, err = s.Node.Pegnet.SelectTransactionHistoryActionsByHash(params.Hash, options)
 	} else if params.Address != "" {
 		addr, _ := factom.NewFAAddress(params.Address) // verified in param
-		actions, count, err = s.Node.Pegnet.SelectTransactionHistoryActionsByAddress(&addr, params.Offset, params.Desc)
+		actions, count, err = s.Node.Pegnet.SelectTransactionHistoryActionsByAddress(&addr, options)
 	} else {
-		actions, count, err = s.Node.Pegnet.SelectTransactionHistoryActionsByHeight(uint32(params.Height), params.Offset, params.Desc)
+		actions, count, err = s.Node.Pegnet.SelectTransactionHistoryActionsByHeight(uint32(params.Height), options)
 	}
 
 	if err != nil {

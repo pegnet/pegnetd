@@ -11,22 +11,6 @@ import (
 	"github.com/pegnet/pegnetd/fat/fat2"
 )
 
-// HistoryAction are the different types of actions inside the history
-type HistoryAction int32
-
-const (
-	// Invalid is used for debugging
-	Invalid HistoryAction = iota
-	// Transfer is a 1:n transfer of pegged assets from one address to another
-	Transfer
-	// Conversion is a conversion of pegged assets
-	Conversion
-	// Coinbase is a miner reward payout
-	Coinbase
-	// FCTBurn is a pFCT payout for burning FCT on factom
-	FCTBurn
-)
-
 // HistoryTransaction is a flattened entry of the history table structure.
 // It contains several actions: transfers, conversions, coinbases, and fct burns
 type HistoryTransaction struct {
@@ -67,8 +51,7 @@ const createTableTxHistoryBatch = `CREATE TABLE IF NOT EXISTS "pn_history_txbatc
 	"timestamp"		INTEGER NOT NULL,
 	"executed"		INTEGER NOT NULL, -- -1 if failed, 0 if pending, height it was applied at otherwise
 
-	UNIQUE("entry_hash", "height"),
-	FOREIGN KEY("height") REFERENCES "pn_grade"
+	UNIQUE("entry_hash", "height")
 );
 CREATE INDEX IF NOT EXISTS "idx_history_txbatch_entry_hash" ON "pn_history_txbatch"("entry_hash");
 CREATE INDEX IF NOT EXISTS "idx_history_txbatch_timestamp" ON "pn_history_txbatch"("timestamp");
@@ -103,160 +86,54 @@ const createTableTxHistoryLookup = `CREATE TABLE IF NOT EXISTS "pn_history_looku
 CREATE INDEX IF NOT EXISTS "idx_history_lookup_address" ON "pn_history_lookup"("address");
 CREATE INDEX IF NOT EXISTS "idx_history_lookup_entry_index" ON "pn_history_lookup"("entry_hash", "tx_index");`
 
+// only add a lookup reference if one doesn't already exist
 const insertLookupQuery = `INSERT INTO pn_history_lookup (entry_hash, tx_index, address) VALUES (?, ?, ?) ON CONFLICT DO NOTHING;`
 
-const baseTxCountQuery = `SELECT COUNT(*) FROM pn_history_txbatch batch, pn_history_transaction tx
-WHERE batch.entry_hash = tx.entry_hash AND (%s)`
-
-const baseTxActionQuery = `SELECT 
-	batch.history_id, batch.entry_hash, batch.height, batch.timestamp, batch.executed,
-	tx.tx_index, tx.action_type, tx.from_address, tx.from_asset, tx.from_amount, tx.outputs,
-	tx.to_asset, tx.to_amount
-FROM pn_history_txbatch batch, pn_history_transaction tx
-WHERE batch.entry_hash = tx.entry_hash AND (%s)
-ORDER BY batch.history_id %s
-LIMIT 50 OFFSET %d`
-
-// helper function for sql results of `baseTxActionQuery`
-func _turnRowsIntoHistoryTransactions(rows *sql.Rows) ([]HistoryTransaction, error) {
-	var actions []HistoryTransaction
-	for rows.Next() {
-		var tx HistoryTransaction
-		var ts, id int64
-		var hash, from, outputs []byte
-		err := rows.Scan(
-			&id, &hash, &tx.Height, &ts, &tx.Executed, // history
-			&tx.TxIndex, &tx.TxAction, &from, &tx.FromAsset, &tx.FromAmount, // action
-			&outputs, &tx.ToAsset, &tx.ToAmount) // data
-		if err != nil {
-			return nil, err
-		}
-		tx.Hash = factom.NewBytes32(hash)
-		tx.Timestamp = time.Unix(ts, 0)
-		var addr factom.FAAddress
-		addr = factom.FAAddress(*factom.NewBytes32(from))
-		tx.FromAddress = &addr
-
-		if tx.TxAction == Transfer {
-			var output []HistoryTransactionOutput
-			if err = json.Unmarshal(outputs, &output); err != nil { // should never fail unless database data is corrupt
-				return nil, fmt.Errorf("database corruption %d %v", id, err)
-			}
-			tx.Outputs = output
-		}
-
-		actions = append(actions, tx)
+func (p *Pegnet) historySelectHelper(field string, data interface{}, options HistoryQueryOptions) ([]HistoryTransaction, int, error) {
+	countQuery, dataQuery, err := historyQueryBuilder(field, options)
+	if err != nil { // developer error
+		return nil, 0, err
 	}
-	return actions, nil
+
+	var count int
+	err = p.DB.QueryRow(countQuery, data).Scan(&count)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	if count == 0 {
+		return nil, 0, nil
+	}
+
+	if options.Offset > count {
+		return nil, 0, fmt.Errorf("offset too big")
+	}
+
+	rows, err := p.DB.Query(dataQuery, data)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+
+	actions, err := turnRowsIntoHistoryTransactions(rows)
+	return actions, count, err
 }
 
 // SelectTransactionHistoryActionsByHash returns the specified amount of transactions based on the hash.
 // Hash can be an entry hash from the opr and transaction chains, or a transaction hash from an fblock.
-func (p *Pegnet) SelectTransactionHistoryActionsByHash(hash *factom.Bytes32, offset int, descending bool) ([]HistoryTransaction, int, error) {
-	var count int
-	err := p.DB.QueryRow(fmt.Sprintf(baseTxCountQuery, "batch.entry_hash = ?"), hash[:]).Scan(&count)
-	if err != nil {
-		return nil, 0, err
-	}
-
-	if count == 0 {
-		return nil, 0, nil
-	}
-
-	if offset > count {
-		return nil, 0, fmt.Errorf("offset too big")
-	}
-
-	order := "ASC"
-	if descending {
-		order = "DESC"
-	}
-
-	q := fmt.Sprintf(baseTxActionQuery, "batch.entry_hash = ?", order, offset)
-
-	rows, err := p.DB.Query(q, hash[:])
-	if err != nil {
-		return nil, 0, err
-	}
-	defer rows.Close()
-
-	a, e := _turnRowsIntoHistoryTransactions(rows)
-	return a, count, e
+func (p *Pegnet) SelectTransactionHistoryActionsByHash(hash *factom.Bytes32, options HistoryQueryOptions) ([]HistoryTransaction, int, error) {
+	return p.historySelectHelper("entry_hash", hash[:], options)
 }
-
-// this has the identical selected fields to baseTxActionQuery
-const addressQuery = `SELECT 
-	batch.history_id, batch.entry_hash, batch.height, batch.timestamp, batch.executed,
-	tx.tx_index, tx.action_type, tx.from_address, tx.from_asset, tx.from_amount, tx.outputs,
-	tx.to_asset, tx.to_amount
-FROM pn_history_lookup lookup, pn_history_txbatch batch, pn_history_transaction tx
-WHERE lookup.address = ? AND lookup.entry_hash = tx.entry_hash AND lookup.tx_index = tx.tx_index AND batch.entry_hash = tx.entry_hash
-ORDER BY batch.history_id %s
-LIMIT 50 OFFSET %d`
-const addressQueryCount = `SELECT COUNT(*) FROM pn_history_lookup lookup WHERE lookup.address = ?`
 
 // SelectTransactionHistoryActionsByAddress uses the lookup table to retrieve all transactions that have
 // the specified address in either inputs or outputs
-func (p *Pegnet) SelectTransactionHistoryActionsByAddress(addr *factom.FAAddress, offset int, descending bool) ([]HistoryTransaction, int, error) {
-	var count int
-	err := p.DB.QueryRow(addressQueryCount, addr[:]).Scan(&count)
-	if err != nil {
-		return nil, 0, err
-	}
-	if count == 0 {
-		return nil, 0, nil
-	}
-	if offset > count {
-		return nil, 0, fmt.Errorf("offset too big")
-	}
-
-	order := "ASC"
-	if descending {
-		order = "DESC"
-	}
-	q := fmt.Sprintf(addressQuery, order, offset)
-
-	rows, err := p.DB.Query(q, addr[:])
-	if err != nil {
-		return nil, 0, err
-	}
-	defer rows.Close()
-
-	a, e := _turnRowsIntoHistoryTransactions(rows)
-	return a, count, e
+func (p *Pegnet) SelectTransactionHistoryActionsByAddress(addr *factom.FAAddress, options HistoryQueryOptions) ([]HistoryTransaction, int, error) {
+	return p.historySelectHelper("address", addr[:], options)
 }
 
 // SelectTransactionHistoryActionsByHeight returns all transactions that were **entered** at the specified height.
-func (p *Pegnet) SelectTransactionHistoryActionsByHeight(height uint32, offset int, descending bool) ([]HistoryTransaction, int, error) {
-	var count int
-	err := p.DB.QueryRow(fmt.Sprintf(baseTxCountQuery, "batch.height = ?"), height).Scan(&count)
-	if err != nil {
-		return nil, 0, err
-	}
-
-	if count == 0 {
-		return nil, 0, nil
-	}
-
-	if offset > count {
-		return nil, 0, fmt.Errorf("offset too big")
-	}
-
-	order := "ASC"
-	if descending {
-		order = "DESC"
-	}
-
-	q := fmt.Sprintf(baseTxActionQuery, "batch.height = ?", order, offset)
-
-	rows, err := p.DB.Query(q, height)
-	if err != nil {
-		return nil, 0, err
-	}
-	defer rows.Close()
-
-	a, e := _turnRowsIntoHistoryTransactions(rows)
-	return a, count, e
+func (p *Pegnet) SelectTransactionHistoryActionsByHeight(height uint32, options HistoryQueryOptions) ([]HistoryTransaction, int, error) {
+	return p.historySelectHelper("height", height, options)
 }
 
 // SelectTransactionHistoryStatus returns the status of a transaction:

@@ -112,11 +112,15 @@ func (p ParamsGetPegnetTransactionStatus) ValidChainID() *factom.Bytes32 {
 // `offset` is the value from a previous query's `nextoffset`.
 // `desc` returns transactions in newest->oldest order
 type ParamsGetPegnetTransaction struct {
-	Hash    *factom.Bytes32 `json:"entryhash,omitempty"`
-	Address string          `json:"address,omitempty"`
-	Height  int             `json:"height,omitempty"`
-	Offset  int             `json:"offset,omitempty"`
-	Desc    bool            `json:"desc,omitempty"`
+	Hash       *factom.Bytes32 `json:"entryhash,omitempty"`
+	Address    string          `json:"address,omitempty"`
+	Height     int             `json:"height,omitempty"`
+	Offset     int             `json:"offset,omitempty"`
+	Desc       bool            `json:"desc,omitempty"`
+	Transfer   bool            `json:"transfer,omitempty"`
+	Conversion bool            `json:"conversion,omitempty"`
+	Coinbase   bool            `json:"coinbase,omitempty"`
+	Burn       bool            `json:"burn,omitempty"`
 }
 
 func (p ParamsGetPegnetTransaction) HasIncludePending() bool { return false }
