@@ -112,15 +112,15 @@ func (p ParamsGetPegnetTransactionStatus) ValidChainID() *factom.Bytes32 {
 // `offset` is the value from a previous query's `nextoffset`.
 // `desc` returns transactions in newest->oldest order
 type ParamsGetPegnetTransaction struct {
-	Hash       *factom.Bytes32 `json:"entryhash,omitempty"`
-	Address    string          `json:"address,omitempty"`
-	Height     int             `json:"height,omitempty"`
-	Offset     int             `json:"offset,omitempty"`
-	Desc       bool            `json:"desc,omitempty"`
-	Transfer   bool            `json:"transfer,omitempty"`
-	Conversion bool            `json:"conversion,omitempty"`
-	Coinbase   bool            `json:"coinbase,omitempty"`
-	Burn       bool            `json:"burn,omitempty"`
+	Hash       string `json:"entryhash,omitempty"`
+	Address    string `json:"address,omitempty"`
+	Height     int    `json:"height,omitempty"`
+	Offset     int    `json:"offset,omitempty"`
+	Desc       bool   `json:"desc,omitempty"`
+	Transfer   bool   `json:"transfer,omitempty"`
+	Conversion bool   `json:"conversion,omitempty"`
+	Coinbase   bool   `json:"coinbase,omitempty"`
+	Burn       bool   `json:"burn,omitempty"`
 }
 
 func (p ParamsGetPegnetTransaction) HasIncludePending() bool { return false }
@@ -128,21 +128,38 @@ func (p ParamsGetPegnetTransaction) IsValid() error {
 	if p.Offset < 0 {
 		return jrpc.InvalidParams(`offset must be >= 0`)
 	}
-	if p.Hash != nil && p.Address != "" && p.Height > 0 {
-		return jrpc.InvalidParams(`required: only set hash or address`)
+	// check that only one is set
+	var count int
+	if p.Hash != "" {
+		count++
 	}
-	if p.Hash != nil {
-		return nil
-	} else if p.Address != "" {
-		_, err := factom.NewFAAddress(p.Address)
-		if err != nil {
-			return err
+	if p.Address != "" {
+		count++
+	}
+	if p.Height > 0 {
+		count++
+	}
+	if count != 1 {
+		if count == 0 {
+			return jrpc.InvalidParams(`need to specify either "entryhash" or "address" or "height"`)
 		}
-		return nil
-	} else if p.Height > 0 {
-		return nil
+		return jrpc.InvalidParams(`cannot specify more than one of "entryhash", "address", or "height"`)
 	}
-	return jrpc.InvalidParams(`required: "entryhash" or "address"`)
+
+	// error check input
+	if p.Address != "" {
+		if _, err := factom.NewFAAddress(p.Address); err != nil {
+			return jrpc.InvalidParams("address: " + err.Error())
+		}
+	}
+	if p.Hash != "" {
+		hash := new(factom.Bytes32)
+		if err := hash.UnmarshalText([]byte(p.Hash)); err != nil {
+			return jrpc.InvalidParams("entryhash: " + err.Error())
+		}
+	}
+
+	return nil
 }
 func (p ParamsGetPegnetTransaction) ValidChainID() *factom.Bytes32 {
 	return nil
