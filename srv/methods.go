@@ -113,8 +113,10 @@ func (s *APIServer) getTransactions(data json.RawMessage) interface{} {
 	var actions []pegnet.HistoryTransaction
 	var count int
 
-	if params.Hash != nil {
-		actions, count, err = s.Node.Pegnet.SelectTransactionHistoryActionsByHash(params.Hash, options)
+	if params.Hash != "" {
+		hash := new(factom.Bytes32)
+		_ = hash.UnmarshalText([]byte(params.Hash)) // error checked by params.valid
+		actions, count, err = s.Node.Pegnet.SelectTransactionHistoryActionsByHash(hash, options)
 	} else if params.Address != "" {
 		addr, _ := factom.NewFAAddress(params.Address) // verified in param
 		actions, count, err = s.Node.Pegnet.SelectTransactionHistoryActionsByAddress(&addr, options)
