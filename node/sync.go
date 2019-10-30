@@ -24,6 +24,7 @@ func (d *Pegnetd) GetCurrentSync() uint32 {
 // DBlockSync iterates through dblocks and syncs the various chains
 func (d *Pegnetd) DBlockSync(ctx context.Context) {
 	retryPeriod := d.Config.GetDuration(config.DBlockSyncRetryPeriod)
+	isFirstSync := true
 OuterSyncLoop:
 	for {
 		if isDone(ctx) {
@@ -42,6 +43,15 @@ OuterSyncLoop:
 		if d.Sync.Synced >= heights.DirectoryBlock {
 			// We are currently synced, nothing to do. If we are above it, the factomd could
 			// be rebooted
+			if d.Sync.Synced > heights.DirectoryBlock {
+				log.Debugf("Factom node behind. database height = %d, factom height = %d", d.Sync.Synced, heights.DirectoryBlock)
+			}
+
+			if isFirstSync {
+				isFirstSync = false
+				log.WithField("height", d.Sync.Synced).Info("Node is up to date")
+			}
+
 			time.Sleep(retryPeriod) // TODO: Should we have a separate polling period?
 			continue
 		}
@@ -49,7 +59,17 @@ OuterSyncLoop:
 		var totalDur time.Duration
 		var iterations int
 
+		var longSync bool
+		if isFirstSync || heights.DirectoryBlock-d.Sync.Synced > 1 {
+			log.WithFields(log.Fields{
+				"height":     d.Sync.Synced,
+				"syncing-to": heights.DirectoryBlock,
+			}).Infof("Starting sync job of %d blocks", heights.DirectoryBlock-d.Sync.Synced)
+			longSync = true
+		}
+
 		begin := time.Now()
+		lastReport := begin
 		for d.Sync.Synced < heights.DirectoryBlock {
 			start := time.Now()
 			hLog := log.WithFields(log.Fields{"height": d.Sync.Synced + 1})
@@ -110,8 +130,9 @@ OuterSyncLoop:
 
 			iterations++
 			totalDur += elapsed
-			// Only print if we are > 50 behind and every 50
-			if iterations%50 == 0 {
+			// update every 15 seconds
+			if time.Since(lastReport) > time.Second*15 {
+				lastReport = time.Now()
 				toGo := heights.DirectoryBlock - d.Sync.Synced
 				avg := totalDur / time.Duration(iterations)
 				hLog.WithFields(log.Fields{
@@ -123,6 +144,13 @@ OuterSyncLoop:
 			}
 		}
 
+		isFirstSync = false
+		if longSync {
+			longSync = false
+			log.WithField("height", d.Sync.Synced).WithField("blocks-synced", iterations).Infof("Finished sync job")
+		} else if d.Sync.Synced%6 == 0 {
+			log.WithField("height", d.Sync.Synced).Infof("status report")
+		}
 	}
 
 }
