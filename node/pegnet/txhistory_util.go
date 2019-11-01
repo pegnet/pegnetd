@@ -60,6 +60,12 @@ type HistoryQueryOptions struct {
 	Conversion bool
 	Coinbase   bool
 	FCTBurn    bool
+
+	// UseTxIndex is set if specifying a specific tx in the batch.
+	// Because 0 is a valid tx index, we want the uninitialized value
+	// to be "off"
+	UseTxIndex bool
+	TxIndex    int
 }
 
 const historyQueryFields = "batch.history_id, batch.entry_hash, batch.height, batch.timestamp, batch.executed," +
@@ -98,6 +104,11 @@ func historyQueryBuilder(field string, options HistoryQueryOptions) (string, str
 		whereCount = where
 	default:
 		return "", "", fmt.Errorf("developer error - unimplemented history query builder field")
+	}
+
+	// Only select the txindex. Only works with entry_hash field
+	if options.UseTxIndex && field == "entry_hash" {
+		where += fmt.Sprintf(" AND tx.tx_index = %d", options.TxIndex)
 	}
 
 	if types != nil {

@@ -131,6 +131,12 @@ func (p *Pegnet) SelectTransactionHistoryActionsByAddress(addr *factom.FAAddress
 	return p.historySelectHelper("address", addr[:], options)
 }
 
+// SelectTransactionHistoryActionsByTxID uses the lookup table to retrieve all transactions that have
+// the specified txid. A TxID is an entryhash + a transaction index
+func (p *Pegnet) SelectTransactionHistoryActionsByTxID(hash *factom.Bytes32, options HistoryQueryOptions) ([]HistoryTransaction, int, error) {
+	return p.historySelectHelper("entry_hash", hash[:], options)
+}
+
 // SelectTransactionHistoryActionsByHeight returns all transactions that were **entered** at the specified height.
 func (p *Pegnet) SelectTransactionHistoryActionsByHeight(height uint32, options HistoryQueryOptions) ([]HistoryTransaction, int, error) {
 	return p.historySelectHelper("height", height, options)

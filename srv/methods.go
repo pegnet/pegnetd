@@ -27,6 +27,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 
 	"github.com/AdamSLevy/jsonrpc2"
 	jrpc "github.com/AdamSLevy/jsonrpc2/v11"
@@ -39,12 +40,13 @@ import (
 
 func (s *APIServer) jrpcMethods() jrpc.MethodMap {
 	return jrpc.MethodMap{
-		"get-transactions":       s.getTransactions,
+		"get-transactions":       s.getTransactions(false),
 		"get-transaction-status": s.getTransactionStatus,
-		"get-transaction":        s.getTransaction(false),
-		"get-transaction-entry":  s.getTransaction(true),
-		"get-pegnet-balances":    s.getPegnetBalances,
-		"get-pegnet-issuance":    s.getPegnetIssuance,
+		"get-transaction":        s.getTransactions(true),
+		// Deprecate?
+		//"get-transaction-entry":  s.getTransaction(true),
+		"get-pegnet-balances": s.getPegnetBalances,
+		"get-pegnet-issuance": s.getPegnetIssuance,
 
 		"send-transaction": s.sendTransaction,
 
@@ -94,52 +96,73 @@ type ResultGetTransactions struct {
 	NextOffset int         `json:"nextoffset"`
 }
 
-func (s *APIServer) getTransactions(data json.RawMessage) interface{} {
-	params := ParamsGetPegnetTransaction{}
-	_, _, err := validate(data, &params)
-	if err != nil {
-		return err
+func (s *APIServer) getTransactions(forceTxId bool) func(data json.RawMessage) interface{} {
+	return func(data json.RawMessage) interface{} {
+		params := ParamsGetPegnetTransaction{}
+		_, _, err := validate(data, &params)
+		if err != nil {
+			return err
+		}
+
+		if forceTxId && params.TxID == "" {
+			return jrpc.InvalidParams(fmt.Errorf("expect txid param to be populated"))
+		}
+
+		// using a separate options struct due to golang's circular import restrictions
+		var options pegnet.HistoryQueryOptions
+		options.Offset = params.Offset
+		options.Desc = params.Desc
+		options.Transfer = params.Transfer
+		options.Conversion = params.Conversion
+		options.Coinbase = params.Coinbase
+		options.FCTBurn = params.Burn
+
+		// Are we searching by txid?
+		if params.TxID != "" {
+			idx, entryhash, err := pegnet.SplitTxID(params.TxID)
+			if err != nil {
+				return jrpc.InvalidParams(err.Error())
+			}
+			options.TxIndex = idx
+			options.UseTxIndex = true
+			params.txEntryHash = entryhash
+		}
+
+		var actions []pegnet.HistoryTransaction
+		var count int
+
+		if params.Hash != "" {
+			hash := new(factom.Bytes32)
+			_ = hash.UnmarshalText([]byte(params.Hash)) // error checked by params.valid
+			actions, count, err = s.Node.Pegnet.SelectTransactionHistoryActionsByHash(hash, options)
+		} else if params.Address != "" {
+			addr, _ := factom.NewFAAddress(params.Address) // verified in param
+			actions, count, err = s.Node.Pegnet.SelectTransactionHistoryActionsByAddress(&addr, options)
+		} else if params.TxID != "" {
+			hash := new(factom.Bytes32)
+			_ = hash.UnmarshalText([]byte(params.txEntryHash)) // error checked by params.valid
+			actions, count, err = s.Node.Pegnet.SelectTransactionHistoryActionsByTxID(hash, options)
+		} else {
+			actions, count, err = s.Node.Pegnet.SelectTransactionHistoryActionsByHeight(uint32(params.Height), options)
+		}
+
+		if err != nil {
+			return jrpc.InvalidParams(err.Error())
+		}
+
+		if len(actions) == 0 {
+			return ErrorTransactionNotFound
+		}
+
+		var res ResultGetTransactions
+		res.Count = count
+		if params.Offset+len(actions) < count {
+			res.NextOffset = params.Offset + len(actions)
+		}
+		res.Actions = actions
+
+		return res
 	}
-
-	// using a separate options struct due to golang's circular import restrictions
-	var options pegnet.HistoryQueryOptions
-	options.Offset = params.Offset
-	options.Desc = params.Desc
-	options.Transfer = params.Transfer
-	options.Conversion = params.Conversion
-	options.Coinbase = params.Coinbase
-	options.FCTBurn = params.Burn
-
-	var actions []pegnet.HistoryTransaction
-	var count int
-
-	if params.Hash != "" {
-		hash := new(factom.Bytes32)
-		_ = hash.UnmarshalText([]byte(params.Hash)) // error checked by params.valid
-		actions, count, err = s.Node.Pegnet.SelectTransactionHistoryActionsByHash(hash, options)
-	} else if params.Address != "" {
-		addr, _ := factom.NewFAAddress(params.Address) // verified in param
-		actions, count, err = s.Node.Pegnet.SelectTransactionHistoryActionsByAddress(&addr, options)
-	} else {
-		actions, count, err = s.Node.Pegnet.SelectTransactionHistoryActionsByHeight(uint32(params.Height), options)
-	}
-
-	if err != nil {
-		return jrpc.InvalidParams(err.Error())
-	}
-
-	if len(actions) == 0 {
-		return ErrorTransactionNotFound
-	}
-
-	var res ResultGetTransactions
-	res.Count = count
-	if params.Offset+len(actions) < count {
-		res.NextOffset = params.Offset + len(actions)
-	}
-	res.Actions = actions
-
-	return res
 }
 
 type ResultGetTransaction struct {
@@ -148,7 +171,10 @@ type ResultGetTransaction struct {
 	Tx        interface{}     `json:"actions"`
 }
 
+// getTransaction is deprecated
 func (s *APIServer) getTransaction(getEntry bool) jrpc.MethodFunc {
+	// TODO: Should we just remove this?
+
 	return func(data json.RawMessage) interface{} {
 		params := ParamsGetTransaction{}
 		_, _, err := validate(data, &params)

@@ -25,6 +25,8 @@ package srv
 import (
 	"time"
 
+	"github.com/pegnet/pegnetd/node/pegnet"
+
 	jrpc "github.com/AdamSLevy/jsonrpc2/v11"
 	"github.com/Factom-Asset-Tokens/factom"
 )
@@ -121,6 +123,11 @@ type ParamsGetPegnetTransaction struct {
 	Conversion bool   `json:"conversion,omitempty"`
 	Coinbase   bool   `json:"coinbase,omitempty"`
 	Burn       bool   `json:"burn,omitempty"`
+
+	// TxID is in the format #-[Entryhash], where '#' == tx index
+	TxID string `json:"txid, omitempty"`
+	// Used by the server to store the entryhash in the txid
+	txEntryHash string `json:"-"`
 }
 
 func (p ParamsGetPegnetTransaction) HasIncludePending() bool { return false }
@@ -136,14 +143,17 @@ func (p ParamsGetPegnetTransaction) IsValid() error {
 	if p.Address != "" {
 		count++
 	}
+	if p.TxID != "" {
+		count++
+	}
 	if p.Height > 0 {
 		count++
 	}
 	if count != 1 {
 		if count == 0 {
-			return jrpc.InvalidParams(`need to specify either "entryhash" or "address" or "height"`)
+			return jrpc.InvalidParams(`need to specify either "entryhash" or "address", "txid", or "height"`)
 		}
-		return jrpc.InvalidParams(`cannot specify more than one of "entryhash", "address", or "height"`)
+		return jrpc.InvalidParams(`cannot specify more than one of "entryhash", "address", "txid", or "height"`)
 	}
 
 	// error check input
@@ -156,6 +166,12 @@ func (p ParamsGetPegnetTransaction) IsValid() error {
 		hash := new(factom.Bytes32)
 		if err := hash.UnmarshalText([]byte(p.Hash)); err != nil {
 			return jrpc.InvalidParams("entryhash: " + err.Error())
+		}
+	}
+	if p.TxID != "" {
+		_, _, err := pegnet.SplitTxID(p.TxID)
+		if err != nil {
+			return jrpc.InvalidParams("txid: " + err.Error())
 		}
 	}
 
