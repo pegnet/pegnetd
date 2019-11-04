@@ -8,7 +8,7 @@ import (
 )
 
 const (
-	DefaultPad = 3
+	DefaultPad = 1
 )
 
 // VerifyTransactionHash checks if a given hash or txid is valid.

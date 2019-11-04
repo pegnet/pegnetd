@@ -135,6 +135,7 @@ func turnRowsIntoHistoryTransactions(rows *sql.Rows) ([]HistoryTransaction, erro
 			return nil, err
 		}
 		tx.Hash = factom.NewBytes32(hash)
+		tx.TxID = FormatTxID(tx.TxIndex, tx.Hash.String())
 		tx.Timestamp = time.Unix(ts, 0)
 		var addr factom.FAAddress
 		addr = factom.FAAddress(*factom.NewBytes32(from))

@@ -15,6 +15,7 @@ import (
 // It contains several actions: transfers, conversions, coinbases, and fct burns
 type HistoryTransaction struct {
 	Hash      *factom.Bytes32 `json:"hash"`
+	TxID      string          `json:"txid"` // [TxIndex]-[BatchHash]
 	Height    int64           `json:"height"`
 	Timestamp time.Time       `json:"timestamp"`
 	Executed  int32           `json:"executed"`
