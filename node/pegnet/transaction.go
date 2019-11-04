@@ -24,9 +24,6 @@ func SplitTxID(txid string) (index int, entryhash string, err error) {
 	if err != nil {
 		return -1, "", fmt.Errorf("index must be a valid integer")
 	}
-	if txIndex < 0 {
-		return -1, "", fmt.Errorf("index must be a postive integer")
-	}
 
 	// Verify the entryhash is valid
 	hash, err := hex.DecodeString(arr[1])
@@ -37,10 +34,6 @@ func SplitTxID(txid string) (index int, entryhash string, err error) {
 		return -1, "", fmt.Errorf("entryhash must be 32 bytes (64 hex characters)")
 	}
 
-	// Over 10k index? That's impossible, that means each tx is of 1 byte
-	if txIndex > 10000 {
-		return -1, "", fmt.Errorf("txindex is too large to be valid")
-	}
 	return int(txIndex), arr[1], nil
 }
 
