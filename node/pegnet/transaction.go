@@ -25,24 +25,26 @@ func SplitTxID(txid string) (index int, entryhash string, err error) {
 		return -1, "", fmt.Errorf("index must be a valid integer")
 	}
 
-	// Verify the entryhash is valid
-	hash, err := hex.DecodeString(arr[1])
+	if len(arr[1]) != 64 {
+		return -1, "", fmt.Errorf("entryhash must be 32 bytes (64 hex characters)")
+	}
+
+	// Verify the entryhash is valid hex
+	// There might be a more efficient check, such as a regex string.
+	_, err = hex.DecodeString(arr[1])
 	if err != nil {
 		return -1, "", fmt.Errorf("entryhash must be a valid hex string")
-	}
-	if len(hash) != 32 {
-		return -1, "", fmt.Errorf("entryhash must be 32 bytes (64 hex characters)")
 	}
 
 	return int(txIndex), arr[1], nil
 }
 
-// FormatTxID constructs a txid from an entryhash and it's index
+// FormatTxID constructs a txid from an entryhash and its index
 func FormatTxID(index int, hash string) string {
 	return FormatTxIDWithPad(DefaultPad, index, hash)
 }
 
-// FormatTxIDWithPad constructs a txid from an entryhash and it's index.
+// FormatTxIDWithPad constructs a txid from an entryhash and its index.
 // It will pad the index such that it is of at least 'pad' characters in lenght.
 // pad = 2 -> 01-entryhash
 // pad = 3 -> 001-entryhash

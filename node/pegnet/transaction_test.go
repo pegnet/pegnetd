@@ -60,9 +60,8 @@ func TestSplitTxID(t *testing.T) {
 		{TxID: "0-1a179409cc789a3eb1061e6b7c783c622c39d5bd78e6fd0aca2a13c0e1a25a", Error: "entryhash too short"},
 		{TxID: "0-1a179409cc789a3eb1061e6b7c783c622c39d5bd78e6fd0aca2a13c0e1a25aaaaa", Error: "entryhash too long"},
 		{TxID: "0-1a179409cc789a3eb1061e6b7c783c622c39d5bd78e6fd0aca2a13c0e1a25a5", Error: "entryhash odd character length"},
-		{TxID: "-2-1a179409cc789a3eb1061e6b7c783c622c39d5bd78e6fd0aca2a13c0e1a25a5", Error: "negative, and too many splits"},
-		{TxID: "a2-1a179409cc789a3eb1061e6b7c783c622c39d5bd78e6fd0aca2a13c0e1a25a5", Error: "txindex not a number"},
-		{TxID: "999999-1a179409cc789a3eb1061e6b7c783c622c39d5bd78e6fd0aca2a13c0e1a25a5", Error: "number too big"},
+		{TxID: "-2-1a179409cc789a3eb1061e6b7c783c622c39d5bd78e6fd0aca2a13c0e1a25a57", Error: "negative, and too many splits"},
+		{TxID: "a2-1a179409cc789a3eb1061e6b7c783c622c39d5bd78e6fd0aca2a13c0e1a25a57", Error: "txindex not a number"},
 
 		// Valids
 		{TxID: "0-1a179409cc789a3eb1061e6b7c783c622c39d5bd78e6fd0aca2a13c0e1a25a57",
@@ -75,6 +74,7 @@ func TestSplitTxID(t *testing.T) {
 			EntryHash: "1a179409cc789a3eb1061e6b7c783c622c39d5bd78e6fd0aca2a13c0e1a25a57", TxIndex: 9, Pad: 1},
 		{TxID: "00000-17c05acb2fec5add1bfadc4c5d7fbd532a1a3fdad0b7b8dee97a544b4ab77396",
 			EntryHash: "17c05acb2fec5add1bfadc4c5d7fbd532a1a3fdad0b7b8dee97a544b4ab77396", TxIndex: 0, Pad: 5},
+		{TxID: "999999-1a179409cc789a3eb1061e6b7c783c622c39d5bd78e6fd0aca2a13c0e1a25a57"},
 	}
 
 	for i := range vects {
@@ -97,6 +97,7 @@ func TestSplitTxID(t *testing.T) {
 				exp := FormatTxIDWithPad(vec.Pad, vec.TxIndex, vec.EntryHash)
 				assert.Equal(exp, vec.TxID)
 			}
+		} else {
 		}
 	}
 }

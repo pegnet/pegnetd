@@ -44,7 +44,6 @@ func (s *APIServer) jrpcMethods() jrpc.MethodMap {
 		"get-transaction-status": s.getTransactionStatus,
 		"get-transaction":        s.getTransactions(true),
 		// Deprecate?
-		//"get-transaction-entry":  s.getTransaction(true),
 		"get-pegnet-balances": s.getPegnetBalances,
 		"get-pegnet-issuance": s.getPegnetIssuance,
 
@@ -161,65 +160,6 @@ func (s *APIServer) getTransactions(forceTxId bool) func(data json.RawMessage) i
 		}
 		res.Actions = actions
 
-		return res
-	}
-}
-
-type ResultGetTransaction struct {
-	Hash      *factom.Bytes32 `json:"entryhash"`
-	Timestamp int64           `json:"timestamp"`
-	Tx        interface{}     `json:"actions"`
-}
-
-// getTransaction is deprecated
-func (s *APIServer) getTransaction(getEntry bool) jrpc.MethodFunc {
-	// TODO: Should we just remove this?
-
-	return func(data json.RawMessage) interface{} {
-		params := ParamsGetTransaction{}
-		_, _, err := validate(data, &params)
-		if err != nil {
-			return err
-		}
-
-		found, err := s.Node.Pegnet.DoesTransactionExist(*params.Hash)
-		if err != nil {
-			return err
-		}
-
-		if !found {
-			return ErrorTransactionNotFound
-		}
-
-		var e factom.Entry
-		e.Hash = params.Hash
-		err = e.Get(s.Node.FactomClient)
-		if err != nil {
-			return jsonrpc2.InternalError
-		}
-
-		if !e.IsPopulated() {
-			return ErrorTransactionNotFound
-		}
-
-		var res ResultGetTransaction
-		res.Hash = e.Hash
-		// TODO: Save timestamp? We'd have to save it to the db
-		//res.Timestamp = e.Timestamp.Unix()
-		// TODO: Fill out the txid field
-		//res.TxIndex
-
-		if getEntry {
-			return e
-		}
-
-		txBatch := fat2.NewTransactionBatch(e)
-		err = txBatch.UnmarshalEntry()
-		if err != nil {
-			return jsonrpc2.InternalError
-		}
-
-		res.Tx = txBatch
 		return res
 	}
 }
