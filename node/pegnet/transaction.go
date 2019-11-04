@@ -11,10 +11,34 @@ const (
 	DefaultPad = 3
 )
 
+// VerifyTransactionHash checks if a given hash or txid is valid.
+// There are 2 types of transaction hashes:
+//    - batches, 64 hex characters indicates a batch of transactions.
+//	             All burns and coinbases are considered batches of length 1.
+//    - txid, [TxIndex]-[BatchHash] indicates a single transaction in a batch.
+//
+// All hashes in pure hash format (64 hex characters) will return an index
+// of -1, meaning the hash indicates a batch of transactions.
+//
+// All hashes in txid format, [TxIndex]-[BatchHash] will return an index
+// number >= 0.
+func VerifyTransactionHash(hash string) (index int, batchHash string, err error) {
+	// First identify if the hash is a batch hash
+	if len(hash) == 64 {
+		_, err := hex.DecodeString(hash)
+		if err != nil { // Not valid hex
+			return -1, "", err
+		}
+		return -1, hash, nil
+	}
+
+	return SplitTxID(hash)
+}
+
 // SplitTxID splits a TxID into it's parts.
-// TxID format : [TxIndex]-[EntryHash]
+// TxID format : [TxIndex]-[BatchHash]
 //				 1-c99dedea0e4e0c40118fe7e4d515b23cc0489269c8cef187b4f15a4ccbd880be
-func SplitTxID(txid string) (index int, entryhash string, err error) {
+func SplitTxID(txid string) (index int, batchHash string, err error) {
 	arr := strings.Split(txid, "-")
 	if len(arr) != 2 {
 		return -1, "", fmt.Errorf("txid does not match txid format, format: [TxIndex]-[EntryHash]")
@@ -26,14 +50,14 @@ func SplitTxID(txid string) (index int, entryhash string, err error) {
 	}
 
 	if len(arr[1]) != 64 {
-		return -1, "", fmt.Errorf("entryhash must be 32 bytes (64 hex characters)")
+		return -1, "", fmt.Errorf("hash must be 32 bytes (64 hex characters)")
 	}
 
-	// Verify the entryhash is valid hex
+	// Verify the hash is valid hex
 	// There might be a more efficient check, such as a regex string.
 	_, err = hex.DecodeString(arr[1])
 	if err != nil {
-		return -1, "", fmt.Errorf("entryhash must be a valid hex string")
+		return -1, "", fmt.Errorf("hash must be a valid hex string")
 	}
 
 	return int(txIndex), arr[1], nil

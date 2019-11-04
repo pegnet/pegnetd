@@ -44,7 +44,7 @@ func TestFormatTxID(t *testing.T) {
 	})
 }
 
-func TestSplitTxID(t *testing.T) {
+func TestVerifyTransactionHash(t *testing.T) {
 	assert := assert.New(t)
 	type TestVec struct {
 		TxID string
@@ -62,6 +62,8 @@ func TestSplitTxID(t *testing.T) {
 		{TxID: "0-1a179409cc789a3eb1061e6b7c783c622c39d5bd78e6fd0aca2a13c0e1a25a5", Error: "entryhash odd character length"},
 		{TxID: "-2-1a179409cc789a3eb1061e6b7c783c622c39d5bd78e6fd0aca2a13c0e1a25a57", Error: "negative, and too many splits"},
 		{TxID: "a2-1a179409cc789a3eb1061e6b7c783c622c39d5bd78e6fd0aca2a13c0e1a25a57", Error: "txindex not a number"},
+		{TxID: "179409cc789a3eb1061e6b7c783c622c39d5bd78e6fd0aca2a13c0e1a25a57", Error: "hash too short"},
+		{TxID: "1a179409cc789a3eb1061e6b7c783c622c39d5bd78e6fd0aca2a13c0e1a25a57aa", Error: "hash too long"},
 
 		// Valids
 		{TxID: "0-1a179409cc789a3eb1061e6b7c783c622c39d5bd78e6fd0aca2a13c0e1a25a57",
@@ -75,11 +77,15 @@ func TestSplitTxID(t *testing.T) {
 		{TxID: "00000-17c05acb2fec5add1bfadc4c5d7fbd532a1a3fdad0b7b8dee97a544b4ab77396",
 			EntryHash: "17c05acb2fec5add1bfadc4c5d7fbd532a1a3fdad0b7b8dee97a544b4ab77396", TxIndex: 0, Pad: 5},
 		{TxID: "999999-1a179409cc789a3eb1061e6b7c783c622c39d5bd78e6fd0aca2a13c0e1a25a57"},
+
+		// Test Batch Hashes
+		{TxID: "1a179409cc789a3eb1061e6b7c783c622c39d5bd78e6fd0aca2a13c0e1a25a57",
+			EntryHash: "1a179409cc789a3eb1061e6b7c783c622c39d5bd78e6fd0aca2a13c0e1a25a57", TxIndex: -1},
 	}
 
 	for i := range vects {
 		vec := vects[i]
-		index, entryhash, err := SplitTxID(vec.TxID)
+		index, entryhash, err := VerifyTransactionHash(vec.TxID)
 		if err != nil && vec.Error == "" {
 			// Error not expected!
 			t.Errorf("%d: should be good, found err: %s", i, err.Error())
@@ -93,7 +99,8 @@ func TestSplitTxID(t *testing.T) {
 				t.Errorf("exp ehash of %s, found %s", vec.EntryHash, entryhash)
 			}
 
-			if vec.EntryHash != "" {
+			// -1 tx idx means don't check the reformatting
+			if vec.EntryHash != "" && vec.TxIndex != -1 {
 				exp := FormatTxIDWithPad(vec.Pad, vec.TxIndex, vec.EntryHash)
 				assert.Equal(exp, vec.TxID)
 			}
