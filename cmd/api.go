@@ -49,11 +49,11 @@ var burn = &cobra.Command{
 	Example:          "pegnetd burn FA2jK2HcLnRdS94dEcU27rF3meoJfpUcZPSinpb7AwQvPRY6RL1Q 50",
 	PersistentPreRun: always,
 	PreRun:           SoftReadConfig,
-	Args: cmd.CombineCobraArgs(
-		cmd.CustomArgOrderValidationBuilder(
+	Args: CombineCobraArgs(
+		CustomArgOrderValidationBuilder(
 			true,
-			cmd.ArgValidatorFCTAddress,
-			cmd.ArgValidatorFCTAmount,
+			ArgValidatorFCTAddress,
+			ArgValidatorFCTAmount,
 		),
 	),
 	Run: func(cmd *cobra.Command, args []string) {
@@ -61,8 +61,8 @@ var burn = &cobra.Command{
 		cl := node.FactomClientFromConfig(viper.GetViper())
 		source, amt := args[0], args[1]
 
-		amount := FactoidToFactoshi(amt)
-		if amount == -1 {
+		amount, err := FactoidToFactoshi(amt)
+		if err != nil {
 			cmd.PrintErrln(fmt.Errorf("invalid amount specified"))
 			os.Exit(1)
 		}

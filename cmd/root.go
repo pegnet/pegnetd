@@ -2,18 +2,16 @@ package cmd
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"os/signal"
 	"path/filepath"
 	"strings"
 	"time"
 
-	"github.com/pegnet/pegnet/common"
-	"github.com/pegnet/pegnetd/srv"
 	"github.com/pegnet/pegnetd/config"
 	"github.com/pegnet/pegnetd/exit"
 	"github.com/pegnet/pegnetd/node"
+	"github.com/pegnet/pegnetd/srv"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"

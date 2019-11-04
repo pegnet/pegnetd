@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/FactomProject/factom"
+	"github.com/Factom-Asset-Tokens/factom"
 
 	"github.com/pegnet/pegnet/modules/opr"
 	"github.com/spf13/cobra"
@@ -83,8 +83,10 @@ func ArgValidatorECAddress(cmd *cobra.Command, arg string) error {
 	if len(arg) > 2 && arg[:2] != "EC" {
 		return fmt.Errorf("EC addresses start with EC")
 	}
-	if !factom.IsValidAddress(arg) {
-		return fmt.Errorf("%s is not a valid EC address", arg)
+
+	_, err := factom.NewECAddress(arg)
+	if err != nil {
+		return fmt.Errorf("%s is not a valid EC address: %s", arg, err.Error())
 	}
 	return nil
 }
@@ -94,8 +96,10 @@ func ArgValidatorFCTAddress(cmd *cobra.Command, arg string) error {
 	if len(arg) > 2 && arg[:2] != "FA" {
 		return fmt.Errorf("FCT addresses start with FA")
 	}
-	if !factom.IsValidAddress(arg) {
-		return fmt.Errorf("%s is not a valid FCT address", arg)
+
+	_, err := factom.NewFAAddress(arg)
+	if err != nil {
+		return fmt.Errorf("%s is not a valid FCT address: %s", arg, err.Error())
 	}
 	return nil
 }
