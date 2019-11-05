@@ -205,10 +205,14 @@ github.com/onsi/gomega v1.5.0/go.mod h1:ex+gbHU/CVuBBDIJjb2X0qEXbFg53c61hWP/1Cpa
 github.com/pegnet/LXR256 v0.0.0-20190721001507-5e925f415fa2/go.mod h1:11Z6s/PoxMH3ON6Kh+2MxNFdaq9op2sgvIAqg52d/3I=
 github.com/pegnet/LXRHash v0.0.0-20190913134745-ca3b8b65a729 h1:LNv5Hz+Ydu+CzU+DAD5cGe81zkcvd1tCCKmyhVtpnuY=
 github.com/pegnet/LXRHash v0.0.0-20190913134745-ca3b8b65a729/go.mod h1:0zBp9GFy9F77zuQbPkAmdUBRiptMaJ1V96eVFdMnXZA=
+github.com/pegnet/LXRHash v0.0.0-20191028162532-138fe8d191a2 h1:ec8NDi02ydYYKw/RpzFZypAh8rvyxZAvkeVVDBo+lxA=
+github.com/pegnet/LXRHash v0.0.0-20191028162532-138fe8d191a2/go.mod h1:0zBp9GFy9F77zuQbPkAmdUBRiptMaJ1V96eVFdMnXZA=
 github.com/pegnet/OracleRecord v0.0.2/go.mod h1:VrY7Shn4oSCli47CsUYBFjH68IenGYtnLaXaaivepu4=
 github.com/pegnet/pegnet v0.0.2/go.mod h1:FUyEs8fyLOzPXZgyqXcqiOhQi58loNtujykIbxxoKbQ=
 github.com/pegnet/pegnet v0.1.0-rc4.0.20191002204629-5a6fd621ca60 h1:LhihCN5xwqmWoZqt3Hd34njIbXe7d6jNP2K8MJinI+U=
 github.com/pegnet/pegnet v0.1.0-rc4.0.20191002204629-5a6fd621ca60/go.mod h1:sC7efuGlr6+ithvzL2v76u7AA/9JagWaweAv7UYu2dk=
+github.com/pegnet/pegnet v0.1.0-rc4.0.20191105153926-e82140e1ce44 h1:vLxdLGSKJUelA++6bBjZte1vyjKv1ZtdemSIdsgJTEo=
+github.com/pegnet/pegnet v0.1.0-rc4.0.20191105153926-e82140e1ce44/go.mod h1:Fy8Qohe9zIuqO9Q/ZOLUNpP2kuiFqxjevzaS3IL62+E=
 github.com/pelletier/go-toml v1.2.0 h1:T5zMGML61Wp+FlcbWjRDT7yAxhJNAiPPLOFECq181zc=
 github.com/pelletier/go-toml v1.2.0/go.mod h1:5z9KED0ma1S8pY6P1sdut58dfprrGBbd/94hg7ilaic=
 github.com/pkg/errors v0.8.0/go.mod h1:bwawxfHBFNV+L2hUp1rHADufV3IMtnDRdf1r5NINEl0=
