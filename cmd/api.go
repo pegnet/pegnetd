@@ -458,14 +458,6 @@ var getTXs = &cobra.Command{
 		params.Burn, _ = cmd.Flags().GetBool("burn")
 		params.Transfer, _ = cmd.Flags().GetBool("tran")
 		params.Coinbase, _ = cmd.Flags().GetBool("coin")
-		oneSet := params.Conversion || params.Burn || params.Transfer || params.Coinbase
-		if !oneSet {
-			// If none are set, then set all of them
-			params.Conversion = true
-			params.Burn = true
-			params.Transfer = true
-			params.Coinbase = true
-		}
 
 		cl := srv.NewClient()
 		cl.PegnetdServer = viper.GetString(config.Pegnetd)
