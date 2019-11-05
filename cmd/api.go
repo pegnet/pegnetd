@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/Factom-Asset-Tokens/factom"
-	"github.com/pegnet/pegnet/cmd"
 	"github.com/pegnet/pegnetd/config"
 	"github.com/pegnet/pegnetd/fat/fat2"
 	"github.com/pegnet/pegnetd/node"
@@ -50,11 +49,11 @@ var burn = &cobra.Command{
 	Example:          "pegnetd burn FA2jK2HcLnRdS94dEcU27rF3meoJfpUcZPSinpb7AwQvPRY6RL1Q 50",
 	PersistentPreRun: always,
 	PreRun:           SoftReadConfig,
-	Args: cmd.CombineCobraArgs(
-		cmd.CustomArgOrderValidationBuilder(
+	Args: CombineCobraArgs(
+		CustomArgOrderValidationBuilder(
 			true,
-			cmd.ArgValidatorFCTAddress,
-			cmd.ArgValidatorFCTAmount,
+			ArgValidatorFCTAddress,
+			ArgValidatorFCTAmount,
 		),
 	),
 	Run: func(cmd *cobra.Command, args []string) {
@@ -62,8 +61,8 @@ var burn = &cobra.Command{
 		cl := node.FactomClientFromConfig(viper.GetViper())
 		source, amt := args[0], args[1]
 
-		amount := FactoidToFactoshi(amt)
-		if amount == -1 {
+		amount, err := FactoidToFactoshi(amt)
+		if err != nil {
 			cmd.PrintErrln(fmt.Errorf("invalid amount specified"))
 			os.Exit(1)
 		}
@@ -165,13 +164,13 @@ var conv = &cobra.Command{
 		" pFCT 100 pUSD ",
 	PersistentPreRun: always,
 	PreRun:           SoftReadConfig,
-	Args: cmd.CombineCobraArgs(
-		cmd.CustomArgOrderValidationBuilder(
+	Args: CombineCobraArgs(
+		CustomArgOrderValidationBuilder(
 			true,
-			cmd.ArgValidatorECAddress,
-			cmd.ArgValidatorFCTAddress,
+			ArgValidatorECAddress,
+			ArgValidatorFCTAddress,
 			ArgValidatorAssetOrP,
-			cmd.ArgValidatorFCTAmount,
+			ArgValidatorFCTAmount,
 			ArgValidatorAssetOrP),
 	),
 	Run: func(cmd *cobra.Command, args []string) {
@@ -210,14 +209,14 @@ var tx = &cobra.Command{
 		" FA33kNzXwUt3cn4tLR56kyHEAryazAGPuMC6GjUubSbwrrNv8e7t PEG 200 FA32xV6SoPBSbAZAVyuiHWwyoMYhnSyMmAHZfK29H8dx7bJXFLja",
 	PersistentPreRun: always,
 	PreRun:           SoftReadConfig,
-	Args: cmd.CombineCobraArgs(
-		cmd.CustomArgOrderValidationBuilder(
+	Args: CombineCobraArgs(
+		CustomArgOrderValidationBuilder(
 			true,
-			cmd.ArgValidatorECAddress,
-			cmd.ArgValidatorFCTAddress,
+			ArgValidatorECAddress,
+			ArgValidatorFCTAddress,
 			ArgValidatorAssetOrP,
-			cmd.ArgValidatorFCTAmount,
-			cmd.ArgValidatorFCTAddress),
+			ArgValidatorFCTAmount,
+			ArgValidatorFCTAddress),
 	),
 	Run: func(cmd *cobra.Command, args []string) {
 		cl := node.FactomClientFromConfig(viper.GetViper())
@@ -253,8 +252,8 @@ var balance = &cobra.Command{
 	Example:          "pegnetd balance PEG FA2CEc2JSkhuckEXy42K111MvM9bycUDkbrrHjd9bNkBfvPBSGKd",
 	PersistentPreRun: always,
 	PreRun:           SoftReadConfig,
-	Args: cmd.CombineCobraArgs(
-		cmd.CustomArgOrderValidationBuilder(false, ArgValidatorAssetOrP, cmd.ArgValidatorFCTAddress),
+	Args: CombineCobraArgs(
+		CustomArgOrderValidationBuilder(true, ArgValidatorAssetOrP, ArgValidatorFCTAddress),
 		cobra.MinimumNArgs(1)),
 	Run: func(cmd *cobra.Command, args []string) {
 		res, err := queryBalances(args[1])
@@ -276,8 +275,8 @@ var balances = &cobra.Command{
 	Example:          "pegnetd balances FA2CEc2JSkhuckEXy42K111MvM9bycUDkbrrHjd9bNkBfvPBSGKd",
 	PersistentPreRun: always,
 	PreRun:           SoftReadConfig,
-	Args: cmd.CombineCobraArgs(
-		cmd.CustomArgOrderValidationBuilder(false, cmd.ArgValidatorFCTAddress),
+	Args: CombineCobraArgs(
+		CustomArgOrderValidationBuilder(true, ArgValidatorFCTAddress),
 		cobra.MinimumNArgs(1)),
 	Run: func(cmd *cobra.Command, args []string) {
 		res, err := queryBalances(args[0])

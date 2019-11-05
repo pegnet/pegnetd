@@ -62,9 +62,9 @@ func signAndSend(tx *fat2.Transaction, cl *factom.Client, payment string) (err e
 
 func setTransferOutput(tx *fat2.Transaction, cl *factom.Client, dest, amt string) error {
 	var err error
-	amount := FactoidToFactoshi(amt)
-	if amount == -1 {
-		return fmt.Errorf("invalid amount specified\n")
+	amount, err := FactoidToFactoshi(amt)
+	if err != nil {
+		return fmt.Errorf("invalid amount specified: %s\n", err.Error())
 	}
 
 	tx.Transfers = make([]fat2.AddressAmountTuple, 1)
@@ -82,9 +82,9 @@ func setTransactionInput(tx *fat2.Transaction, cl *factom.Client, source, asset,
 		return err
 	}
 
-	amount := FactoidToFactoshi(amt)
-	if amount == -1 {
-		return fmt.Errorf("invalid amount specified\n")
+	amount, err := FactoidToFactoshi(amt)
+	if err != nil {
+		return fmt.Errorf("invalid amount specified: %s\n", err.Error())
 	}
 	tx.Input.Amount = uint64(amount)
 

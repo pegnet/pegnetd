@@ -14,7 +14,6 @@ require (
 	github.com/spf13/cobra v0.0.5
 	github.com/spf13/viper v1.4.0
 	github.com/stretchr/testify v1.4.0
-	launchpad.net/gocheck v0.0.0-20140225173054-000000000087 // indirect
 )
 
 replace github.com/Factom-Asset-Tokens/factom => github.com/Emyrk/factom v0.0.0-20191001194233-40c0cdc2f2a0
