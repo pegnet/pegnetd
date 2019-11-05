@@ -27,6 +27,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 
 	"github.com/AdamSLevy/jsonrpc2"
 	jrpc "github.com/AdamSLevy/jsonrpc2/v11"
@@ -39,12 +40,12 @@ import (
 
 func (s *APIServer) jrpcMethods() jrpc.MethodMap {
 	return jrpc.MethodMap{
-		"get-transactions":       s.getTransactions,
+		"get-transactions":       s.getTransactions(false),
 		"get-transaction-status": s.getTransactionStatus,
-		"get-transaction":        s.getTransaction(false),
-		"get-transaction-entry":  s.getTransaction(true),
-		"get-pegnet-balances":    s.getPegnetBalances,
-		"get-pegnet-issuance":    s.getPegnetIssuance,
+		"get-transaction":        s.getTransactions(true),
+		// Deprecate?
+		"get-pegnet-balances": s.getPegnetBalances,
+		"get-pegnet-issuance": s.getPegnetIssuance,
 
 		"send-transaction": s.sendTransaction,
 
@@ -94,106 +95,71 @@ type ResultGetTransactions struct {
 	NextOffset int         `json:"nextoffset"`
 }
 
-func (s *APIServer) getTransactions(data json.RawMessage) interface{} {
-	params := ParamsGetPegnetTransaction{}
-	_, _, err := validate(data, &params)
-	if err != nil {
-		return err
-	}
-
-	// using a separate options struct due to golang's circular import restrictions
-	var options pegnet.HistoryQueryOptions
-	options.Offset = params.Offset
-	options.Desc = params.Desc
-	options.Transfer = params.Transfer
-	options.Conversion = params.Conversion
-	options.Coinbase = params.Coinbase
-	options.FCTBurn = params.Burn
-
-	var actions []pegnet.HistoryTransaction
-	var count int
-
-	if params.Hash != "" {
-		hash := new(factom.Bytes32)
-		_ = hash.UnmarshalText([]byte(params.Hash)) // error checked by params.valid
-		actions, count, err = s.Node.Pegnet.SelectTransactionHistoryActionsByHash(hash, options)
-	} else if params.Address != "" {
-		addr, _ := factom.NewFAAddress(params.Address) // verified in param
-		actions, count, err = s.Node.Pegnet.SelectTransactionHistoryActionsByAddress(&addr, options)
-	} else {
-		actions, count, err = s.Node.Pegnet.SelectTransactionHistoryActionsByHeight(uint32(params.Height), options)
-	}
-
-	if err != nil {
-		return jrpc.InvalidParams(err.Error())
-	}
-
-	if len(actions) == 0 {
-		return ErrorTransactionNotFound
-	}
-
-	var res ResultGetTransactions
-	res.Count = count
-	if params.Offset+len(actions) < count {
-		res.NextOffset = params.Offset + len(actions)
-	}
-	res.Actions = actions
-
-	return res
-}
-
-type ResultGetTransaction struct {
-	Hash      *factom.Bytes32 `json:"entryhash"`
-	Timestamp int64           `json:"timestamp"`
-	Tx        interface{}     `json:"actions"`
-}
-
-func (s *APIServer) getTransaction(getEntry bool) jrpc.MethodFunc {
+func (s *APIServer) getTransactions(forceTxId bool) func(data json.RawMessage) interface{} {
 	return func(data json.RawMessage) interface{} {
-		params := ParamsGetTransaction{}
+		params := ParamsGetPegnetTransaction{}
 		_, _, err := validate(data, &params)
 		if err != nil {
 			return err
 		}
 
-		found, err := s.Node.Pegnet.DoesTransactionExist(*params.Hash)
-		if err != nil {
-			return err
+		if forceTxId && params.TxID == "" {
+			return jrpc.InvalidParams(fmt.Errorf("expect txid param to be populated"))
 		}
 
-		if !found {
+		// using a separate options struct due to golang's circular import restrictions
+		var options pegnet.HistoryQueryOptions
+		options.Offset = params.Offset
+		options.Desc = params.Desc
+		options.Transfer = params.Transfer
+		options.Conversion = params.Conversion
+		options.Coinbase = params.Coinbase
+		options.FCTBurn = params.Burn
+
+		// Are we searching by txid?
+		if params.TxID != "" {
+			idx, entryhash, err := pegnet.SplitTxID(params.TxID)
+			if err != nil {
+				return jrpc.InvalidParams(err.Error())
+			}
+			options.TxIndex = idx
+			options.UseTxIndex = true
+			params.txEntryHash = entryhash
+		}
+
+		var actions []pegnet.HistoryTransaction
+		var count int
+
+		if params.Hash != "" {
+			hash := new(factom.Bytes32)
+			_ = hash.UnmarshalText([]byte(params.Hash)) // error checked by params.valid
+			actions, count, err = s.Node.Pegnet.SelectTransactionHistoryActionsByHash(hash, options)
+		} else if params.Address != "" {
+			addr, _ := factom.NewFAAddress(params.Address) // verified in param
+			actions, count, err = s.Node.Pegnet.SelectTransactionHistoryActionsByAddress(&addr, options)
+		} else if params.TxID != "" {
+			hash := new(factom.Bytes32)
+			_ = hash.UnmarshalText([]byte(params.txEntryHash)) // error checked by params.valid
+			actions, count, err = s.Node.Pegnet.SelectTransactionHistoryActionsByTxID(hash, options)
+		} else {
+			actions, count, err = s.Node.Pegnet.SelectTransactionHistoryActionsByHeight(uint32(params.Height), options)
+		}
+
+		if err != nil {
+			return jrpc.InvalidParams(err.Error())
+		}
+
+		if len(actions) == 0 {
 			return ErrorTransactionNotFound
 		}
 
-		var e factom.Entry
-		e.Hash = params.Hash
-		err = e.Get(s.Node.FactomClient)
-		if err != nil {
-			return jsonrpc2.InternalError
+		var res ResultGetTransactions
+		res.Count = count
+		if params.Offset+len(actions) < count {
+			res.NextOffset = params.Offset + len(actions)
 		}
+		res.Actions = actions
 
-		if !e.IsPopulated() {
-			return ErrorTransactionNotFound
-		}
-
-		var res ResultGetTransaction
-		res.Hash = e.Hash
-		// TODO: Save timestamp? We'd have to save it to the db
-		//res.Timestamp = e.Timestamp.Unix()
-		// TODO: Fill out the txid field
-		//res.TxIndex
-
-		if getEntry {
-			return e
-		}
-
-		txBatch := fat2.NewTransactionBatch(e)
-		err = txBatch.UnmarshalEntry()
-		if err != nil {
-			return jsonrpc2.InternalError
-		}
-
-		res.Tx = txBatch
 		return res
 	}
 }

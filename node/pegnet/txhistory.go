@@ -15,6 +15,7 @@ import (
 // It contains several actions: transfers, conversions, coinbases, and fct burns
 type HistoryTransaction struct {
 	Hash      *factom.Bytes32 `json:"hash"`
+	TxID      string          `json:"txid"` // [TxIndex]-[BatchHash]
 	Height    int64           `json:"height"`
 	Timestamp time.Time       `json:"timestamp"`
 	Executed  int32           `json:"executed"`
@@ -129,6 +130,12 @@ func (p *Pegnet) SelectTransactionHistoryActionsByHash(hash *factom.Bytes32, opt
 // the specified address in either inputs or outputs
 func (p *Pegnet) SelectTransactionHistoryActionsByAddress(addr *factom.FAAddress, options HistoryQueryOptions) ([]HistoryTransaction, int, error) {
 	return p.historySelectHelper("address", addr[:], options)
+}
+
+// SelectTransactionHistoryActionsByTxID uses the lookup table to retrieve all transactions that have
+// the specified txid. A TxID is an entryhash + a transaction index
+func (p *Pegnet) SelectTransactionHistoryActionsByTxID(hash *factom.Bytes32, options HistoryQueryOptions) ([]HistoryTransaction, int, error) {
+	return p.historySelectHelper("entry_hash", hash[:], options)
 }
 
 // SelectTransactionHistoryActionsByHeight returns all transactions that were **entered** at the specified height.
