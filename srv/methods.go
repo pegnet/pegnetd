@@ -27,6 +27,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 
 	"github.com/AdamSLevy/jsonrpc2"
 	jrpc "github.com/AdamSLevy/jsonrpc2/v11"
@@ -34,16 +35,17 @@ import (
 	"github.com/pegnet/pegnetd/config"
 	"github.com/pegnet/pegnetd/fat/fat2"
 	"github.com/pegnet/pegnetd/node"
+	"github.com/pegnet/pegnetd/node/pegnet"
 )
 
 func (s *APIServer) jrpcMethods() jrpc.MethodMap {
 	return jrpc.MethodMap{
-		"get-transaction":       s.getTransaction(false),
-		"get-transaction-entry": s.getTransaction(true),
-		"get-pegnet-balances":   s.getPegnetBalances,
-		"get-pegnet-issuance":   s.getPegnetIssuance,
-
-		"send-transaction": s.sendTransaction,
+		"get-transactions":       s.getTransactions(false),
+		"get-transaction-status": s.getTransactionStatus,
+		"get-transaction":        s.getTransactions(true),
+		"get-pegnet-balances":    s.getPegnetBalances,
+		"get-pegnet-issuance":    s.getPegnetIssuance,
+		"send-transaction":       s.sendTransaction,
 
 		"get-sync-status": s.getSyncStatus,
 
@@ -52,59 +54,110 @@ func (s *APIServer) jrpcMethods() jrpc.MethodMap {
 
 }
 
-type ResultGetTransaction struct {
-	Hash      *factom.Bytes32 `json:"entryhash"`
-	Timestamp int64           `json:"timestamp"`
-	TxIndex   uint64          `json:"txindex,omitempty"`
-	Tx        interface{}     `json:"data"`
+type ResultGetTransactionStatus struct {
+	Height   uint32 `json:"height"`
+	Executed uint32 `json:"executed"`
 }
 
-func (s *APIServer) getTransaction(getEntry bool) jrpc.MethodFunc {
+func (s *APIServer) getTransactionStatus(data json.RawMessage) interface{} {
+	params := ParamsGetPegnetTransactionStatus{}
+	_, _, err := validate(data, &params)
+	if err != nil {
+		return err
+	}
+
+	height, executed, err := s.Node.Pegnet.SelectTransactionHistoryStatus(params.Hash)
+	if err != nil {
+		return jrpc.InvalidParams(err.Error())
+	}
+
+	if height == 0 {
+		return ErrorTransactionNotFound
+	}
+
+	var res ResultGetTransactionStatus
+	res.Height = height
+	res.Executed = executed
+
+	return res
+}
+
+// ResultGetTransactions returns history entries.
+// `Actions` contains []pegnet.HistoryTransaction.
+// `Count` is the total number of possible transactions
+// `NextOffset` returns the offset to use to get the next set of records.
+//  0 means no more records available
+type ResultGetTransactions struct {
+	Actions    interface{} `json:"actions"`
+	Count      int         `json:"count"`
+	NextOffset int         `json:"nextoffset"`
+}
+
+func (s *APIServer) getTransactions(forceTxId bool) func(data json.RawMessage) interface{} {
 	return func(data json.RawMessage) interface{} {
-		params := ParamsGetTransaction{}
+		params := ParamsGetPegnetTransaction{}
 		_, _, err := validate(data, &params)
 		if err != nil {
 			return err
 		}
 
-		found, err := s.Node.Pegnet.DoesTransactionExist(*params.Hash)
-		if err != nil {
-			return err
+		if forceTxId && params.TxID == "" {
+			return jrpc.InvalidParams(fmt.Errorf("expect txid param to be populated"))
 		}
 
-		if !found {
+		// using a separate options struct due to golang's circular import restrictions
+		var options pegnet.HistoryQueryOptions
+		options.Offset = params.Offset
+		options.Desc = params.Desc
+		options.Transfer = params.Transfer
+		options.Conversion = params.Conversion
+		options.Coinbase = params.Coinbase
+		options.FCTBurn = params.Burn
+
+		// Are we searching by txid?
+		if params.TxID != "" {
+			idx, entryhash, err := pegnet.SplitTxID(params.TxID)
+			if err != nil {
+				return jrpc.InvalidParams(err.Error())
+			}
+			options.TxIndex = idx
+			options.UseTxIndex = true
+			params.txEntryHash = entryhash
+		}
+
+		var actions []pegnet.HistoryTransaction
+		var count int
+
+		if params.Hash != "" {
+			hash := new(factom.Bytes32)
+			_ = hash.UnmarshalText([]byte(params.Hash)) // error checked by params.valid
+			actions, count, err = s.Node.Pegnet.SelectTransactionHistoryActionsByHash(hash, options)
+		} else if params.Address != "" {
+			addr, _ := factom.NewFAAddress(params.Address) // verified in param
+			actions, count, err = s.Node.Pegnet.SelectTransactionHistoryActionsByAddress(&addr, options)
+		} else if params.TxID != "" {
+			hash := new(factom.Bytes32)
+			_ = hash.UnmarshalText([]byte(params.txEntryHash)) // error checked by params.valid
+			actions, count, err = s.Node.Pegnet.SelectTransactionHistoryActionsByTxID(hash, options)
+		} else {
+			actions, count, err = s.Node.Pegnet.SelectTransactionHistoryActionsByHeight(uint32(params.Height), options)
+		}
+
+		if err != nil {
+			return jrpc.InvalidParams(err.Error())
+		}
+
+		if len(actions) == 0 {
 			return ErrorTransactionNotFound
 		}
 
-		var e factom.Entry
-		e.Hash = params.Hash
-		err = e.Get(s.Node.FactomClient)
-		if err != nil {
-			return jsonrpc2.InternalError
+		var res ResultGetTransactions
+		res.Count = count
+		if params.Offset+len(actions) < count {
+			res.NextOffset = params.Offset + len(actions)
 		}
+		res.Actions = actions
 
-		if !e.IsPopulated() {
-			return ErrorTransactionNotFound
-		}
-
-		var res ResultGetTransaction
-		res.Hash = e.Hash
-		// TODO: Save timestamp? We'd have to save it to the db
-		//res.Timestamp = e.Timestamp.Unix()
-		// TODO: Fill out the txid field
-		//res.TxIndex
-
-		if getEntry {
-			return e
-		}
-
-		txBatch := fat2.NewTransactionBatch(e)
-		err = txBatch.UnmarshalEntry()
-		if err != nil {
-			return jsonrpc2.InternalError
-		}
-
-		res.Tx = txBatch
 		return res
 	}
 }

@@ -25,6 +25,8 @@ package srv
 import (
 	"time"
 
+	"github.com/pegnet/pegnetd/node/pegnet"
+
 	jrpc "github.com/AdamSLevy/jsonrpc2/v11"
 	"github.com/Factom-Asset-Tokens/factom"
 )
@@ -88,6 +90,94 @@ func (p ParamsGetPegnetRates) IsValid() error {
 	return nil
 }
 func (ParamsGetPegnetRates) ValidChainID() *factom.Bytes32 {
+	return nil
+}
+
+type ParamsGetPegnetTransactionStatus struct {
+	Hash *factom.Bytes32 `json:"entryhash,omitempty"`
+}
+
+func (p ParamsGetPegnetTransactionStatus) HasIncludePending() bool { return false }
+func (p ParamsGetPegnetTransactionStatus) IsValid() error {
+	if p.Hash == nil {
+		return jrpc.InvalidParams(`required: "entryhash"`)
+	}
+	return nil
+}
+func (p ParamsGetPegnetTransactionStatus) ValidChainID() *factom.Bytes32 {
+	return nil
+}
+
+// ParamsGetPegnetTransaction are the parameters for retrieving transactions from
+// the history system.
+// You need to specify exactly one of either `hash`, `address`, or `height`.
+// `offset` is the value from a previous query's `nextoffset`.
+// `desc` returns transactions in newest->oldest order
+type ParamsGetPegnetTransaction struct {
+	Hash       string `json:"entryhash,omitempty"`
+	Address    string `json:"address,omitempty"`
+	Height     int    `json:"height,omitempty"`
+	Offset     int    `json:"offset,omitempty"`
+	Desc       bool   `json:"desc,omitempty"`
+	Transfer   bool   `json:"transfer,omitempty"`
+	Conversion bool   `json:"conversion,omitempty"`
+	Coinbase   bool   `json:"coinbase,omitempty"`
+	Burn       bool   `json:"burn,omitempty"`
+
+	// TxID is in the format #-[Entryhash], where '#' == tx index
+	TxID string `json:"txid, omitempty"`
+	// Used by the server to store the entryhash in the txid
+	txEntryHash string `json:"-"`
+}
+
+func (p ParamsGetPegnetTransaction) HasIncludePending() bool { return false }
+func (p ParamsGetPegnetTransaction) IsValid() error {
+	if p.Offset < 0 {
+		return jrpc.InvalidParams(`offset must be >= 0`)
+	}
+	// check that only one is set
+	var count int
+	if p.Hash != "" {
+		count++
+	}
+	if p.Address != "" {
+		count++
+	}
+	if p.TxID != "" {
+		count++
+	}
+	if p.Height > 0 {
+		count++
+	}
+	if count != 1 {
+		if count == 0 {
+			return jrpc.InvalidParams(`need to specify either "entryhash" or "address", "txid", or "height"`)
+		}
+		return jrpc.InvalidParams(`cannot specify more than one of "entryhash", "address", "txid", or "height"`)
+	}
+
+	// error check input
+	if p.Address != "" {
+		if _, err := factom.NewFAAddress(p.Address); err != nil {
+			return jrpc.InvalidParams("address: " + err.Error())
+		}
+	}
+	if p.Hash != "" {
+		hash := new(factom.Bytes32)
+		if err := hash.UnmarshalText([]byte(p.Hash)); err != nil {
+			return jrpc.InvalidParams("entryhash: " + err.Error())
+		}
+	}
+	if p.TxID != "" {
+		_, _, err := pegnet.SplitTxID(p.TxID)
+		if err != nil {
+			return jrpc.InvalidParams("txid: " + err.Error())
+		}
+	}
+
+	return nil
+}
+func (p ParamsGetPegnetTransaction) ValidChainID() *factom.Bytes32 {
 	return nil
 }
 
