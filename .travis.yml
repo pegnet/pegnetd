@@ -46,9 +46,6 @@ before_deploy:
   - docker build --tag xgo-builder xgo
   - xgo -image xgo-builder --targets=windows/amd64,darwin/amd64,linux/amd64 .
   - ls
-  - chmod +x pegnetd-darwin-10.6-amd64
-  - chmod +x pegnetd-windows-4.0-amd64.exe
-  - chmod +x pegnetd-linux-amd64
 
 
 deploy:
