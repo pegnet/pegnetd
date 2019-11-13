@@ -30,8 +30,8 @@ A quick table of the allowed transfers. The allowed column allows what addresses
 | FA    | FCT      | FA           |
 | FA    | pXXX     | FA, eFA      |
 |       |          |              |
-| eFA   | FCT      |              |
+| eFA   | FCT      |      x       |
 | eFA   | pXXX     | FA, eFA, EFA |
 |       |          |              |
-| EFA   | FCT      |              |
+| EFA   | FCT      |      x       |
 | EFA   | pXXX     | eFA, EFA     |
