@@ -13,18 +13,39 @@ github.com/AdamSLevy/jsonrpc2/v11 v11.3.2/go.mod h1:7fNjH6BXM0KVswWqj+K/mnOS8wiS
 github.com/AdamSLevy/jsonrpc2/v12 v12.0.1/go.mod h1:UUmIu8A7Sjw+yI0tIc/iGQHoSu/7loifZ7E/AbjFFcI=
 github.com/AdamSLevy/jsonrpc2/v12 v12.0.2-0.20190929214639-94306464b409 h1:s7+6wUZJvorkJWm6Eyifm4NDbmqGqJfFsZvtz416L2A=
 github.com/AdamSLevy/jsonrpc2/v12 v12.0.2-0.20190929214639-94306464b409/go.mod h1:UUmIu8A7Sjw+yI0tIc/iGQHoSu/7loifZ7E/AbjFFcI=
+<<<<<<< HEAD
 github.com/AdamSLevy/jsonrpc2/v13 v13.0.1 h1:hQ5rfCFBQrXQNtvP+2mtH6EmsUAEN61ZF1n8UGVNis0=
 github.com/AdamSLevy/jsonrpc2/v13 v13.0.1/go.mod h1:8QsYqGKdPEim+n/j9KFTYB2tIj250f044Vxh2XRKhP4=
+=======
+github.com/AdamSLevy/jsonrpc2/v12 v12.0.2-0.20191015223217-9181d6ac9347 h1:bnHpux+c+kROwUL+2nscrUODAa33JQWlViGCBD2W5bg=
+github.com/AdamSLevy/jsonrpc2/v12 v12.0.2-0.20191015223217-9181d6ac9347/go.mod h1:UUmIu8A7Sjw+yI0tIc/iGQHoSu/7loifZ7E/AbjFFcI=
+github.com/AdamSLevy/pflag v1.0.4 h1:oykgyxDWo391JRRNOLr892UzaK2SmLiAvza8OBLX24U=
+github.com/AdamSLevy/pflag v1.0.4/go.mod h1:UeCxQpw/gAoTUVBfjr8n7qcGZZNmECgohVFOAdlRMtA=
+github.com/AdamSLevy/sqlite v0.1.3-0.20191014215059-b98bb18889de/go.mod h1:igAO5JulrQ1DbdZdtVq48mnZUBAPOeFzer7VhDWNtW4=
+>>>>>>> Begin work to match refactor in fat
 github.com/AdamSLevy/sqlitechangeset v0.0.0-20190925183646-3ddb70fb709d h1:yPm4An70OhM4k4WUq7M9sWaVlFas2+hJB+I3Fsgw38A=
 github.com/AdamSLevy/sqlitechangeset v0.0.0-20190925183646-3ddb70fb709d/go.mod h1:kQNmmf+2gf3uGKHt0LS4guxdp4Ay44SXA4+Is8/Gxm8=
+github.com/AdamSLevy/sqlitechangeset v0.0.0-20191006235841-dce5d9b996f1 h1:ye/hOs1ZMZGZaHNJDhKkutMkVhj0K6oHoIsXeTkxJSw=
+github.com/AdamSLevy/sqlitechangeset v0.0.0-20191006235841-dce5d9b996f1/go.mod h1:pF5nbZZjux9muExIGxa23eUidokr9C/qTB80dpTze60=
 github.com/BurntSushi/toml v0.3.1 h1:WXkYYl6Yr3qBf1K79EBnL4mak0OimBfB0XUf9Vl28OQ=
 github.com/BurntSushi/toml v0.3.1/go.mod h1:xHWCNGjB5oqiDr8zfno3MHue2Ht5sIBksp03qcyfWMU=
+<<<<<<< HEAD
 github.com/Emyrk/factom v0.0.0-20191126143921-b5fc57ecd146 h1:2VcBtt+1ysKrzL5s5EIZDS49PsflfeOepJ2LrjOcekI=
 github.com/Emyrk/factom v0.0.0-20191126143921-b5fc57ecd146/go.mod h1:XbZ9AweH09WKgxrfPIEauJ5/2XL/zroNmDAbd3TdKXk=
+=======
+github.com/Emyrk/factom v0.0.0-20191001194233-40c0cdc2f2a0 h1:blIsTi+ppAojepc46TFXMtHaTMRXI5Ga3cddTC8P0U4=
+github.com/Emyrk/factom v0.0.0-20191001194233-40c0cdc2f2a0/go.mod h1:XbZ9AweH09WKgxrfPIEauJ5/2XL/zroNmDAbd3TdKXk=
+github.com/Emyrk/factom v0.0.0-20191115203952-1520e3ca4f6a h1:KH2LS+g2L7Jj3YgV4crgzsFIse7Ox8Ltwrv9XmcYT1I=
+github.com/Emyrk/factom v0.0.0-20191115203952-1520e3ca4f6a/go.mod h1:VYH2CT47swOogDIz1ptrGXnrX4JZeLQUIfNWXScJUQA=
+>>>>>>> Begin work to match refactor in fat
 github.com/Factom-Asset-Tokens/base58 v0.0.0-20181227014902-61655c4dd885 h1:rfy2fwMrOZPqQgjsH7VCreGMSPzcvqQrfjeSs8nf+sY=
 github.com/Factom-Asset-Tokens/base58 v0.0.0-20181227014902-61655c4dd885/go.mod h1:RVXsRSp6VzXw5l1uiGazuf3qo23Qk0h1HzMcQk+X4LE=
 github.com/Factom-Asset-Tokens/fatd v0.6.1-0.20190927200133-81408234a2b5 h1:nJgckkWLVJxlZyfc5Wv8unMV9QmOQz6InW87MU8x0fg=
 github.com/Factom-Asset-Tokens/fatd v0.6.1-0.20190927200133-81408234a2b5/go.mod h1:BtAPS0V7pjfxo1rdQ+ZKiW8QYBxDcVskMxkY3JKQsqw=
+github.com/Factom-Asset-Tokens/fatd v1.0.0 h1:toUPNw+pAbM2/z0qpWcRTZGUJuqSi/tv+phdVpyxnJA=
+github.com/Factom-Asset-Tokens/fatd v1.0.0/go.mod h1:AFNSSid4TqEvsZs2G2xPwPRuMdTaHl0SmcH8ORBK6ZM=
+github.com/Factom-Asset-Tokens/fatd v1.0.1-0.20191115033315-aa22fa985791 h1:yQiBURzeL5SomMe4zDflmbU2aeNZnGPc/QeYNtA7K7k=
+github.com/Factom-Asset-Tokens/fatd v1.0.1-0.20191115033315-aa22fa985791/go.mod h1:hPi+c7bNCRoK7gLk2pavWkqRYxlc/mersibsBL1lU+c=
 github.com/FactomProject/FactomCode v0.3.5 h1:WKa5H9cg7V/zrteqBiEOdnpIxzRggOZMLlS3XLeBW2w=
 github.com/FactomProject/FactomCode v0.3.5/go.mod h1:7XksVta7THNbD031Ax0/dS5RKMS+ug+d7/Lmti8jAhE=
 github.com/FactomProject/basen v0.0.0-20150613233007-fe3947df716e h1:ahyvB3q25YnZWly5Gq1ekg6jcmWaGj/vG/MhF4aisoc=
@@ -75,6 +96,7 @@ github.com/FactomProject/serveridentity v0.0.0-20180611231115-cf42d2aa8deb/go.mo
 github.com/FactomProject/web v0.1.0 h1:M136UkW3h/V8hH7h+s7qqm3GGSrKGKyXi6p94Z/AgPw=
 github.com/FactomProject/web v0.1.0/go.mod h1:wiLhlN8amF4dalkSy+u75C3xsXaesSHy2cph6b/8PrI=
 github.com/OneOfOne/xxhash v1.2.2/go.mod h1:HSdplMjZKSmBqAxg5vPj2TmRDmfkzw+cTzAElWljhcU=
+github.com/aead/siphash v1.0.1/go.mod h1:Nywa3cDsYNNK3gaciGTWPwHt0wlpNV15vwmswBAUSII=
 github.com/alecthomas/template v0.0.0-20160405071501-a0175ee3bccc/go.mod h1:LOuyumcjzFXgccqObfd/Ljyb9UuFJ6TxHnclSeseNhc=
 github.com/alecthomas/units v0.0.0-20151022065526-2efee857e7cf/go.mod h1:ybxpYRFXyAe+OPACYpWeL0wqObRcbAqCMya13uyzqw0=
 github.com/alexandrevicenzi/go-sse v0.0.0-20190531224209-805eefa457e7 h1:HF2BoTaOEJzRl1WV+epnYM+kGi4DD87mVyQlWbkVLgA=
@@ -87,6 +109,15 @@ github.com/bmizerany/assert v0.0.0-20160611221934-b7ed37b82869 h1:DDGfHa7BWjL4Yn
 github.com/bmizerany/assert v0.0.0-20160611221934-b7ed37b82869/go.mod h1:Ekp36dRnpXw/yCqJaO+ZrUyxD+3VXMFFr56k5XYrpB4=
 github.com/boltdb/bolt v1.3.1 h1:JQmyP4ZBrce+ZQu0dY660FMfatumYDLun9hBCUVIkF4=
 github.com/boltdb/bolt v1.3.1/go.mod h1:clJnj/oiGkjum5o1McbSZDSLxVThjynRyGBgiAx27Ps=
+github.com/btcsuite/btcd v0.20.1-beta h1:Ik4hyJqN8Jfyv3S4AGBOmyouMsYE3EdYODkMbQjwPGw=
+github.com/btcsuite/btcd v0.20.1-beta/go.mod h1:wVuoA8VJLEcwgqHBwHmzLRazpKxTv13Px/pDuV7OomQ=
+github.com/btcsuite/btclog v0.0.0-20170628155309-84c8d2346e9f/go.mod h1:TdznJufoqS23FtqVCzL0ZqgP5MqXbb4fg/WgDys70nA=
+github.com/btcsuite/btcutil v0.0.0-20190425235716-9e5f4b9a998d/go.mod h1:+5NJ2+qvTyV9exUAL/rxXi3DcLg2Ts+ymUAY5y4NvMg=
+github.com/btcsuite/go-socks v0.0.0-20170105172521-4720035b7bfd/go.mod h1:HHNXQzUsZCxOoE+CPiyCTO6x34Zs86zZUiwtpXoGdtg=
+github.com/btcsuite/goleveldb v0.0.0-20160330041536-7834afc9e8cd/go.mod h1:F+uVaaLLH7j4eDXPRvw78tMflu7Ie2bzYOH4Y8rRKBY=
+github.com/btcsuite/snappy-go v0.0.0-20151229074030-0bdef8d06723/go.mod h1:8woku9dyThutzjeg+3xrA5iCpBRH8XEEg3lh6TiUghc=
+github.com/btcsuite/websocket v0.0.0-20150119174127-31079b680792/go.mod h1:ghJtEyQwv5/p4Mg4C0fgbePVuGr935/5ddU9Z3TmDRY=
+github.com/btcsuite/winsvc v1.0.0/go.mod h1:jsenWakMcC0zFBFurPLEAyrnc/teJEM1O46fmI40EZs=
 github.com/btcsuitereleases/btcutil v0.0.0-20150612230727-f2b1058a8255 h1:2Dd/81Xn+6DGPIV01YTt9mNV1li0kM1dk62cE3YDU44=
 github.com/btcsuitereleases/btcutil v0.0.0-20150612230727-f2b1058a8255/go.mod h1:cUeoYJcc2EfS9DIrDrJ44AjirCbgkmThYeFu/yEddxs=
 github.com/cenkalti/backoff v2.1.1+incompatible h1:tKJnvO2kl0zmb/jA5UKAt4VoEVw1qxKWjE/Bpp46npY=
@@ -104,6 +135,7 @@ github.com/coreos/go-semver v0.2.0/go.mod h1:nnelYz7RCh+5ahJtPPxZlU+153eP4D4r3Ee
 github.com/coreos/go-systemd v0.0.0-20190321100706-95778dfbb74e/go.mod h1:F5haX7vjVVG0kc13fIWeqUViNPyEJxv/OmvnBo0Yme4=
 github.com/coreos/pkg v0.0.0-20180928190104-399ea9e2e55f/go.mod h1:E3G3o1h8I7cfcXa63jLwjI0eiQQMgzzUDFVpN/nH/eA=
 github.com/cpuguy83/go-md2man v1.0.10/go.mod h1:SmD6nW6nTyfqj6ABTjUi3V3JVMnlJmwcJI5acqYI6dE=
+github.com/davecgh/go-spew v0.0.0-20171005155431-ecdeabc65495/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
@@ -111,6 +143,8 @@ github.com/dgrijalva/jwt-go v3.2.0+incompatible/go.mod h1:E3ru+11k8xSBh+hMPgOLZm
 github.com/dgryski/go-sip13 v0.0.0-20181026042036-e10d5fee7954/go.mod h1:vAd38F8PWV+bWy6jNmig1y/TA+kYO4g3RSRF0IAv0no=
 github.com/dustin/go-humanize v1.0.0 h1:VSnTsYCnlFHaM2/igO1h6X3HA71jcobQuxemgkq4zYo=
 github.com/dustin/go-humanize v1.0.0/go.mod h1:HtrtbFcZ19U5GC7JDqmcUSB87Iq5E25KnS6fMYU6eOk=
+github.com/ethereum/go-ethereum v1.9.7 h1:p4O+z0MGzB7xxngHbplcYNloxkFwGkeComhkzWnq0ig=
+github.com/ethereum/go-ethereum v1.9.7/go.mod h1:PwpWDrCLZrV+tfrhqqF6kPknbISMHaJv9Ln3kPCZLwY=
 github.com/fsnotify/fsnotify v1.4.7 h1:IXs+QLmnXW2CcXuY+8Mzv/fWEsPGWxqefPtCP5CnV9I=
 github.com/fsnotify/fsnotify v1.4.7/go.mod h1:jwhsz4b93w/PPRr/qN1Yymfu8t87LnFCMoQvtojpjFo=
 github.com/ghodss/yaml v1.0.0 h1:wQHKEahhL6wmXdzwWG11gIVCkOv05bNOh+Rxn0yngAk=
@@ -162,13 +196,16 @@ github.com/hpcloud/tail v1.0.0 h1:nfCOvKYfkgYP8hkirhJocXT2+zOD8yUNjXaWfTlyFKI=
 github.com/hpcloud/tail v1.0.0/go.mod h1:ab1qPbhIpdTxEkNHXyeSf5vhxWSCs/tWer42PpOxQnU=
 github.com/inconshreveable/mousetrap v1.0.0 h1:Z8tu5sraLXCXIcARxBp/8cbvlwVa7Z1NHg9XEKhtSvM=
 github.com/inconshreveable/mousetrap v1.0.0/go.mod h1:PxqpIevigyE2G7u3NXJIT2ANytuPF1OarO4DADm73n8=
+github.com/jessevdk/go-flags v0.0.0-20141203071132-1679536dcc89/go.mod h1:4FA24M0QyGHXBuZZK/XkWh8h0e1EYbRYJSGM75WSRxI=
 github.com/jonboulle/clockwork v0.1.0/go.mod h1:Ii8DK3G1RaLaWxj9trq07+26W01tbo22gdxWY5EU2bo=
+github.com/jrick/logrotate v1.0.0/go.mod h1:LNinyqDIJnpAur+b8yyulnQw/wDuN1+BYKlTRt3OuAQ=
 github.com/json-iterator/go v1.1.6/go.mod h1:+SdeFBvtyEkXs7REEP0seUULqWtbJapLOCVDaaPEHmU=
 github.com/jtolds/gls v4.20.0+incompatible h1:xdiiI2gbIgH/gLH7ADydsJ1uDOEzR8yvV7C0MuV77Wo=
 github.com/jtolds/gls v4.20.0+incompatible/go.mod h1:QJZ7F/aHp+rZTRtaJ1ow/lLfFfVYBRgL+9YlvaHOwJU=
 github.com/julienschmidt/httprouter v1.2.0/go.mod h1:SYymIcj16QtmaHHD7aYtjjsJG7VTCxuUUipMqKk8s4w=
 github.com/kisielk/errcheck v1.1.0/go.mod h1:EZBBE59ingxPouuu3KfxchcWSUPOHkagtvWXihfKN4Q=
 github.com/kisielk/gotool v1.0.0/go.mod h1:XhKaO+MFFWcvkIS/tQcRk01m1F5IRFswLeQ+oQHNcck=
+github.com/kkdai/bstream v0.0.0-20161212061736-f391b8402d23/go.mod h1:J+Gs4SYgM6CZQHDETBtE9HaSEkGmuNXF86RwHhHUvq4=
 github.com/konsorten/go-windows-terminal-sequences v1.0.1 h1:mweAR1A6xJ3oS2pRaGiHgQ4OO8tzTaLawm8vnODuwDk=
 github.com/konsorten/go-windows-terminal-sequences v1.0.1/go.mod h1:T0+1ngSBFLxvqU3pZ+m/2kptfBszLMUkC4ZK/EgS/cQ=
 github.com/konsorten/go-windows-terminal-sequences v1.0.2 h1:DB17ag19krx9CFsz4o3enTrPXyIXCl+2iCXH/aMAp9s=
@@ -282,6 +319,7 @@ go.uber.org/atomic v1.4.0/go.mod h1:gD2HeocX3+yG+ygLZcrzQJaqmWj9AIm7n08wl/qW/PE=
 go.uber.org/multierr v1.1.0/go.mod h1:wR5kodmAFQ0UK8QlbwjlSNy0Z68gJhDJUG5sjR94q/0=
 go.uber.org/ratelimit v0.1.0/go.mod h1:2X8KaoNd1J0lZV+PxJk/5+DGbO/tpwLR1m++a7FnB/Y=
 go.uber.org/zap v1.10.0/go.mod h1:vwi/ZaCAaUcBkycHslxD9B2zi4UTXhF60s6SWpuDF0Q=
+golang.org/x/crypto v0.0.0-20170930174604-9419663f5a44/go.mod h1:6SG95UA2DQfeDnfUPMdvaQW0Q7yPrPDi9nlGo2tz2b4=
 golang.org/x/crypto v0.0.0-20180904163835-0709b304e793/go.mod h1:6SG95UA2DQfeDnfUPMdvaQW0Q7yPrPDi9nlGo2tz2b4=
 golang.org/x/crypto v0.0.0-20181203042331-505ab145d0a9/go.mod h1:6SG95UA2DQfeDnfUPMdvaQW0Q7yPrPDi9nlGo2tz2b4=
 golang.org/x/crypto v0.0.0-20190308221718-c2843e01d9a2/go.mod h1:djNgcEr1/C05ACkg1iLfiJU5Ep61QUkGW8qpdssI0+w=

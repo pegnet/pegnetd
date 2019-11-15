@@ -4,8 +4,9 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/Factom-Asset-Tokens/fatd/fat103"
+
 	"github.com/Factom-Asset-Tokens/factom"
-	"github.com/Factom-Asset-Tokens/fatd/fat"
 	"github.com/Factom-Asset-Tokens/fatd/fat/jsonlen"
 )
 
@@ -14,13 +15,24 @@ import (
 type TransactionBatch struct {
 	Version      uint          `json:"version"`
 	Transactions []Transaction `json:"transactions"`
-	fat.Entry
+
+	Metadata json.RawMessage `json:"metadata,omitempty"`
+	Entry    factom.Entry    `json:"-"`
 }
 
 // NewTransactionBatch returns a TransactionBatch initialized with the given
 // entry.
-func NewTransactionBatch(entry factom.Entry) *TransactionBatch {
-	return &TransactionBatch{Entry: fat.Entry{Entry: entry}}
+func NewTransactionBatch(entry factom.Entry) (*TransactionBatch, error) {
+	t := TransactionBatch{Entry: entry}
+	if err := t.UnmarshalJSON(entry.Content); err != nil {
+		return nil, err
+	}
+
+	if err := t.Validate(); err != nil {
+		return nil, err
+	}
+
+	return &t, nil
 }
 
 type transactionBatch TransactionBatch
@@ -32,10 +44,11 @@ func (t *TransactionBatch) UnmarshalJSON(data []byte) error {
 	tRaw := struct {
 		Version      json.RawMessage `json:"version"`
 		Transactions json.RawMessage `json:"transactions"`
-		fat.Entry
+		Metadata     json.RawMessage `json:"metadata,omitempty"`
 	}{}
 	if err := json.Unmarshal(data, &tRaw); err != nil {
-		return fmt.Errorf("%T: %v", t, err)
+		return fmt.Errorf(
+			"%T: %v", t, err)
 	}
 	if err := json.Unmarshal(tRaw.Version, &t.Version); err != nil {
 		return fmt.Errorf("%T.Version: %v", t, err)
@@ -43,6 +56,7 @@ func (t *TransactionBatch) UnmarshalJSON(data []byte) error {
 	if err := json.Unmarshal(tRaw.Transactions, &t.Transactions); err != nil {
 		return fmt.Errorf("%T.Transactions: %v", t, err)
 	}
+	t.Metadata = tRaw.Metadata
 
 	expectedJSONLen := len(`{"version":,"transactions":}`) +
 		len(tRaw.Version) + len(tRaw.Transactions)
@@ -69,14 +83,24 @@ func (t TransactionBatch) String() string {
 	return string(data)
 }
 
-// UnmarshalEntry unmarshals the Entry content as a TransactionBatch
-func (t *TransactionBatch) UnmarshalEntry() error {
-	return t.Entry.UnmarshalEntry(t)
-}
+//// UnmarshalEntry unmarshals the Entry content as a TransactionBatch
+//func (t *TransactionBatch) UnmarshalEntry() error {
+//	return t.Entry.UnmarshalEntry(t)
+//}
+//
+//// MarshalEntry marshals the TransactionBatch into the entry content
+//func (t *TransactionBatch) MarshalEntry() error {
+//	return t.Entry.MarshalEntry(t)
+//}
 
-// MarshalEntry marshals the TransactionBatch into the entry content
-func (t *TransactionBatch) MarshalEntry() error {
-	return t.Entry.MarshalEntry(t)
+func (t TransactionBatch) Sign(signingSet ...factom.RCDSigner) (factom.Entry, error) {
+	e := t.Entry
+	content, err := json.Marshal(t)
+	if err != nil {
+		return e, err
+	}
+	e.Content = content
+	return fat103.Sign(e, signingSet...), nil
 }
 
 // Validate performs all validation checks and returns nil if it is a valid
@@ -124,25 +148,27 @@ func (t *TransactionBatch) ValidData() error {
 // ValidData returns nil.
 func (t TransactionBatch) ValidExtIDs() error {
 	// Count unique inputs to know how many signatures are needed on the entry
-	uniqueInputs := make(map[factom.FAAddress]struct{})
+
+	uniqueInputs := make(map[factom.Bytes32]struct{})
 	for _, tx := range t.Transactions {
-		uniqueInputs[tx.Input.Address] = struct{}{}
+		uniqueInputs[factom.Bytes32(tx.Input.Address)] = struct{}{}
 	}
-	if err := t.Entry.ValidExtIDs(len(uniqueInputs)); err != nil {
+
+	if err := fat103.Validate(t.Entry, uniqueInputs); err != nil {
 		return err
 	}
-	// Create a map of all RCDs that are present in the ExtIDs
-	includedRCDHashes := make(map[factom.FAAddress]struct{})
-	extIDs := t.ExtIDs[1:]
-	for i := 0; i < len(extIDs)/2; i++ {
-		includedRCDHashes[t.FAAddress(i)] = struct{}{}
-	}
-	// Ensure that for all unique inputs there is a corresponding RCD in the ExtIDs
-	for address := range uniqueInputs {
-		if _, ok := includedRCDHashes[address]; !ok {
-			return fmt.Errorf("invalid RCDs")
-		}
-	}
+	//// Create a map of all RCDs that are present in the ExtIDs
+	//includedRCDHashes := make(map[factom.FAAddress]struct{})
+	//extIDs := t.ExtIDs[1:]
+	//for i := 0; i < len(extIDs)/2; i++ {
+	//	includedRCDHashes[t.FAAddress(i)] = struct{}{}
+	//}
+	//// Ensure that for all unique inputs there is a corresponding RCD in the ExtIDs
+	//for address := range uniqueInputs {
+	//	if _, ok := includedRCDHashes[address]; !ok {
+	//		return fmt.Errorf("invalid RCDs")
+	//	}
+	//}
 	return nil
 }
 
