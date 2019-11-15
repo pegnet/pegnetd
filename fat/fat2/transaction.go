@@ -6,7 +6,7 @@ import (
 
 	"github.com/Factom-Asset-Tokens/factom"
 	"github.com/Factom-Asset-Tokens/fatd/fat"
-	"github.com/Factom-Asset-Tokens/fatd/fat/jsonlen"
+	"github.com/pegnet/pegnetd/fat/internal/jsonlen"
 )
 
 // TypedAddressAmountTuple represents a tuple of a Factoid address sending

@@ -151,7 +151,7 @@ var burn = &cobra.Command{
 		}
 		faddr := factom.Bytes32(addr)
 
-		priv, err := addr.GetFsAddress(cl)
+		priv, err := addr.GetFsAddress(nil, cl)
 		if err != nil {
 			cmd.PrintErrf("unable to get private key: %s\n", err.Error())
 			os.Exit(1)
@@ -163,7 +163,7 @@ var burn = &cobra.Command{
 			os.Exit(1)
 		}
 
-		balance, err := addr.GetBalance(cl)
+		balance, err := addr.GetBalance(nil, cl)
 		if err != nil {
 			cmd.PrintErrln("unable to retrieve balance:" + err.Error())
 			os.Exit(1)
@@ -179,22 +179,26 @@ var burn = &cobra.Command{
 
 		var trans factom.FactoidTransaction
 		trans.Version = 2
-		trans.Timestamp = time.Now()
-		trans.InputCount = 1
-		trans.ECOutputCount = 1
+		trans.TimestampSalt = time.Now()
 		trans.FCTInputs = append(trans.FCTInputs, factom.FactoidTransactionIO{
 			Amount:  uint64(amount),
-			Address: &faddr,
+			Address: faddr,
 		})
 		trans.ECOutputs = append(trans.ECOutputs, factom.FactoidTransactionIO{
 			Amount:  0,
-			Address: &fBurnAddress,
+			Address: fBurnAddress,
 		})
+
+		rcd1, ok := rcd.(*factom.RCD1)
+		if !ok {
+			cmd.PrintErrln("failed to make rcd type 1")
+			os.Exit(1)
+		}
 
 		// the library requires at least one signature to "be populated"
 		// fill in below with real sig
 		trans.Signatures = append(trans.Signatures, factom.FactoidTransactionSignature{
-			ReedeemCondition: rcd,
+			ReedeemCondition: *rcd1,
 			SignatureBlock:   nil,
 		})
 
@@ -222,7 +226,7 @@ var burn = &cobra.Command{
 			TXID    string `json:"txid"`
 		}
 
-		err = cl.FactomdRequest("factoid-submit", params, &result)
+		err = cl.FactomdRequest(nil, "factoid-submit", params, &result)
 		if err != nil {
 			cmd.PrintErrf("unable to submit transaction: %s\n", err.Error())
 			os.Exit(1)

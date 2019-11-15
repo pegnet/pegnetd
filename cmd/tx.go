@@ -11,7 +11,7 @@ import (
 
 func signAndSend(tx *fat2.Transaction, cl *factom.Client, payment string) (err error, commit *factom.Bytes32, reveal *factom.Bytes32) {
 	// Get out private key
-	priv, err := tx.Input.Address.GetFsAddress(cl)
+	priv, err := tx.Input.Address.GetFsAddress(nil, cl)
 	if err != nil {
 		return fmt.Errorf("unable to get private key: %s\n", err.Error()), nil, nil
 	}
@@ -19,15 +19,14 @@ func signAndSend(tx *fat2.Transaction, cl *factom.Client, payment string) (err e
 	var txBatch fat2.TransactionBatch
 	txBatch.Version = 1
 	txBatch.Transactions = []fat2.Transaction{*tx}
-	txBatch.ChainID = &node.TransactionChain
+	txBatch.Entry.ChainID = &node.TransactionChain
 
 	// Sign the tx and make an entry
-	err = txBatch.MarshalEntry()
+	entry, err := txBatch.Sign(priv)
 	if err != nil {
 		return fmt.Errorf("failed to marshal tx: %s", err.Error()), nil, nil
 	}
-
-	txBatch.Sign(priv)
+	txBatch.Entry = entry
 
 	if err := txBatch.Validate(); err != nil {
 		return fmt.Errorf("invalid tx: %s", err.Error()), nil, nil
@@ -38,26 +37,26 @@ func signAndSend(tx *fat2.Transaction, cl *factom.Client, payment string) (err e
 		return fmt.Errorf("failed to parse input: %s\n", err.Error()), nil, nil
 	}
 
-	bal, err := ec.GetBalance(cl)
+	bal, err := ec.GetBalance(nil, cl)
 	if err != nil {
 		return fmt.Errorf("failed to get ec balance: %s\n", err.Error()), nil, nil
 	}
 
-	if cost, err := txBatch.Cost(false); err != nil || uint64(cost) > bal {
+	if cost, err := entry.Cost(); err != nil || uint64(cost) > bal {
 		return fmt.Errorf("not enough ec balance for the transaction"), nil, nil
 	}
 
-	es, err := ec.GetEsAddress(cl)
+	es, err := ec.GetEsAddress(nil, cl)
 	if err != nil {
 		return fmt.Errorf("failed to parse input: %s\n", err.Error()), nil, nil
 	}
 
-	txid, err := txBatch.ComposeCreate(cl, es, false)
+	txid, err := entry.ComposeCreate(nil, cl, es)
 	if err != nil {
 		return fmt.Errorf("failed to submit entry: %s\n", err.Error()), nil, nil
 	}
 
-	return nil, txid, txBatch.Hash
+	return nil, &txid, txBatch.Entry.Hash
 }
 
 func setTransferOutput(tx *fat2.Transaction, cl *factom.Client, dest, amt string) error {

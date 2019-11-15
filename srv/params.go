@@ -274,7 +274,7 @@ func (p *ParamsSendTransaction) IsValid() error {
 		Timestamp: time.Now(),
 		ChainID:   p.ChainID,
 	}
-	if _, err := p.entry.Cost(false); err != nil {
+	if _, err := p.entry.Cost(); err != nil {
 		return jrpc.ErrorInvalidParams(err)
 	}
 

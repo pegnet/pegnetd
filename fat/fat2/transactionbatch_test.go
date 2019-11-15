@@ -2,8 +2,9 @@ package fat2_test
 
 import (
 	"encoding/json"
-	"github.com/Factom-Asset-Tokens/factom"
 	"testing"
+
+	"github.com/Factom-Asset-Tokens/factom"
 
 	. "github.com/pegnet/pegnetd/fat/fat2"
 	"github.com/stretchr/testify/assert"
@@ -117,7 +118,7 @@ var transactionBatchValidateTests = []struct {
 	TxJSON: validTransactionBatchJSON,
 }, {
 	Name:   "extra signature",
-	Error:  "invalid RCDs",
+	Error:  "ExtIDs[1]: unexpected or duplicate RCD Hash",
 	Keys:   []string{"Fs1KWJrpLdfucvmYwN2nWrwepLn8ercpMbzXshd1g8zyhKXLVLWj"},
 	TxJSON: validTransactionBatchJSON,
 }}
@@ -134,15 +135,18 @@ func TestTransactionBatch_Validate(t *testing.T) {
 			err := json.Unmarshal([]byte(test.TxJSON), &txBatch)
 			require.NoError(t, err, "TransactionBatch JSON Unmarshal raised an unexpected error")
 
-			txBatch.ChainID = factom.NewBytes32FromString("00000000000000000000000000000000")
-			signerKeys := make([]factom.RCDPrivateKey, len(test.Keys))
+			c := factom.NewBytes32("00000000000000000000000000000000")
+			txBatch.Entry.ChainID = &c
+			signerKeys := make([]factom.RCDSigner, len(test.Keys))
 			for i, keyString := range test.Keys {
 				key := factom.FsAddress{}
 				err = key.Set(keyString)
 				signerKeys[i] = key
 				require.NoError(t, err, "FsAddress.Set()")
 			}
-			txBatch.Sign(signerKeys...)
+			ent, err := txBatch.Sign(signerKeys...)
+			assert.NoError(err)
+			txBatch.Entry = ent
 
 			err = txBatch.Validate()
 			if len(test.Error) != 0 {

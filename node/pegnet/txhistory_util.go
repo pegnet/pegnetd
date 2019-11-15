@@ -145,11 +145,18 @@ func turnRowsIntoHistoryTransactions(rows *sql.Rows) ([]HistoryTransaction, erro
 		if err != nil {
 			return nil, err
 		}
-		tx.Hash = factom.NewBytes32(hash)
+
+		var hash32 factom.Bytes32
+		copy(hash32[:], hash)
+
+		var from32 factom.Bytes32
+		copy(from32[:], from)
+
+		tx.Hash = &hash32
 		tx.TxID = FormatTxID(tx.TxIndex, tx.Hash.String())
 		tx.Timestamp = time.Unix(ts, 0)
 		var addr factom.FAAddress
-		addr = factom.FAAddress(*factom.NewBytes32(from))
+		addr = factom.FAAddress(from32)
 		tx.FromAddress = &addr
 
 		// Conversions into PEG

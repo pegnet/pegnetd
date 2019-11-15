@@ -4,10 +4,9 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/Factom-Asset-Tokens/fatd/fat103"
-
 	"github.com/Factom-Asset-Tokens/factom"
-	"github.com/Factom-Asset-Tokens/fatd/fat/jsonlen"
+	"github.com/Factom-Asset-Tokens/fatd/fat103"
+	"github.com/pegnet/pegnetd/fat/internal/jsonlen"
 )
 
 // TransactionBatch represents a fat2 entry, which can be a list of one or more

@@ -309,7 +309,7 @@ func (p *Pegnet) InsertTransactionHistoryTxBatch(tx *sql.Tx, blockorder int, txb
 
 // InsertFCTBurn inserts a payout for an FCT burn into the system.
 // Note that from_asset and to_asset are hardcoded
-func (p *Pegnet) InsertFCTBurn(tx *sql.Tx, fBlockHash *factom.Bytes32, burn *factom.FactoidTransaction, height uint32) error {
+func (p *Pegnet) InsertFCTBurn(tx *sql.Tx, fBlockHash *factom.Bytes32, burn factom.FactoidTransaction, height uint32) error {
 	stmt, err := tx.Prepare(`INSERT INTO "pn_history_txbatch"
                 (entry_hash, height, blockorder, timestamp, executed) VALUES
                 (?, ?, ?, ?, ?)`)
@@ -322,7 +322,7 @@ func (p *Pegnet) InsertFCTBurn(tx *sql.Tx, fBlockHash *factom.Bytes32, burn *fac
 		return err
 	}
 
-	_, err = stmt.Exec(burn.TransactionID[:], height, -1, burn.FactoidTransactionHeader.Timestamp.Unix(), height)
+	_, err = stmt.Exec(burn.TransactionID[:], height, -1, burn.FactoidTransactionHeader.TimestampSalt.Unix(), height)
 	if err != nil {
 		return err
 	}

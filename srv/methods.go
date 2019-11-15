@@ -413,13 +413,13 @@ func (s *APIServer) sendTransaction(_ context.Context, data json.RawMessage) int
 	//	return err
 	//}
 
-	var txID *factom.Bytes32
+	var txID factom.Bytes32
 	if !params.DryRun {
-		balance, err := ecPrivateKey.ECAddress().GetBalance(s.Node.FactomClient)
+		balance, err := ecPrivateKey.ECAddress().GetBalance(nil, s.Node.FactomClient)
 		if err != nil {
 			panic(err)
 		}
-		cost, err := entry.Cost(false)
+		cost, err := entry.Cost()
 		if err != nil {
 			rerr := ErrorInvalidTransaction
 			rerr.Data = err.Error()
@@ -428,7 +428,7 @@ func (s *APIServer) sendTransaction(_ context.Context, data json.RawMessage) int
 		if balance < uint64(cost) {
 			return ErrorNoEC
 		}
-		txID, err = entry.ComposeCreate(s.Node.FactomClient, ecPrivateKey, false)
+		txID, err = entry.ComposeCreate(nil, s.Node.FactomClient, ecPrivateKey)
 		if err != nil {
 			panic(err)
 		}
@@ -438,7 +438,7 @@ func (s *APIServer) sendTransaction(_ context.Context, data json.RawMessage) int
 		ChainID *factom.Bytes32 `json:"chainid"`
 		TxID    *factom.Bytes32 `json:"txid,omitempty"`
 		Hash    *factom.Bytes32 `json:"entryhash"`
-	}{ChainID: entry.ChainID, TxID: txID, Hash: entry.Hash}
+	}{ChainID: entry.ChainID, TxID: &txID, Hash: entry.Hash}
 	return nil
 }
 
@@ -469,7 +469,7 @@ type ResultGetSyncStatus struct {
 
 func (s *APIServer) getSyncStatus(_ context.Context, data json.RawMessage) interface{} {
 	heights := new(factom.Heights)
-	err := heights.Get(s.Node.FactomClient)
+	err := heights.Get(nil, s.Node.FactomClient)
 	if err != nil {
 		return ResultGetSyncStatus{Sync: s.Node.GetCurrentSync(), Current: -1}
 	}
