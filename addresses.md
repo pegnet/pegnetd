@@ -45,7 +45,7 @@ A quick table of the allowed transfers. The allowed column allows what addresses
 | data | Field Name | Description |
 | ----------------- | ---------------- | --------------- |
 | varInt_F | Type | The RCD type.  This specifies how the datastructure should be interpreted.  Type 14 `(0x0e)` indicates the Ethereum linked rcd.|
-| 32 bytes | Pubkey 0 | The 64 byte ecdsa uncompressed public key. If generating an uncompressed key, and the length is 65, remove the `0x04` prefix indicating an uncompressed key. |
+| 64 bytes | Pubkey 0 | The 64 byte ecdsa uncompressed public key. If generating an uncompressed key, and the length is 65, remove the `0x04` prefix indicating an uncompressed key. |
 
 The private key is the 32 byte ecdsa private key. When represented as text, the Ethereum hex style `0x00..` should be used.
 
