@@ -85,7 +85,7 @@ func ComputeMovingAverage(latest uint64, previous uint64, nPoints int) uint64 {
 func (p *Pegnet) InsertRates(tx *sql.Tx, height uint32, rates []opr.AssetUint, pricePEG bool) error {
 	// Rates are the spot prices for the asset for this block. We need to store
 	// more than just the spot price, as we also need to include the average price.
-	previousRates, err := p.SelectRecentRates(height)
+	previousRates, err := p.SelectRecentRatesWithAvgs(height)
 	if err != nil && err != sql.ErrNoRows {
 		return err
 	}
@@ -189,9 +189,17 @@ func (p *Pegnet) SelectPendingRates(ctx context.Context, tx *sql.Tx, height uint
 	return _extractAssets(rows)
 }
 
-// SelectRecentRates selects the last rates from a height. It is possible to
+func (p *Pegnet) SelectPendingRatesWithAvgs(ctx context.Context, tx *sql.Tx, height uint32) (map[fat2.PTicker]Quote, error) {
+	rows, err := tx.Query("SELECT token, value, movingaverage FROM pn_rate WHERE height = $1", height)
+	if err != nil {
+		return nil, err
+	}
+	return _extractAssetsWithAvg(rows)
+}
+
+// SelectRecentRatesWithAvgs selects the last rates from a height. It is possible to
 // skip a block for rates, and sometimes the last recorded rates are needed.
-func (p *Pegnet) SelectRecentRates(height uint32) (map[fat2.PTicker]Quote, error) {
+func (p *Pegnet) SelectRecentRatesWithAvgs(height uint32) (map[fat2.PTicker]Quote, error) {
 	rows, err := p.DB.Query("SELECT token, value, movingaverage FROM pn_rate WHERE height = (SELECT MAX(height) FROM pn_rate WHERE height <= $1)", height)
 	if err != nil {
 		return nil, err
@@ -261,6 +269,20 @@ func _extractAssets(rows *sql.Rows) (map[fat2.PTicker]uint64, error) {
 type Quote struct {
 	Price         uint64
 	MovingAverage uint64
+}
+
+func (q Quote) Min() uint64 {
+	if q.Price < q.MovingAverage {
+		return q.Price
+	}
+	return q.MovingAverage
+}
+
+func (q Quote) Max() uint64 {
+	if q.Price > q.MovingAverage {
+		return q.Price
+	}
+	return q.MovingAverage
 }
 
 func _extractAssetsWithAvg(rows *sql.Rows) (map[fat2.PTicker]Quote, error) {
