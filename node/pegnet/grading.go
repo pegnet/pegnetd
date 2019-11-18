@@ -46,28 +46,63 @@ const createTableRate = `CREATE TABLE IF NOT EXISTS "pn_rate" (
 	"height" INTEGER NOT NULL,
 	"token" TEXT,
 	"value" INTEGER,
+	"movingaverage" INTEGER DEFAULT 0,
 	
 	UNIQUE("height", "token")
 );
 `
 
-func (p *Pegnet) insertRate(tx *sql.Tx, height uint32, tickerString string, rate uint64) error {
-	_, err := tx.Exec("INSERT INTO pn_rate (height, token, value) VALUES ($1, $2, $3)", height, tickerString, rate)
+func (p *Pegnet) insertRate(tx *sql.Tx, height uint32, tickerString string, rate uint64, mvAvg uint64) error {
+	_, err := tx.Exec("INSERT INTO pn_rate (height, token, value, movingaverage) VALUES ($1, $2, $3, $4)", height, tickerString, rate, mvAvg)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
+const (
+	PreviousWeight = 7
+)
+
+// ComputeMovingAverage is a weighted moving average
+// ([Previous Avg * (nPoints - 1)] + Current Price) / nPoints
+func ComputeMovingAverage(latest uint64, previous uint64, nPoints int) uint64 {
+	if previous == 0 {
+		return latest
+	}
+
+	l := new(big.Int).SetUint64(latest)
+	p := new(big.Int).SetUint64(previous)
+	w := big.NewInt(int64(nPoints) - 1)
+	p = p.Mul(p, w) // Weight the previous
+	p = p.Add(p, l) // Add the current price
+	p = p.Quo(p, big.NewInt(int64(nPoints)))
+
+	return p.Uint64()
+}
+
 // InsertRates adds all asset rates as rows, computing the rate for PEG if necessary
 func (p *Pegnet) InsertRates(tx *sql.Tx, height uint32, rates []opr.AssetUint, pricePEG bool) error {
+	// Rates are the spot prices for the asset for this block. We need to store
+	// more than just the spot price, as we also need to include the average price.
+	previousRates, err := p.SelectRecentRates(height)
+	if err != nil && err != sql.ErrNoRows {
+		return err
+	}
+
 	for i := range rates {
 		if rates[i].Name == "PEG" {
 			continue
 		}
+
 		// Correct rates to use `pAsset`
 		rates[i].Name = "p" + rates[i].Name
-		err := p.insertRate(tx, height, rates[i].Name, rates[i].Value)
+
+		// Calculate moving avg
+		ticker := fat2.StringToTicker(rates[i].Name)
+		mA := ComputeMovingAverage(rates[i].Value, previousRates[ticker].MovingAverage, PreviousWeight)
+
+		err := p.insertRate(tx, height, rates[i].Name, rates[i].Value, mA)
 		if err != nil {
 			return err
 		}
@@ -94,7 +129,9 @@ func (p *Pegnet) InsertRates(tx *sql.Tx, height uint32, rates []opr.AssetUint, p
 			ratePEG.Div(totalCapitalization, new(big.Int).SetUint64(issuance[fat2.PTickerPEG]))
 		}
 	}
-	err := p.insertRate(tx, height, fat2.PTickerPEG.String(), ratePEG.Uint64())
+
+	mA := ComputeMovingAverage(ratePEG.Uint64(), previousRates[fat2.PTickerPEG].MovingAverage, PreviousWeight)
+	err = p.insertRate(tx, height, fat2.PTickerPEG.String(), ratePEG.Uint64(), mA)
 	if err != nil {
 		return err
 	}
@@ -152,6 +189,16 @@ func (p *Pegnet) SelectPendingRates(ctx context.Context, tx *sql.Tx, height uint
 	return _extractAssets(rows)
 }
 
+// SelectRecentRates selects the last rates from a height. It is possible to
+// skip a block for rates, and sometimes the last recorded rates are needed.
+func (p *Pegnet) SelectRecentRates(height uint32) (map[fat2.PTicker]Quote, error) {
+	rows, err := p.DB.Query("SELECT token, value, movingaverage FROM pn_rate WHERE height = (SELECT MAX(height) FROM pn_rate WHERE height <= $1)", height)
+	if err != nil {
+		return nil, err
+	}
+	return _extractAssetsWithAvg(rows)
+}
+
 func (p *Pegnet) SelectRates(ctx context.Context, height uint32) (map[fat2.PTicker]uint64, error) {
 	rows, err := p.DB.Query("SELECT token, value FROM pn_rate WHERE height = $1", height)
 	if err != nil {
@@ -206,6 +253,28 @@ func _extractAssets(rows *sql.Rows) (map[fat2.PTicker]uint64, error) {
 		}
 		if ticker := fat2.StringToTicker(tickerName); ticker != fat2.PTickerInvalid {
 			assets[ticker] = rateValue
+		}
+	}
+	return assets, nil
+}
+
+type Quote struct {
+	Price         uint64
+	MovingAverage uint64
+}
+
+func _extractAssetsWithAvg(rows *sql.Rows) (map[fat2.PTicker]Quote, error) {
+	defer rows.Close()
+	assets := make(map[fat2.PTicker]Quote)
+	for rows.Next() {
+		var tickerName string
+		var rateValue uint64
+		var movingAvg uint64
+		if err := rows.Scan(&tickerName, &rateValue, &movingAvg); err != nil {
+			return nil, err
+		}
+		if ticker := fat2.StringToTicker(tickerName); ticker != fat2.PTickerInvalid {
+			assets[ticker] = Quote{Price: rateValue, MovingAverage: movingAvg}
 		}
 	}
 	return assets, nil
