@@ -381,6 +381,14 @@ func (d *Pegnetd) ApplyTransactionBlock(sqlTx *sql.Tx, eblock *factom.EBlock) er
 	return nil
 }
 
+func extractRates(height uint32, rates map[fat2.PTicker]pegnet.Quote, src, dst fat2.PTicker) (srcRate, dstRate uint64) {
+	if height < SpreadActivation {
+		return rates[src].MarketRate, rates[dst].MarketRate
+	}
+
+	return rates[src].MinTolerance(0), rates[dst].MaxTolerance(0)
+}
+
 // applyTransactionBatch
 //	currentHeight is just for tracing
 func (d *Pegnetd) applyTransactionBatch(sqlTx *sql.Tx, txBatch *fat2.TransactionBatch, rates map[fat2.PTicker]pegnet.Quote, currentHeight uint32) error {
@@ -407,13 +415,14 @@ func (d *Pegnetd) applyTransactionBatch(sqlTx *sql.Tx, txBatch *fat2.Transaction
 				// This error will fail the block
 				return fmt.Errorf("rates must exist if TransactionBatch contains conversions")
 			}
-			if rates[tx.Input.Type].Price == 0 || rates[tx.Conversion].Price == 0 {
+			if rates[tx.Input.Type].MarketRate == 0 || rates[tx.Conversion].MarketRate == 0 {
 				// This error will not fail the block, skip the tx
 				return nil // 0 rates result in an invalid tx. So we drop it
 			}
 			// TODO: For now any bogus amounts will be tossed. Someone can fake an overflow for example,
 			// 		and hold us up forever.
-			_, err := conversions.Convert(int64(tx.Input.Amount), rates[tx.Input.Type].Min(), rates[tx.Conversion].Max())
+			srcRate, dstRate := extractRates(currentHeight, rates, tx.Input.Type, tx.Conversion)
+			_, err := conversions.Convert(int64(tx.Input.Amount), srcRate, dstRate)
 			if err != nil {
 				return nil
 			}
@@ -431,10 +440,12 @@ func (d *Pegnetd) applyTransactionBatch(sqlTx *sql.Tx, txBatch *fat2.Transaction
 		balances[tx.Input.Address][tx.Input.Type] -= tx.Input.Amount
 
 		if tx.IsConversion() {
-			outputAmount, err := conversions.Convert(int64(tx.Input.Amount), rates[tx.Input.Type].Min(), rates[tx.Conversion].Max())
+			srcRate, dstRate := extractRates(currentHeight, rates, tx.Input.Type, tx.Conversion)
+			outputAmount, err := conversions.Convert(int64(tx.Input.Amount), srcRate, dstRate)
 			if err != nil {
 				return err
 			}
+
 			balances[tx.Input.Address][tx.Conversion] += uint64(outputAmount)
 		} else {
 			for _, transfer := range tx.Transfers {
@@ -465,7 +476,8 @@ func (d *Pegnetd) applyTransactionBatch(sqlTx *sql.Tx, txBatch *fat2.Transaction
 		}
 
 		if tx.IsConversion() {
-			outputAmount, err := conversions.Convert(int64(tx.Input.Amount), rates[tx.Input.Type].Min(), rates[tx.Conversion].Max())
+			srcRate, dstRate := extractRates(currentHeight, rates, tx.Input.Type, tx.Conversion)
+			outputAmount, err := conversions.Convert(int64(tx.Input.Amount), srcRate, dstRate)
 			if err != nil {
 				return err
 			}

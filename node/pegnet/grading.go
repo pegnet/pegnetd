@@ -65,7 +65,7 @@ const (
 )
 
 // ComputeMovingAverage is a weighted moving average
-// ([Previous Avg * (nPoints - 1)] + Current Price) / nPoints
+// ([Previous Avg * (nPoints - 1)] + Current MarketRate) / nPoints
 func ComputeMovingAverage(latest uint64, previous uint64, nPoints int) uint64 {
 	if previous == 0 {
 		return latest
@@ -267,20 +267,55 @@ func _extractAssets(rows *sql.Rows) (map[fat2.PTicker]uint64, error) {
 }
 
 type Quote struct {
-	Price         uint64
+	MarketRate    uint64
 	MovingAverage uint64
 }
 
+func (q Quote) MinTolerance(tolerance uint64) uint64 {
+	if q.MovingAverage >= q.MarketRate {
+		return q.MarketRate
+	}
+	toleranced := q.MovingAverage + tolerance
+	return min(q.MarketRate, toleranced)
+
+}
+
+func (q Quote) MaxTolerance(tolerance uint64) uint64 {
+	if q.MovingAverage <= q.MarketRate {
+		return q.MarketRate
+	}
+
+	toleranced := q.MovingAverage - tolerance
+	if tolerance > q.MovingAverage {
+		q.MovingAverage = 0 // Protect underflow
+	}
+	return max(q.MarketRate, toleranced)
+}
+
+func max(a, b uint64) uint64 {
+	if a > b {
+		return a
+	}
+	return b
+}
+
+func min(a, b uint64) uint64 {
+	if a < b {
+		return a
+	}
+	return b
+}
+
 func (q Quote) Min() uint64 {
-	if q.Price < q.MovingAverage {
-		return q.Price
+	if q.MarketRate < q.MovingAverage {
+		return q.MarketRate
 	}
 	return q.MovingAverage
 }
 
 func (q Quote) Max() uint64 {
-	if q.Price > q.MovingAverage {
-		return q.Price
+	if q.MarketRate > q.MovingAverage {
+		return q.MarketRate
 	}
 	return q.MovingAverage
 }
@@ -296,7 +331,7 @@ func _extractAssetsWithAvg(rows *sql.Rows) (map[fat2.PTicker]Quote, error) {
 			return nil, err
 		}
 		if ticker := fat2.StringToTicker(tickerName); ticker != fat2.PTickerInvalid {
-			assets[ticker] = Quote{Price: rateValue, MovingAverage: movingAvg}
+			assets[ticker] = Quote{MarketRate: rateValue, MovingAverage: movingAvg}
 		}
 	}
 	return assets, nil
