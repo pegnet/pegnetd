@@ -61,7 +61,8 @@ func (p *Pegnet) insertRate(tx *sql.Tx, height uint32, tickerString string, rate
 }
 
 const (
-	PreviousWeight = 7
+	PreviousWeight        = 7
+	SpreadToleranceFactor = 100 // Tolerance factor is set to 1%
 )
 
 // ComputeMovingAverage is a weighted moving average
@@ -271,20 +272,26 @@ type Quote struct {
 	MovingAverage uint64
 }
 
-func (q Quote) MinTolerance(tolerance uint64) uint64 {
+func (q Quote) GetTolerance() uint64 {
+	return q.MarketRate / SpreadToleranceFactor
+}
+
+func (q Quote) MinTolerance() uint64 {
 	if q.MovingAverage >= q.MarketRate {
 		return q.MarketRate
 	}
+	tolerance := q.GetTolerance()
 	toleranced := q.MovingAverage + tolerance
 	return min(q.MarketRate, toleranced)
 
 }
 
-func (q Quote) MaxTolerance(tolerance uint64) uint64 {
+func (q Quote) MaxTolerance() uint64 {
 	if q.MovingAverage <= q.MarketRate {
 		return q.MarketRate
 	}
 
+	tolerance := q.GetTolerance()
 	toleranced := q.MovingAverage - tolerance
 	if tolerance > q.MovingAverage {
 		q.MovingAverage = 0 // Protect underflow

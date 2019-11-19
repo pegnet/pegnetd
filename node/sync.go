@@ -386,7 +386,7 @@ func extractRates(height uint32, rates map[fat2.PTicker]pegnet.Quote, src, dst f
 		return rates[src].MarketRate, rates[dst].MarketRate
 	}
 
-	return rates[src].MinTolerance(0), rates[dst].MaxTolerance(0)
+	return rates[src].MinTolerance(), rates[dst].MaxTolerance()
 }
 
 // applyTransactionBatch
