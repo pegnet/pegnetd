@@ -31,8 +31,8 @@ func init() {
 
 	get.AddCommand(getTX)
 	get.AddCommand(getRates)
-	getSpread.Flags().Bool("tol", true, "Use tolerances for spread calculation")
-	get.AddCommand(getSpread)
+	getPrice.Flags().Bool("tol", true, "Use tolerances for spread calculation")
+	get.AddCommand(getPrice)
 	getTXs.Flags().Bool("burn", false, "Show burns")
 	getTXs.Flags().Bool("cvt", false, "Show converions")
 	getTXs.Flags().Bool("tran", false, "Show transfers")
@@ -516,9 +516,9 @@ var getRates = &cobra.Command{
 	},
 }
 
-var getSpread = &cobra.Command{
-	Use:              "spread <height> <src-asset> <optional dst-asset>",
-	Example:          "pegnetd get spread 219000 pFCT\npegnetd get spread 219000 pFCT pXBT",
+var getPrice = &cobra.Command{
+	Use:              "price <height> <src-asset> <optional dst-asset>",
+	Example:          "pegnetd get price 219000 pFCT\npegnetd get price 219000 pFCT pXBT",
 	Short:            "Fetch the spread amount and percent for a trading pair",
 	PersistentPreRun: always,
 	PreRun:           SoftReadConfig,
