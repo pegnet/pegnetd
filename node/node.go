@@ -64,6 +64,11 @@ func FactomClientFromConfig(conf *viper.Viper) *factom.Client {
 	cl := factom.NewClient()
 	cl.FactomdServer = conf.GetString(config.Server)
 	cl.WalletdServer = conf.GetString(config.Wallet)
+	if config.WalletUser != "" {
+		cl.Walletd.BasicAuth = true
+		cl.Walletd.User = conf.GetString(config.WalletUser)
+		cl.Walletd.Password = conf.GetString(config.WalletPass)
+	}
 
 	return cl
 }

@@ -11,6 +11,8 @@
   pegnetd = "http://localhost:8070"
   server = "http://localhost:8088/v2"
   wallet = "http://localhost:8089/v2"
+  walletUser = ""
+  walletPass = ""
 
 [dblocksync]
   retry = "5s"
