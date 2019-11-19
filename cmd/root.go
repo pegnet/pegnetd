@@ -80,6 +80,7 @@ func always(cmd *cobra.Command, args []string) {
 		node.GradingV2Activation = uint32(act)
 		node.TransactionConversionActivation = uint32(act)
 		node.PEGPricingActivation = uint32(act)
+		node.SpreadActivation = uint32(act)
 	}
 
 	// Setup config reading

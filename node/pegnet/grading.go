@@ -208,6 +208,14 @@ func (p *Pegnet) SelectRecentRatesWithAvgs(height uint32) (map[fat2.PTicker]Quot
 	return _extractAssetsWithAvg(rows)
 }
 
+func (p *Pegnet) SelectRatesWithAvgs(ctx context.Context, height uint32) (map[fat2.PTicker]Quote, error) {
+	rows, err := p.DB.Query("SELECT token, value, movingaverage FROM pn_rate WHERE height = $1", height)
+	if err != nil {
+		return nil, err
+	}
+	return _extractAssetsWithAvg(rows)
+}
+
 func (p *Pegnet) SelectRates(ctx context.Context, height uint32) (map[fat2.PTicker]uint64, error) {
 	rows, err := p.DB.Query("SELECT token, value FROM pn_rate WHERE height = $1", height)
 	if err != nil {
@@ -265,66 +273,6 @@ func _extractAssets(rows *sql.Rows) (map[fat2.PTicker]uint64, error) {
 		}
 	}
 	return assets, nil
-}
-
-type Quote struct {
-	MarketRate    uint64
-	MovingAverage uint64
-}
-
-func (q Quote) GetTolerance() uint64 {
-	return q.MarketRate / SpreadToleranceFactor
-}
-
-func (q Quote) MinTolerance() uint64 {
-	if q.MovingAverage >= q.MarketRate {
-		return q.MarketRate
-	}
-	tolerance := q.GetTolerance()
-	toleranced := q.MovingAverage + tolerance
-	return min(q.MarketRate, toleranced)
-
-}
-
-func (q Quote) MaxTolerance() uint64 {
-	if q.MovingAverage <= q.MarketRate {
-		return q.MarketRate
-	}
-
-	tolerance := q.GetTolerance()
-	toleranced := q.MovingAverage - tolerance
-	if tolerance > q.MovingAverage {
-		q.MovingAverage = 0 // Protect underflow
-	}
-	return max(q.MarketRate, toleranced)
-}
-
-func max(a, b uint64) uint64 {
-	if a > b {
-		return a
-	}
-	return b
-}
-
-func min(a, b uint64) uint64 {
-	if a < b {
-		return a
-	}
-	return b
-}
-
-func (q Quote) Min() uint64 {
-	if q.MarketRate < q.MovingAverage {
-		return q.MarketRate
-	}
-	return q.MovingAverage
-}
-
-func (q Quote) Max() uint64 {
-	if q.MarketRate > q.MovingAverage {
-		return q.MarketRate
-	}
-	return q.MovingAverage
 }
 
 func _extractAssetsWithAvg(rows *sql.Rows) (map[fat2.PTicker]Quote, error) {

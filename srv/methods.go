@@ -49,7 +49,8 @@ func (s *APIServer) jrpcMethods() jrpc.MethodMap {
 
 		"get-sync-status": s.getSyncStatus,
 
-		"get-pegnet-rates": s.getPegnetRates,
+		"get-pegnet-rates":   s.getPegnetRates,
+		"get-pegnet-spreads": s.getPegnetSpreads,
 	}
 
 }
@@ -163,16 +164,17 @@ func (s *APIServer) getTransactions(forceTxId bool) func(data json.RawMessage) i
 }
 
 // TODO: This is incompatible with FAT.
-type ResultPegnetTickerMap map[fat2.PTicker]uint64
+type ResultPegnetTickerRateMap map[fat2.PTicker]uint64
 
-func (r ResultPegnetTickerMap) MarshalJSON() ([]byte, error) {
+func (r ResultPegnetTickerRateMap) MarshalJSON() ([]byte, error) {
 	strMap := make(map[string]uint64, len(r))
 	for ticker, balance := range r {
 		strMap[ticker.String()] = balance
 	}
 	return json.Marshal(strMap)
 }
-func (r *ResultPegnetTickerMap) UnmarshalJSON(data []byte) error {
+
+func (r *ResultPegnetTickerRateMap) UnmarshalJSON(data []byte) error {
 	var strMap map[string]uint64
 	if err := json.Unmarshal(data, &strMap); err != nil {
 		return err
@@ -203,12 +205,12 @@ func (s *APIServer) getPegnetBalances(data json.RawMessage) interface{} {
 	if err != nil {
 		return jsonrpc2.InternalError
 	}
-	return ResultPegnetTickerMap(bals)
+	return ResultPegnetTickerRateMap(bals)
 }
 
 type ResultGetIssuance struct {
-	SyncStatus ResultGetSyncStatus   `json:"syncstatus"`
-	Issuance   ResultPegnetTickerMap `json:"issuance"`
+	SyncStatus ResultGetSyncStatus       `json:"syncstatus"`
+	Issuance   ResultPegnetTickerRateMap `json:"issuance"`
 }
 
 func (s *APIServer) getPegnetIssuance(data json.RawMessage) interface{} {
@@ -241,7 +243,50 @@ func (s *APIServer) getPegnetRates(data json.RawMessage) interface{} {
 	}
 
 	// The balance results actually works for rates too
-	return ResultPegnetTickerMap(rates)
+	return ResultPegnetTickerRateMap(rates)
+}
+
+type ResultPegnetTickerQuoteMap map[fat2.PTicker]pegnet.Quote
+
+func (r ResultPegnetTickerQuoteMap) MarshalJSON() ([]byte, error) {
+	strMap := make(map[string]pegnet.Quote, len(r))
+	for ticker, balance := range r {
+		strMap[ticker.String()] = balance
+	}
+	return json.Marshal(strMap)
+}
+
+func (r *ResultPegnetTickerQuoteMap) UnmarshalJSON(data []byte) error {
+	var strMap map[string]pegnet.Quote
+	if err := json.Unmarshal(data, &strMap); err != nil {
+		return err
+	}
+	*r = make(map[fat2.PTicker]pegnet.Quote, len(strMap))
+	for str, q := range strMap {
+		ticker := new(fat2.PTicker)
+		if err := ticker.UnmarshalJSON([]byte(str)); err != nil {
+			return err
+		}
+		(*r)[*ticker] = q
+	}
+	return nil
+}
+
+func (s *APIServer) getPegnetSpreads(data json.RawMessage) interface{} {
+	params := ParamsGetPegnetRates{}
+	if _, _, err := validate(data, &params); err != nil {
+		return err
+	}
+	quotes, err := s.Node.Pegnet.SelectRatesWithAvgs(context.Background(), *params.Height)
+	if err == sql.ErrNoRows || quotes == nil || len(quotes) == 0 {
+		return ErrorNotFound
+	}
+	if err != nil {
+		return jsonrpc2.InternalError
+	}
+
+	// The balance results actually works for rates too
+	return ResultPegnetTickerQuoteMap(quotes)
 }
 
 func (s *APIServer) sendTransaction(data json.RawMessage) interface{} {

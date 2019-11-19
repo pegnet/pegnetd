@@ -10,6 +10,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/pegnet/pegnet/modules/conversions"
+
 	"github.com/Factom-Asset-Tokens/factom"
 	"github.com/pegnet/pegnetd/config"
 	"github.com/pegnet/pegnetd/fat/fat2"
@@ -29,6 +31,8 @@ func init() {
 
 	get.AddCommand(getTX)
 	get.AddCommand(getRates)
+	getSpread.Flags().Bool("tol", true, "Use tolerances for spread calculation")
+	get.AddCommand(getSpread)
 	getTXs.Flags().Bool("burn", false, "Show burns")
 	getTXs.Flags().Bool("cvt", false, "Show converions")
 	getTXs.Flags().Bool("tran", false, "Show transfers")
@@ -299,7 +303,7 @@ var balances = &cobra.Command{
 	},
 }
 
-func queryBalances(humanAddress string) (srv.ResultPegnetTickerMap, error) {
+func queryBalances(humanAddress string) (srv.ResultPegnetTickerRateMap, error) {
 	cl := srv.NewClient()
 	cl.PegnetdServer = viper.GetString(config.Pegnetd)
 	addr, err := factom.NewFAAddress(humanAddress)
@@ -309,7 +313,7 @@ func queryBalances(humanAddress string) (srv.ResultPegnetTickerMap, error) {
 		os.Exit(1)
 	}
 
-	var res srv.ResultPegnetTickerMap
+	var res srv.ResultPegnetTickerRateMap
 	err = cl.Request("get-pegnet-balances", srv.ParamsGetPegnetBalances{&addr}, &res)
 	if err != nil {
 		// TODO: Better error
@@ -490,7 +494,7 @@ var getRates = &cobra.Command{
 
 		cl := srv.NewClient()
 		cl.PegnetdServer = viper.GetString(config.Pegnetd)
-		var res srv.ResultPegnetTickerMap
+		var res srv.ResultPegnetTickerRateMap
 		uH := uint32(height)
 		err = cl.Request("get-pegnet-rates", srv.ParamsGetPegnetRates{Height: &uH}, &res)
 		if err != nil {
@@ -509,6 +513,89 @@ var getRates = &cobra.Command{
 			panic(err)
 		}
 		fmt.Println(string(data))
+	},
+}
+
+var getSpread = &cobra.Command{
+	Use:              "spread <height> <src-asset> <optional dst-asset>",
+	Example:          "pegnetd get spread 219000 pFCT\npegnetd get spread 219000 pFCT pXBT",
+	Short:            "Fetch the spread amount and percent for a trading pair",
+	PersistentPreRun: always,
+	PreRun:           SoftReadConfig,
+	Args:             cobra.RangeArgs(2, 3),
+	Run: func(cmd *cobra.Command, args []string) {
+		height, err := strconv.Atoi(args[0])
+		if height <= 0 || err != nil {
+			cmd.PrintErrf("height must be a number greater than 0")
+			os.Exit(1)
+		}
+
+		cl := srv.NewClient()
+		cl.PegnetdServer = viper.GetString(config.Pegnetd)
+		var res srv.ResultPegnetTickerQuoteMap
+		uH := uint32(height)
+		err = cl.Request("get-pegnet-spreads", srv.ParamsGetPegnetRates{Height: &uH}, &res)
+		if err != nil {
+			fmt.Printf("Failed to make RPC request\nDetails:\n%v\n", err)
+			os.Exit(1)
+		}
+
+		src := fat2.StringToTicker(toP(args[1]))
+		dst := fat2.PTickerUSD
+		if len(args) == 3 {
+			dst = fat2.StringToTicker(toP(args[2]))
+		}
+
+		if src == fat2.PTickerInvalid || dst == fat2.PTickerInvalid {
+			fmt.Printf("Arguments must be valid tickers\n")
+			os.Exit(1)
+		}
+
+		mkC, _ := conversions.Convert(1e8, res[src].MarketRate, res[dst].MarketRate)
+		pgC, _ := conversions.Convert(1e8, res[src].MinTolerance(), res[dst].MaxTolerance())
+		pair := res[src].MakeBase(res[dst])
+
+		fmt.Printf("Trading pair %s/%s\n", src, dst)
+		format := "%20s: %s\n"
+
+		type Spreadable interface {
+			Spread() int64
+			SpreadWithTolerance() int64
+		}
+
+		spreadString := func(s Spreadable) []interface{} {
+			if tol, _ := cmd.Flags().GetBool("tol"); tol {
+				return []interface{}{"Tolerance Spread", FactoshiToFactoid(s.SpreadWithTolerance())}
+			}
+			return []interface{}{"Raw Spread", FactoshiToFactoid(s.Spread())}
+		}
+
+		spreadPString := func(s Spreadable, base int64) []interface{} {
+			if tol, _ := cmd.Flags().GetBool("tol"); tol {
+				return []interface{}{"Tolerance Spread %", fmt.Sprintf("%.4f", 100.0*float64(s.SpreadWithTolerance())/float64(base))}
+			}
+			return []interface{}{"Raw Spread %", fmt.Sprintf("%.4f", 100.0*float64(s.Spread())/float64(base))}
+		}
+
+		fmt.Printf(format, "Market Rate", FactoshiToFactoid(mkC))
+		fmt.Printf(format, "Pegnet Rate", FactoshiToFactoid(pgC))
+		fmt.Printf(format, spreadString(pair)...)
+		fmt.Printf(format, spreadPString(pair, mkC)...)
+
+		fmt.Println("Raw prices")
+		fmt.Printf("%4s:\n", src)
+		fmt.Printf("\t"+format, "Market Price", FactoshiToFactoid(int64(res[src].MarketRate)))
+		fmt.Printf("\t"+format, "Moving Avg Price", FactoshiToFactoid(int64(res[src].MovingAverage)))
+		fmt.Printf("\t"+format, spreadString(res[src])...)
+		fmt.Printf("\t"+format, spreadPString(res[src], int64(res[src].MarketRate))...)
+
+		if dst != fat2.PTickerUSD {
+			fmt.Printf("%4s:\n", src)
+			fmt.Printf("\t"+format, "Market Price", FactoshiToFactoid(int64(res[dst].MarketRate)))
+			fmt.Printf("\t"+format, "Moving Avg Price", FactoshiToFactoid(int64(res[dst].MovingAverage)))
+			fmt.Printf("\t"+format, spreadString(res[dst])...)
+			fmt.Printf("\t"+format, spreadPString(res[dst], int64(res[dst].MarketRate))...)
+		}
 	},
 }
 
