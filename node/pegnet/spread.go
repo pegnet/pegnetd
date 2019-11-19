@@ -101,12 +101,35 @@ type QuotePair struct {
 	QuoteCurrency Quote `json:"quotecurrency"`
 }
 
+func (q QuotePair) SellRate() int64 {
+	rate, err := conversions.Convert(1e8, q.BaseCurrency.MinTolerance(), q.QuoteCurrency.MaxTolerance())
+	if err != nil {
+		return -1
+	}
+	return rate
+}
+
+func (q QuotePair) BuyRate() int64 {
+	rate, err := conversions.Convert(1e8, q.BaseCurrency.MaxTolerance(), q.QuoteCurrency.MinTolerance())
+	if err != nil {
+		return -1
+	}
+	return rate
+}
+
 func (q QuotePair) Spread() int64 {
 	return spread(q.BaseCurrency.MarketRate, q.QuoteCurrency.MarketRate, q.BaseCurrency.Min(), q.QuoteCurrency.Max())
 }
 
 func (q QuotePair) SpreadWithTolerance() int64 {
 	return spread(q.BaseCurrency.MarketRate, q.QuoteCurrency.MarketRate, q.BaseCurrency.MinTolerance(), q.QuoteCurrency.MaxTolerance())
+}
+
+func (q QuotePair) Flip() QuotePair {
+	return QuotePair{
+		BaseCurrency:  q.QuoteCurrency,
+		QuoteCurrency: q.BaseCurrency,
+	}
 }
 
 func spread(srcRate, dstRate, sprdSrcRate, sprdDstRate uint64) int64 {

@@ -553,48 +553,57 @@ var getSpread = &cobra.Command{
 
 		mkC, _ := conversions.Convert(1e8, res[src].MarketRate, res[dst].MarketRate)
 		pgC, _ := conversions.Convert(1e8, res[src].MinTolerance(), res[dst].MaxTolerance())
+		var _ = pgC
 		pair := res[src].MakeBase(res[dst])
 
 		fmt.Printf("Trading pair %s/%s\n", src, dst)
 		format := "%20s: %s\n"
 
-		type Spreadable interface {
-			Spread() int64
-			SpreadWithTolerance() int64
-		}
-
-		spreadString := func(s Spreadable) []interface{} {
+		spreadString := func(s pegnet.QuotePair) []interface{} {
+			if s.Spread() == 0 {
+				s = s.Flip()
+			}
 			if tol, _ := cmd.Flags().GetBool("tol"); tol {
 				return []interface{}{"Tolerance Spread", FactoshiToFactoid(s.SpreadWithTolerance())}
 			}
 			return []interface{}{"Raw Spread", FactoshiToFactoid(s.Spread())}
 		}
 
-		spreadPString := func(s Spreadable, base int64) []interface{} {
+		spreadPString := func(s pegnet.QuotePair, base int64) []interface{} {
+			if s.Spread() == 0 {
+				s = s.Flip()
+			}
 			if tol, _ := cmd.Flags().GetBool("tol"); tol {
 				return []interface{}{"Tolerance Spread %", fmt.Sprintf("%.4f", 100.0*float64(s.SpreadWithTolerance())/float64(base))}
 			}
 			return []interface{}{"Raw Spread %", fmt.Sprintf("%.4f", 100.0*float64(s.Spread())/float64(base))}
 		}
 
+		var _, _ = spreadPString, spreadString
+
 		fmt.Printf(format, "Market Rate", FactoshiToFactoid(mkC))
-		fmt.Printf(format, "Pegnet Rate", FactoshiToFactoid(pgC))
-		fmt.Printf(format, spreadString(pair)...)
-		fmt.Printf(format, spreadPString(pair, mkC)...)
+		fmt.Printf(format, "Buy Price", FactoshiToFactoid(pair.BuyRate()))
+		fmt.Printf(format, "Sell Price", FactoshiToFactoid(pair.SellRate()))
+		//
+		//fmt.Printf(format, spreadString(pair)...)
+		//fmt.Printf(format, spreadPString(pair, mkC)...)
 
-		fmt.Println("Raw prices")
-		fmt.Printf("%4s:\n", src)
-		fmt.Printf("\t"+format, "Market Price", FactoshiToFactoid(int64(res[src].MarketRate)))
-		fmt.Printf("\t"+format, "Moving Avg Price", FactoshiToFactoid(int64(res[src].MovingAverage)))
-		fmt.Printf("\t"+format, spreadString(res[src])...)
-		fmt.Printf("\t"+format, spreadPString(res[src], int64(res[src].MarketRate))...)
-
+		fmt.Println()
 		if dst != fat2.PTickerUSD {
-			fmt.Printf("%4s:\n", dst)
+			srcUsdPair := res[src].MakeBase(res[fat2.PTickerUSD])
+			fmt.Println("pUSD Prices")
+			fmt.Printf("%4s/pUSD:\n", src)
+			fmt.Printf("\t"+format, "Market Price", FactoshiToFactoid(int64(res[src].MarketRate)))
+			fmt.Printf("\t"+format, "Moving Avg Price", FactoshiToFactoid(int64(res[src].MovingAverage)))
+			fmt.Printf("\t"+format, "Buy Price", FactoshiToFactoid(srcUsdPair.BuyRate()))
+			fmt.Printf("\t"+format, "Sell Price", FactoshiToFactoid(srcUsdPair.SellRate()))
+
+			dstUsdPair := res[dst].MakeBase(res[fat2.PTickerUSD])
+			fmt.Printf("%4s/pUSD:\n", dst)
 			fmt.Printf("\t"+format, "Market Price", FactoshiToFactoid(int64(res[dst].MarketRate)))
 			fmt.Printf("\t"+format, "Moving Avg Price", FactoshiToFactoid(int64(res[dst].MovingAverage)))
-			fmt.Printf("\t"+format, spreadString(res[dst])...)
-			fmt.Printf("\t"+format, spreadPString(res[dst], int64(res[dst].MarketRate))...)
+			fmt.Printf("\t"+format, "Buy Price", FactoshiToFactoid(dstUsdPair.BuyRate()))
+			fmt.Printf("\t"+format, "Sell Price", FactoshiToFactoid(dstUsdPair.SellRate()))
 		}
 	},
 }
