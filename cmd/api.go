@@ -590,7 +590,7 @@ var getSpread = &cobra.Command{
 		fmt.Printf("\t"+format, spreadPString(res[src], int64(res[src].MarketRate))...)
 
 		if dst != fat2.PTickerUSD {
-			fmt.Printf("%4s:\n", src)
+			fmt.Printf("%4s:\n", dst)
 			fmt.Printf("\t"+format, "Market Price", FactoshiToFactoid(int64(res[dst].MarketRate)))
 			fmt.Printf("\t"+format, "Moving Avg Price", FactoshiToFactoid(int64(res[dst].MovingAverage)))
 			fmt.Printf("\t"+format, spreadString(res[dst])...)
