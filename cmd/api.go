@@ -10,9 +10,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/pegnet/pegnet/modules/conversions"
-
 	"github.com/Factom-Asset-Tokens/factom"
+	"github.com/pegnet/pegnet/modules/conversions"
 	"github.com/pegnet/pegnetd/config"
 	"github.com/pegnet/pegnetd/fat/fat2"
 	"github.com/pegnet/pegnetd/node"
@@ -31,7 +30,6 @@ func init() {
 
 	get.AddCommand(getTX)
 	get.AddCommand(getRates)
-	getPrice.Flags().Bool("tol", true, "Use tolerances for spread calculation")
 	get.AddCommand(getPrice)
 	getTXs.Flags().Bool("burn", false, "Show burns")
 	getTXs.Flags().Bool("cvt", false, "Show converions")
