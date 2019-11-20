@@ -321,8 +321,12 @@ func (d *Pegnetd) ApplyTransactionBatchesInHolding(ctx context.Context, sqlTx *s
 			}
 
 			err = d.applyTransactionBatch(sqlTx, txBatch, rates, currentHeight)
-			if err != nil && err != pegnet.InsufficientBalanceErr {
-				return nil
+			if err != nil && err != pegnet.InsufficientBalanceErr && err != pegnet.PFCTOneWayError {
+				return err
+			} else if err == pegnet.InsufficientBalanceErr {
+				fmt.Println(d.Pegnet.SetTransactionHistoryExecuted(sqlTx, txBatch, -1))
+			} else if err == pegnet.PFCTOneWayError {
+				fmt.Println(d.Pegnet.SetTransactionHistoryExecuted(sqlTx, txBatch, -2))
 			}
 		}
 	}
@@ -372,10 +376,14 @@ func (d *Pegnetd) ApplyTransactionBlock(sqlTx *sql.Tx, eblock *factom.EBlock) er
 		}
 
 		// No conversions in the batch, it can be applied immediately
-		if err = d.applyTransactionBatch(sqlTx, txBatch, nil, eblock.Height); err != nil && err != pegnet.InsufficientBalanceErr {
+		if err = d.applyTransactionBatch(sqlTx, txBatch, nil, eblock.Height); err != nil &&
+			err != pegnet.InsufficientBalanceErr && // Allowed Exception
+			err != pegnet.PFCTOneWayError { // Allowed Exception
 			return err
 		} else if err == pegnet.InsufficientBalanceErr {
 			d.Pegnet.SetTransactionHistoryExecuted(sqlTx, txBatch, -1)
+		} else if err == pegnet.PFCTOneWayError {
+			d.Pegnet.SetTransactionHistoryExecuted(sqlTx, txBatch, -2)
 		}
 	}
 	return nil
@@ -411,6 +419,12 @@ func (d *Pegnetd) applyTransactionBatch(sqlTx *sql.Tx, txBatch *fat2.Transaction
 				// This error will not fail the block, skip the tx
 				return nil // 0 rates result in an invalid tx. So we drop it
 			}
+
+			// pXXX -> pFCT conversions are disabled at the activation height
+			if currentHeight >= OneWaypFCTConversions && tx.Conversion == fat2.PTickerFCT {
+				return pegnet.PFCTOneWayError
+			}
+
 			// TODO: For now any bogus amounts will be tossed. Someone can fake an overflow for example,
 			// 		and hold us up forever.
 			_, err := conversions.Convert(int64(tx.Input.Amount), rates[tx.Input.Type], rates[tx.Conversion])

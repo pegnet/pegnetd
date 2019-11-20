@@ -76,10 +76,9 @@ func always(cmd *cobra.Command, args []string) {
 		if act <= 0 {
 			act = 0
 		}
-		node.PegnetActivation = uint32(act)
-		node.GradingV2Activation = uint32(act)
-		node.TransactionConversionActivation = uint32(act)
-		node.PEGPricingActivation = uint32(act)
+
+		// Set all activations for testing
+		node.SetAllActivations(uint32(act))
 	}
 
 	// Setup config reading
