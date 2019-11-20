@@ -517,7 +517,7 @@ var getRates = &cobra.Command{
 var getPrice = &cobra.Command{
 	Use:              "price <height> <src-asset> <optional dst-asset>",
 	Example:          "pegnetd get price 219000 pFCT\npegnetd get price 219000 pFCT pXBT",
-	Short:            "Fetch the spread amount and percent for a trading pair",
+	Short:            "Fetch the buy/sell price of the trading pair.",
 	PersistentPreRun: always,
 	PreRun:           SoftReadConfig,
 	Args:             cobra.RangeArgs(2, 3),
@@ -549,32 +549,49 @@ var getPrice = &cobra.Command{
 			os.Exit(1)
 		}
 
+		pre := ""
+
+		if uint32(height) < node.SpreadActivation {
+			fmt.Println("*************************************")
+			fmt.Println("**This height uses the MARKET PRICE**")
+			fmt.Println("*************************************")
+			fmt.Printf("Heights after %d use the Buy/Sell price\n", node.SpreadActivation)
+			fmt.Println()
+			pre = "*"
+		}
+
 		mkC, _ := conversions.Convert(1e8, res[src].MarketRate, res[dst].MarketRate)
-		pgC, _ := conversions.Convert(1e8, res[src].MinTolerance(), res[dst].MaxTolerance())
-		var _ = pgC
-		pair := res[src].MakeBase(res[dst])
+		pair := res[src].MakeBase(res[dst]) // Pair is Src/Dst
 
 		fmt.Printf("Price of 1.0 %s:\n", src)
 		format := "%20s: %s\n"
 
-		fmt.Printf(format, "Market Rate", FactoshiToFactoid(mkC)+" "+dst.String())
-		fmt.Printf(format, "Buy Price", FactoshiToFactoid(pair.BuyRate())+" "+dst.String())
-		fmt.Printf(format, "Sell Price", FactoshiToFactoid(pair.SellRate())+" "+dst.String())
+		fmt.Printf(format, "Market Price", FactoshiToFactoid(mkC)+" "+dst.String())
+		fmt.Printf(format, pre+"Buy Price", FactoshiToFactoid(pair.BuyRate())+" "+dst.String())
+		fmt.Printf(format, pre+"Sell Price", FactoshiToFactoid(pair.SellRate())+" "+dst.String())
 
-		fmt.Println()
+		// If the dst is already pUSD, then the buy/sell price above is enough.
+		// If the dst is not pUSD, then showing the Src/pUSD and Dst/pUSD
+		// shows the spread on both sides of the pair.
 		if dst != fat2.PTickerUSD {
+			fmt.Println()
 			srcUsdPair := res[src].MakeBase(res[fat2.PTickerUSD])
 			fmt.Println("pUSD Prices")
 			fmt.Printf("%4s:\n", src)
 			fmt.Printf(format, "Market Price", FactoshiToFactoid(int64(res[src].MarketRate))+" pUSD")
-			fmt.Printf(format, "Buy Price", FactoshiToFactoid(srcUsdPair.BuyRate())+" pUSD")
-			fmt.Printf(format, "Sell Price", FactoshiToFactoid(srcUsdPair.SellRate())+" pUSD")
+			fmt.Printf(format, pre+"Buy Price", FactoshiToFactoid(srcUsdPair.BuyRate())+" pUSD")
+			fmt.Printf(format, pre+"Sell Price", FactoshiToFactoid(srcUsdPair.SellRate())+" pUSD")
 
 			dstUsdPair := res[dst].MakeBase(res[fat2.PTickerUSD])
 			fmt.Printf("%4s:\n", dst)
 			fmt.Printf(format, "Market Price", FactoshiToFactoid(int64(res[dst].MarketRate))+" pUSD")
-			fmt.Printf(format, "Buy Price", FactoshiToFactoid(dstUsdPair.BuyRate())+" pUSD")
-			fmt.Printf(format, "Sell Price", FactoshiToFactoid(dstUsdPair.SellRate())+" pUSD")
+			fmt.Printf(format, pre+"Buy Price", FactoshiToFactoid(dstUsdPair.BuyRate())+" pUSD")
+			fmt.Printf(format, pre+"Sell Price", FactoshiToFactoid(dstUsdPair.SellRate())+" pUSD")
+		}
+
+		if uint32(height) < node.SpreadActivation {
+			fmt.Println()
+			fmt.Println("*Buy/*Sell price are shown, but the market price is used for all conversions at this height.")
 		}
 	},
 }

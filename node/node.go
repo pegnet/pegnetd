@@ -20,7 +20,7 @@ var GradingV2Activation uint32 = 210330
 
 // SpreadActivation indicates when conversion spread is added to the conversion
 // formula.
-var SpreadActivation uint32 = 0 // TODO: Make an activation height
+var SpreadActivation uint32 = 9999999 // TODO: Make an activation height
 
 // TransactionConversionActivation indicates when tx/conversions go live on mainnet.
 // Target Activation Height is Oct 7, 2019 15 UTC
