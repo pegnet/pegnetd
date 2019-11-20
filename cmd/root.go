@@ -29,8 +29,11 @@ func init() {
 	rootCmd.Flags().Bool("wal", false, "Turn on WAL mode for sqlite")
 
 	// This is for testing purposes
-	rootCmd.PersistentFlags().Bool("testing", false, "If this flag is set, all v2 activations heights are set to 0.")
+	rootCmd.PersistentFlags().Bool("testing", false, "If this flag is set, all activations heights are set to 0.")
 	rootCmd.PersistentFlags().Int("act", -1, "Able to manually set the activation heights")
+
+	// TEMPORARY
+	rootCmd.PersistentFlags().Int("onf", 0, "If this flag is set, OneWayFactoid act height is set to this")
 }
 
 // Execute is cobra's entry point
@@ -79,6 +82,10 @@ func always(cmd *cobra.Command, args []string) {
 
 		// Set all activations for testing
 		node.SetAllActivations(uint32(act))
+	}
+
+	if onf, _ := cmd.Flags().GetInt("onf"); onf != 0 {
+		node.OneWaypFCTConversions = uint32(onf)
 	}
 
 	// Setup config reading
