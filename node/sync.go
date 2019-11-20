@@ -324,9 +324,9 @@ func (d *Pegnetd) ApplyTransactionBatchesInHolding(ctx context.Context, sqlTx *s
 			if err != nil && err != pegnet.InsufficientBalanceErr && err != pegnet.PFCTOneWayError {
 				return err
 			} else if err == pegnet.InsufficientBalanceErr {
-				fmt.Println(d.Pegnet.SetTransactionHistoryExecuted(sqlTx, txBatch, -1))
+				d.Pegnet.SetTransactionHistoryExecuted(sqlTx, txBatch, -1)
 			} else if err == pegnet.PFCTOneWayError {
-				fmt.Println(d.Pegnet.SetTransactionHistoryExecuted(sqlTx, txBatch, -2))
+				d.Pegnet.SetTransactionHistoryExecuted(sqlTx, txBatch, -2)
 			}
 		}
 	}

@@ -181,7 +181,7 @@ var conv = &cobra.Command{
 		// Let's check the pXXX -> pFCT first
 		status := getStatus()
 		if uint32(status.Current) >= node.OneWaypFCTConversions {
-			cmd.PrintErrln(fmt.Sprintf("pXXX -> pFCT conversions are not allowed since block height %d", node.OneWaypFCTConversions))
+			cmd.PrintErrln(fmt.Sprintf("pXXX -> pFCT conversions are not allowed since block height %d. If you need to aquire pFCT, you have to burn FCT -> pFCT", node.OneWaypFCTConversions))
 			os.Exit(1)
 		}
 
