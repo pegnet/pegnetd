@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/Factom-Asset-Tokens/factom"
+	"github.com/pegnet/pegnetd/fat/fat2"
 )
 
 // HistoryAction are the different types of actions inside the history
@@ -60,6 +61,7 @@ type HistoryQueryOptions struct {
 	Conversion bool
 	Coinbase   bool
 	FCTBurn    bool
+	Asset      string
 
 	// UseTxIndex is set if specifying a specific tx in the batch.
 	// Because 0 is a valid tx index, we want the uninitialized value
@@ -86,7 +88,7 @@ func historyQueryBuilder(field string, options HistoryQueryOptions) (string, str
 	var from, where, fromCount, whereCount string
 	switch field {
 	case "address":
-		if types != nil {
+		if types != nil || options.Asset != "" {
 			fromCount = "pn_history_lookup lookup, pn_history_transaction tx"
 			whereCount = "lookup.address = ? AND lookup.entry_hash = tx.entry_hash AND lookup.tx_index = tx.tx_index"
 		} else {
@@ -109,6 +111,15 @@ func historyQueryBuilder(field string, options HistoryQueryOptions) (string, str
 	// Only select the txindex. Only works with entry_hash field
 	if options.UseTxIndex && field == "entry_hash" {
 		where += fmt.Sprintf(" AND tx.tx_index = %d", options.TxIndex)
+	}
+
+	if options.Asset != "" {
+		tick := fat2.StringToTicker(options.Asset)
+		if tick.String() == "invalid token type" {
+			return "", "", fmt.Errorf("invalid asset specified")
+		}
+		where += fmt.Sprintf(" AND (tx.from_asset = '%s' OR tx.to_asset = '%s')", options.Asset, options.Asset)
+		whereCount += fmt.Sprintf(" AND (tx.from_asset = '%s' OR tx.to_asset = '%s')", options.Asset, options.Asset)
 	}
 
 	if types != nil {

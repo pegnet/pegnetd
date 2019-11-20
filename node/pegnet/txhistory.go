@@ -92,7 +92,7 @@ const insertLookupQuery = `INSERT INTO pn_history_lookup (entry_hash, tx_index, 
 
 func (p *Pegnet) historySelectHelper(field string, data interface{}, options HistoryQueryOptions) ([]HistoryTransaction, int, error) {
 	countQuery, dataQuery, err := historyQueryBuilder(field, options)
-	if err != nil { // developer error
+	if err != nil {
 		return nil, 0, err
 	}
 

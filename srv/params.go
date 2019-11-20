@@ -25,6 +25,8 @@ package srv
 import (
 	"time"
 
+	"github.com/pegnet/pegnetd/fat/fat2"
+
 	"github.com/pegnet/pegnetd/node/pegnet"
 
 	jrpc "github.com/AdamSLevy/jsonrpc2/v11"
@@ -123,11 +125,12 @@ type ParamsGetPegnetTransaction struct {
 	Conversion bool   `json:"conversion,omitempty"`
 	Coinbase   bool   `json:"coinbase,omitempty"`
 	Burn       bool   `json:"burn,omitempty"`
+	Asset      string `json:"asset,omitempty"`
 
 	// TxID is in the format #-[Entryhash], where '#' == tx index
-	TxID string `json:"txid, omitempty"`
+	TxID string `json:"txid,omitempty"`
 	// Used by the server to store the entryhash in the txid
-	txEntryHash string `json:"-"`
+	txEntryHash string
 }
 
 func (p ParamsGetPegnetTransaction) HasIncludePending() bool { return false }
@@ -154,6 +157,13 @@ func (p ParamsGetPegnetTransaction) IsValid() error {
 			return jrpc.InvalidParams(`need to specify either "entryhash" or "address", "txid", or "height"`)
 		}
 		return jrpc.InvalidParams(`cannot specify more than one of "entryhash", "address", "txid", or "height"`)
+	}
+
+	if p.Asset != "" {
+		ticker := fat2.StringToTicker(p.Asset)
+		if ticker == fat2.PTickerInvalid {
+			return jrpc.InvalidParams("invalid asset filter")
+		}
 	}
 
 	// error check input

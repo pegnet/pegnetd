@@ -113,6 +113,7 @@ func (s *APIServer) getTransactions(forceTxId bool) func(data json.RawMessage) i
 		options.Conversion = params.Conversion
 		options.Coinbase = params.Coinbase
 		options.FCTBurn = params.Burn
+		options.Asset = params.Asset
 
 		// Are we searching by txid?
 		if params.TxID != "" {
