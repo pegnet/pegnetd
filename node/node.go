@@ -26,14 +26,15 @@ var (
 	// Target Activation Height is Oct 7, 2019 15 UTC
 	TransactionConversionActivation uint32 = 213237
 
-	// Estimated to be Oct 14 2019, 15:00:00 UTC
 	// This is when PEG is priced by the market cap equation
+	// Estimated to be Oct 14 2019, 15:00:00 UTC
 	PEGPricingActivation uint32 = 214287
 
 	// OneWaypFCTConversions makes pFCT a 1 way conversion. This means pFCT->pXXX,
 	// but no asset can go into pFCT. AKA pXXX -/> pFCT.
 	// The only way to aquire pFCT is to burn FCT. The burn command will remain.
-	OneWaypFCTConversions uint32 = 0
+	// Estimated to be Nov 25, 2019 17:47:00 UTC
+	OneWaypFCTConversions uint32 = 220346
 )
 
 func SetAllActivations(act uint32) {
