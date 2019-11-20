@@ -17,6 +17,7 @@ var OPRChain = *factom.NewBytes32FromString("a642a8674f46696cc47fdb6b65f9c87b2a1
 var TransactionChain = *factom.NewBytes32FromString("cffce0f409ebba4ed236d49d89c70e4bd1f1367d86402a3363366683265a242d")
 var PegnetActivation uint32 = 206421
 var GradingV2Activation uint32 = 210330
+
 // SpreadActivation indicates when conversion spread is added to the conversion
 // formula.
 var SpreadActivation uint32 = 0 // TODO: Make an activation height

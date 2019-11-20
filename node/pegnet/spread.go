@@ -1,10 +1,6 @@
 package pegnet
 
-import (
-	"encoding/json"
-
-	"github.com/pegnet/pegnet/modules/conversions"
-)
+import "github.com/pegnet/pegnet/modules/conversions"
 
 type Quote struct {
 	MarketRate    uint64 `json:"marketrate"`
@@ -80,18 +76,6 @@ func min(a, b uint64) uint64 {
 		return a
 	}
 	return b
-}
-
-func (q Quote) MarshalJSON() ([]byte, error) {
-	return json.Marshal(struct {
-		MarketRate    uint64 `json:"marketrate"`
-		MovingAverage uint64 `json:"movingaverage"`
-		Spread        int64
-	}{
-		MarketRate:    q.MarketRate,
-		MovingAverage: q.MovingAverage,
-		Spread:        q.SpreadWithTolerance(),
-	})
 }
 
 type QuotePair struct {
