@@ -311,6 +311,7 @@ func (d *Pegnetd) ApplyTransactionBatchesInHolding(ctx context.Context, sqlTx *s
 		for _, txBatch := range txBatches {
 			// Re-validate transaction batch because timestamp might not be valid anymore
 			if err := txBatch.Validate(); err != nil {
+				d.Pegnet.SetTransactionHistoryExecuted(sqlTx, txBatch, -1)
 				continue
 			}
 			isReplay, err := d.Pegnet.IsReplayTransaction(sqlTx, txBatch.Hash)
@@ -323,6 +324,8 @@ func (d *Pegnetd) ApplyTransactionBatchesInHolding(ctx context.Context, sqlTx *s
 			err = d.applyTransactionBatch(sqlTx, txBatch, rates, currentHeight)
 			if err != nil && err != pegnet.InsufficientBalanceErr {
 				return nil
+			} else if err == pegnet.InsufficientBalanceErr {
+				d.Pegnet.SetTransactionHistoryExecuted(sqlTx, txBatch, -1)
 			}
 		}
 	}
