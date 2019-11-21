@@ -74,6 +74,7 @@ const createTableTxHistoryTx = `CREATE TABLE IF NOT EXISTS "pn_history_transacti
 	FOREIGN KEY("entry_hash") REFERENCES "pn_history_txbatch"
 );
 CREATE INDEX IF NOT EXISTS "idx_history_transaction_entry_hash" ON "pn_history_transaction"("entry_hash");
+CREATE INDEX IF NOT EXISTS "idx_history_transaction_tx_index" ON "pn_history_transaction"("tx_index");
 `
 
 const createTableTxHistoryLookup = `CREATE TABLE IF NOT EXISTS "pn_history_lookup" (
