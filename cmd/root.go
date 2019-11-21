@@ -31,7 +31,7 @@ func init() {
 	rootCmd.Flags().Bool("wal", false, "Turn on WAL mode for sqlite")
 
 	// This is for testing purposes
-	rootCmd.PersistentFlags().Bool("testing", false, "If this flag is set, all v2 activations heights are set to 0.")
+	rootCmd.PersistentFlags().Bool("testing", false, "If this flag is set, all activations heights are set to 0.")
 	rootCmd.PersistentFlags().Int("act", -1, "Able to manually set the activation heights")
 }
 
@@ -78,10 +78,9 @@ func always(cmd *cobra.Command, args []string) {
 		if act <= 0 {
 			act = 0
 		}
-		node.PegnetActivation = uint32(act)
-		node.GradingV2Activation = uint32(act)
-		node.TransactionConversionActivation = uint32(act)
-		node.PEGPricingActivation = uint32(act)
+
+		// Set all activations for testing
+		node.SetAllActivations(uint32(act))
 	}
 
 	// Setup config reading
