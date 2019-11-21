@@ -14,6 +14,8 @@ const (
 
 	Server       = "app.Server"
 	Wallet       = "app.Wallet"
+	WalletUser   = "app.WalletUser"
+	WalletPass   = "app.WalletPass"
 	Pegnetd      = "app.Pegnetd"
 	ECPrivateKey = "app.ECPrivateKey"
 )

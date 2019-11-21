@@ -13,17 +13,37 @@ import (
 	"github.com/spf13/viper"
 )
 
-var OPRChain = *factom.NewBytes32FromString("a642a8674f46696cc47fdb6b65f9c87b2a19c5ea8123b3d2f0c13b6f33a9d5ef")
-var TransactionChain = *factom.NewBytes32FromString("cffce0f409ebba4ed236d49d89c70e4bd1f1367d86402a3363366683265a242d")
-var PegnetActivation uint32 = 206421
-var GradingV2Activation uint32 = 210330
+var (
+	OPRChain         = *factom.NewBytes32FromString("a642a8674f46696cc47fdb6b65f9c87b2a19c5ea8123b3d2f0c13b6f33a9d5ef")
+	TransactionChain = *factom.NewBytes32FromString("cffce0f409ebba4ed236d49d89c70e4bd1f1367d86402a3363366683265a242d")
 
-// TransactionConversionActivation indicates when tx/conversions go live on mainnet.
-// Target Activation Height is Oct 7, 2019 15 UTC
-var TransactionConversionActivation uint32 = 213237
+	// Acivation Heights
 
-// Estimated to be Oct 14 2019, 15:00:00 UTC
-var PEGPricingActivation uint32 = 214287
+	PegnetActivation    uint32 = 206421
+	GradingV2Activation uint32 = 210330
+
+	// TransactionConversionActivation indicates when tx/conversions go live on mainnet.
+	// Target Activation Height is Oct 7, 2019 15 UTC
+	TransactionConversionActivation uint32 = 213237
+
+	// This is when PEG is priced by the market cap equation
+	// Estimated to be Oct 14 2019, 15:00:00 UTC
+	PEGPricingActivation uint32 = 214287
+
+	// OneWaypFCTConversions makes pFCT a 1 way conversion. This means pFCT->pXXX,
+	// but no asset can go into pFCT. AKA pXXX -/> pFCT.
+	// The only way to aquire pFCT is to burn FCT. The burn command will remain.
+	// Estimated to be Nov 25, 2019 17:47:00 UTC
+	OneWaypFCTConversions uint32 = 220346
+)
+
+func SetAllActivations(act uint32) {
+	PegnetActivation = act
+	GradingV2Activation = act
+	TransactionConversionActivation = act
+	PEGPricingActivation = act
+	OneWaypFCTConversions = act
+}
 
 type Pegnetd struct {
 	FactomClient *factom.Client
@@ -64,6 +84,11 @@ func FactomClientFromConfig(conf *viper.Viper) *factom.Client {
 	cl := factom.NewClient()
 	cl.FactomdServer = conf.GetString(config.Server)
 	cl.WalletdServer = conf.GetString(config.Wallet)
+	if config.WalletUser != "" {
+		cl.Walletd.BasicAuth = true
+		cl.Walletd.User = conf.GetString(config.WalletUser)
+		cl.Walletd.Password = conf.GetString(config.WalletPass)
+	}
 
 	return cl
 }

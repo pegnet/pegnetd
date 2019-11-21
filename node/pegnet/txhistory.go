@@ -74,6 +74,7 @@ const createTableTxHistoryTx = `CREATE TABLE IF NOT EXISTS "pn_history_transacti
 	FOREIGN KEY("entry_hash") REFERENCES "pn_history_txbatch"
 );
 CREATE INDEX IF NOT EXISTS "idx_history_transaction_entry_hash" ON "pn_history_transaction"("entry_hash");
+CREATE INDEX IF NOT EXISTS "idx_history_transaction_tx_index" ON "pn_history_transaction"("tx_index");
 `
 
 const createTableTxHistoryLookup = `CREATE TABLE IF NOT EXISTS "pn_history_lookup" (
@@ -92,7 +93,7 @@ const insertLookupQuery = `INSERT INTO pn_history_lookup (entry_hash, tx_index, 
 
 func (p *Pegnet) historySelectHelper(field string, data interface{}, options HistoryQueryOptions) ([]HistoryTransaction, int, error) {
 	countQuery, dataQuery, err := historyQueryBuilder(field, options)
-	if err != nil { // developer error
+	if err != nil {
 		return nil, 0, err
 	}
 

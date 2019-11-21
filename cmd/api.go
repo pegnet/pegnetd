@@ -33,6 +33,8 @@ func init() {
 	getTXs.Flags().Bool("cvt", false, "Show converions")
 	getTXs.Flags().Bool("tran", false, "Show transfers")
 	getTXs.Flags().Bool("coin", false, "Show coinbases")
+	getTXs.Flags().String("asset", "", "Filter by specific asset")
+	getTXs.Flags().Int("offset", 0, "Specify an offset for pagination")
 
 	get.AddCommand(getTXs)
 	rootCmd.AddCommand(get)
@@ -177,6 +179,13 @@ var conv = &cobra.Command{
 		var err error
 		cl := node.FactomClientFromConfig(viper.GetViper())
 		payment, source, srcAsset, amt, destAsset := args[0], args[1], args[2], args[3], args[4]
+
+		// Let's check the pXXX -> pFCT first
+		status := getStatus()
+		if (destAsset == "pFCT" || destAsset == "FCT") && uint32(status.Current) >= node.OneWaypFCTConversions {
+			cmd.PrintErrln(fmt.Sprintf("pXXX -> pFCT conversions are not allowed since block height %d. If you need to aquire pFCT, you have to burn FCT -> pFCT", node.OneWaypFCTConversions))
+			os.Exit(1)
+		}
 
 		// Build the transaction from the args
 		var trans fat2.Transaction
@@ -362,21 +371,25 @@ var status = &cobra.Command{
 	PersistentPreRun: always,
 	PreRun:           SoftReadConfig,
 	Run: func(cmd *cobra.Command, args []string) {
-		cl := srv.NewClient()
-		cl.PegnetdServer = viper.GetString(config.Pegnetd)
-		var res srv.ResultGetSyncStatus
-		err := cl.Request("get-sync-status", nil, &res)
-		if err != nil {
-			fmt.Printf("Failed to make RPC request\nDetails:\n%v\n", err)
-			os.Exit(1)
-		}
-
+		res := getStatus()
 		data, err := json.Marshal(res)
 		if err != nil {
 			panic(err)
 		}
 		fmt.Println(string(data))
 	},
+}
+
+func getStatus() srv.ResultGetSyncStatus {
+	cl := srv.NewClient()
+	cl.PegnetdServer = viper.GetString(config.Pegnetd)
+	var res srv.ResultGetSyncStatus
+	err := cl.Request("get-sync-status", nil, &res)
+	if err != nil {
+		fmt.Printf("Failed to make RPC request\nDetails:\n%v\n", err)
+		os.Exit(1)
+	}
+	return res
 }
 
 var get = &cobra.Command{
@@ -418,7 +431,8 @@ var getTXs = &cobra.Command{
 	Short: "Fetch all transactions for an entryhash, FA address, or height",
 	Long: "Fetch all transactions for an entryhash, FA address, or height. " +
 		"If a --burn, --cvt, --tran, or --coin is provided, then only the flags" +
-		" provided will be displayed.",
+		" provided will be displayed. If you specify --asset=pAsset, only transactions" +
+		" involving that asset will be returned.",
 	Example:          "pegnetd txs 07cebdd5d3f5216f36f792d71f030af07ddaa99147929d9af477833ee4c586a5",
 	PersistentPreRun: always,
 	PreRun:           SoftReadConfig,
@@ -457,6 +471,8 @@ var getTXs = &cobra.Command{
 		params.Burn, _ = cmd.Flags().GetBool("burn")
 		params.Transfer, _ = cmd.Flags().GetBool("tran")
 		params.Coinbase, _ = cmd.Flags().GetBool("coin")
+		params.Asset, _ = cmd.Flags().GetString("asset")
+		params.Offset, _ = cmd.Flags().GetInt("offset")
 
 		cl := srv.NewClient()
 		cl.PegnetdServer = viper.GetString(config.Pegnetd)

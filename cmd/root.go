@@ -21,6 +21,8 @@ func init() {
 	rootCmd.PersistentFlags().String("log", "info", "Change the logging level. Can choose from 'trace', 'debug', 'info', 'warn', 'error', or 'fatal'")
 	rootCmd.PersistentFlags().StringP("server", "s", "http://localhost:8088/v2", "The url to the factomd endpoint without a trailing slash")
 	rootCmd.PersistentFlags().StringP("wallet", "w", "http://localhost:8089/v2", "The url to the factomd-wallet endpoint without a trailing slash")
+	rootCmd.PersistentFlags().String("walletuser", "", "The username for Wallet RPC")
+	rootCmd.PersistentFlags().String("walletpassword", "", "The password for Wallet RPC")
 	rootCmd.PersistentFlags().StringP("pegnetd", "p", "http://localhost:8070", "The url to the pegnetd endpoint without a trailing slash")
 	rootCmd.PersistentFlags().String("api", "8070", "Change the api listening port for the api")
 	rootCmd.PersistentFlags().String("config", "", "Optional file location of the config file")
@@ -29,7 +31,7 @@ func init() {
 	rootCmd.Flags().Bool("wal", false, "Turn on WAL mode for sqlite")
 
 	// This is for testing purposes
-	rootCmd.PersistentFlags().Bool("testing", false, "If this flag is set, all v2 activations heights are set to 0.")
+	rootCmd.PersistentFlags().Bool("testing", false, "If this flag is set, all activations heights are set to 0.")
 	rootCmd.PersistentFlags().Int("act", -1, "Able to manually set the activation heights")
 }
 
@@ -76,10 +78,9 @@ func always(cmd *cobra.Command, args []string) {
 		if act <= 0 {
 			act = 0
 		}
-		node.PegnetActivation = uint32(act)
-		node.GradingV2Activation = uint32(act)
-		node.TransactionConversionActivation = uint32(act)
-		node.PEGPricingActivation = uint32(act)
+
+		// Set all activations for testing
+		node.SetAllActivations(uint32(act))
 	}
 
 	// Setup config reading
@@ -100,6 +101,8 @@ func always(cmd *cobra.Command, args []string) {
 	_ = viper.BindPFlag(config.LoggingLevel, cmd.Flags().Lookup("log"))
 	_ = viper.BindPFlag(config.Server, cmd.Flags().Lookup("server"))
 	_ = viper.BindPFlag(config.Wallet, cmd.Flags().Lookup("wallet"))
+	_ = viper.BindPFlag(config.WalletUser, cmd.Flags().Lookup("walletuser"))
+	_ = viper.BindPFlag(config.WalletPass, cmd.Flags().Lookup("walletpassword"))
 	_ = viper.BindPFlag(config.Pegnetd, cmd.Flags().Lookup("pegnetd"))
 	_ = viper.BindPFlag(config.APIListen, cmd.Flags().Lookup("api"))
 	_ = viper.BindPFlag(config.SQLDBWalMode, cmd.Flags().Lookup("wal"))
