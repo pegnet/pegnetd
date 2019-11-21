@@ -378,13 +378,10 @@ func (d *Pegnetd) ApplyTransactionBlock(sqlTx *sql.Tx, eblock *factom.EBlock) er
 
 		// No conversions in the batch, it can be applied immediately
 		if err = d.applyTransactionBatch(sqlTx, txBatch, nil, eblock.Height); err != nil &&
-			err != pegnet.InsufficientBalanceErr && // Allowed Exception
-			err != pegnet.PFCTOneWayError { // Allowed Exception
+			err != pegnet.InsufficientBalanceErr { // Allowed Exception
 			return err
 		} else if err == pegnet.InsufficientBalanceErr {
 			d.Pegnet.SetTransactionHistoryExecuted(sqlTx, txBatch, -1)
-		} else if err == pegnet.PFCTOneWayError {
-			d.Pegnet.SetTransactionHistoryExecuted(sqlTx, txBatch, -3)
 		}
 	}
 	return nil
