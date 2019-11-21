@@ -5,8 +5,8 @@ import (
 	"fmt"
 
 	"github.com/Factom-Asset-Tokens/factom"
-	"github.com/Factom-Asset-Tokens/fatd/fat103"
-	"github.com/pegnet/pegnetd/fat/internal/jsonlen"
+	"github.com/Factom-Asset-Tokens/factom/fat103"
+	"github.com/Factom-Asset-Tokens/factom/jsonlen"
 )
 
 // TransactionBatch represents a fat2 entry, which can be a list of one or more
@@ -156,6 +156,7 @@ func (t TransactionBatch) ValidExtIDs() error {
 	if err := fat103.Validate(t.Entry, uniqueInputs); err != nil {
 		return err
 	}
+	// TODO: Verify this check is still enforced above
 	//// Create a map of all RCDs that are present in the ExtIDs
 	//includedRCDHashes := make(map[factom.FAAddress]struct{})
 	//extIDs := t.ExtIDs[1:]
