@@ -42,7 +42,7 @@ func signAndSend(tx *fat2.Transaction, cl *factom.Client, payment string) (err e
 		return fmt.Errorf("failed to get ec balance: %s\n", err.Error()), nil, nil
 	}
 
-	if cost, err := entry.Cost(); err != nil || uint64(cost) > bal {
+	if cost, err := txBatch.Entry.Cost(); err != nil || uint64(cost) > bal {
 		return fmt.Errorf("not enough ec balance for the transaction"), nil, nil
 	}
 
@@ -51,7 +51,7 @@ func signAndSend(tx *fat2.Transaction, cl *factom.Client, payment string) (err e
 		return fmt.Errorf("failed to parse input: %s\n", err.Error()), nil, nil
 	}
 
-	txid, err := entry.ComposeCreate(nil, cl, es)
+	txid, err := txBatch.Entry.ComposeCreate(nil, cl, es)
 	if err != nil {
 		return fmt.Errorf("failed to submit entry: %s\n", err.Error()), nil, nil
 	}

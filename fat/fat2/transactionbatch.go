@@ -99,7 +99,9 @@ func (t TransactionBatch) Sign(signingSet ...factom.RCDSigner) (factom.Entry, er
 		return e, err
 	}
 	e.Content = content
-	return fat103.Sign(e, signingSet...), nil
+	signed := fat103.Sign(e, signingSet...)
+	t.Entry = signed
+	return t.Entry, nil
 }
 
 // Validate performs all validation checks and returns nil if it is a valid
