@@ -22,7 +22,7 @@
 
 package srv
 
-import jrpc "github.com/AdamSLevy/jsonrpc2/v11"
+import jrpc "github.com/AdamSLevy/jsonrpc2/v13"
 
 var (
 	ErrorTokenNotFound = jrpc.NewError(-32800, "Token Not Found",

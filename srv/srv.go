@@ -27,7 +27,7 @@ import (
 	"net/http"
 	"strings"
 
-	jrpc "github.com/AdamSLevy/jsonrpc2/v11"
+	jrpc "github.com/AdamSLevy/jsonrpc2/v13"
 	"github.com/pegnet/pegnetd/config"
 	"github.com/pegnet/pegnetd/node"
 	"github.com/rs/cors"
@@ -61,7 +61,7 @@ func NewAPIServer(conf *viper.Viper, n *node.Pegnetd) *APIServer {
 func (s *APIServer) Start(stop <-chan struct{}) (done <-chan struct{}) {
 	// Set up JSON RPC 2.0 handler with correct headers.
 	jrpc.DebugMethodFunc = true
-	jrpcHandler := jrpc.HTTPRequestHandler(s.jrpcMethods())
+	jrpcHandler := jrpc.HTTPRequestHandler(s.jrpcMethods(), nil)
 
 	var handler http.Handler = http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
