@@ -29,8 +29,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/AdamSLevy/jsonrpc2"
-	jrpc "github.com/AdamSLevy/jsonrpc2/v11"
+	jrpc "github.com/AdamSLevy/jsonrpc2/v13"
 	"github.com/Factom-Asset-Tokens/factom"
 	"github.com/pegnet/pegnetd/config"
 	"github.com/pegnet/pegnetd/fat/fat2"
@@ -59,7 +58,7 @@ type ResultGetTransactionStatus struct {
 	Executed uint32 `json:"executed"`
 }
 
-func (s *APIServer) getTransactionStatus(data json.RawMessage) interface{} {
+func (s *APIServer) getTransactionStatus(_ context.Context, data json.RawMessage) interface{} {
 	params := ParamsGetPegnetTransactionStatus{}
 	_, _, err := validate(data, &params)
 	if err != nil {
@@ -68,7 +67,7 @@ func (s *APIServer) getTransactionStatus(data json.RawMessage) interface{} {
 
 	height, executed, err := s.Node.Pegnet.SelectTransactionHistoryStatus(params.Hash)
 	if err != nil {
-		return jrpc.InvalidParams(err.Error())
+		return jrpc.ErrorInvalidParams(err)
 	}
 
 	if height == 0 {
@@ -93,8 +92,8 @@ type ResultGetTransactions struct {
 	NextOffset int         `json:"nextoffset"`
 }
 
-func (s *APIServer) getTransactions(forceTxId bool) func(data json.RawMessage) interface{} {
-	return func(data json.RawMessage) interface{} {
+func (s *APIServer) getTransactions(forceTxId bool) func(_ context.Context, data json.RawMessage) interface{} {
+	return func(_ context.Context, data json.RawMessage) interface{} {
 		params := ParamsGetPegnetTransaction{}
 		_, _, err := validate(data, &params)
 		if err != nil {
@@ -102,7 +101,7 @@ func (s *APIServer) getTransactions(forceTxId bool) func(data json.RawMessage) i
 		}
 
 		if forceTxId && params.TxID == "" {
-			return jrpc.InvalidParams(fmt.Errorf("expect txid param to be populated"))
+			return jrpc.ErrorInvalidParams(fmt.Errorf("expect txid param to be populated"))
 		}
 
 		// using a separate options struct due to golang's circular import restrictions
@@ -119,7 +118,7 @@ func (s *APIServer) getTransactions(forceTxId bool) func(data json.RawMessage) i
 		if params.TxID != "" {
 			idx, entryhash, err := pegnet.SplitTxID(params.TxID)
 			if err != nil {
-				return jrpc.InvalidParams(err.Error())
+				return jrpc.ErrorInvalidParams(err.Error())
 			}
 			options.TxIndex = idx
 			options.UseTxIndex = true
@@ -145,7 +144,7 @@ func (s *APIServer) getTransactions(forceTxId bool) func(data json.RawMessage) i
 		}
 
 		if err != nil {
-			return jrpc.InvalidParams(err.Error())
+			return jrpc.ErrorInvalidParams(err.Error())
 		}
 
 		if len(actions) == 0 {
@@ -192,7 +191,7 @@ func (r *ResultPegnetTickerMap) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-func (s *APIServer) getPegnetBalances(data json.RawMessage) interface{} {
+func (s *APIServer) getPegnetBalances(_ context.Context, data json.RawMessage) interface{} {
 	params := ParamsGetPegnetBalances{}
 	if _, _, err := validate(data, &params); err != nil {
 		return err
@@ -202,7 +201,7 @@ func (s *APIServer) getPegnetBalances(data json.RawMessage) interface{} {
 		return ErrorAddressNotFound
 	}
 	if err != nil {
-		return jsonrpc2.InternalError
+		panic(err) // This is an internal error
 	}
 	return ResultPegnetTickerMap(bals)
 }
@@ -212,23 +211,23 @@ type ResultGetIssuance struct {
 	Issuance   ResultPegnetTickerMap `json:"issuance"`
 }
 
-func (s *APIServer) getPegnetIssuance(data json.RawMessage) interface{} {
+func (s *APIServer) getPegnetIssuance(_ context.Context, data json.RawMessage) interface{} {
 	issuance, err := s.Node.Pegnet.SelectIssuances()
 	if err == sql.ErrNoRows {
 		return ErrorAddressNotFound
 	}
 	if err != nil {
-		return jsonrpc2.InternalError
+		panic(err) // This is an internal error
 	}
 
-	syncStatus := s.getSyncStatus(nil)
+	syncStatus := s.getSyncStatus(context.Background(), nil)
 	return ResultGetIssuance{
 		SyncStatus: syncStatus.(ResultGetSyncStatus),
 		Issuance:   issuance,
 	}
 }
 
-func (s *APIServer) getPegnetRates(data json.RawMessage) interface{} {
+func (s *APIServer) getPegnetRates(_ context.Context, data json.RawMessage) interface{} {
 	params := ParamsGetPegnetRates{}
 	if _, _, err := validate(data, &params); err != nil {
 		return err
@@ -238,14 +237,14 @@ func (s *APIServer) getPegnetRates(data json.RawMessage) interface{} {
 		return ErrorNotFound
 	}
 	if err != nil {
-		return jsonrpc2.InternalError
+		panic(err) // This is an internal error
 	}
 
 	// The balance results actually works for rates too
 	return ResultPegnetTickerMap(rates)
 }
 
-func (s *APIServer) sendTransaction(data json.RawMessage) interface{} {
+func (s *APIServer) sendTransaction(_ context.Context, data json.RawMessage) interface{} {
 	params := ParamsSendTransaction{}
 	_, _, err := validate(data, &params)
 	if err != nil {
@@ -256,7 +255,7 @@ func (s *APIServer) sendTransaction(data json.RawMessage) interface{} {
 	ecPrivateKeyString := s.Config.GetString(config.ECPrivateKey)
 	var ecPrivateKey factom.EsAddress
 	if err = ecPrivateKey.Set(ecPrivateKeyString); err != nil {
-		return jsonrpc2.InternalError
+		panic(err) // This is an internal error
 	}
 
 	entry := params.Entry()
@@ -326,7 +325,7 @@ type ResultGetSyncStatus struct {
 	Current int32  `json:"factomheight"`
 }
 
-func (s *APIServer) getSyncStatus(data json.RawMessage) interface{} {
+func (s *APIServer) getSyncStatus(_ context.Context, data json.RawMessage) interface{} {
 	heights := new(factom.Heights)
 	err := heights.Get(s.Node.FactomClient)
 	if err != nil {
@@ -340,7 +339,7 @@ func (s *APIServer) getSyncStatus(data json.RawMessage) interface{} {
 func validate(data json.RawMessage, params Params) (interface{}, func(), error) {
 	if params == nil {
 		if len(data) > 0 {
-			return nil, nil, jrpc.InvalidParams(`no "params" accepted`)
+			return nil, nil, jrpc.ErrorInvalidParams(`no "params" accepted`)
 		}
 		return nil, nil, nil
 	}
@@ -348,7 +347,7 @@ func validate(data json.RawMessage, params Params) (interface{}, func(), error) 
 		return nil, nil, params.IsValid()
 	}
 	if err := unmarshalStrict(data, params); err != nil {
-		return nil, nil, jrpc.InvalidParams(err.Error())
+		return nil, nil, jrpc.ErrorInvalidParams(err.Error())
 	}
 	if err := params.IsValid(); err != nil {
 		return nil, nil, err

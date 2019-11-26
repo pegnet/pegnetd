@@ -25,12 +25,10 @@ package srv
 import (
 	"time"
 
-	"github.com/pegnet/pegnetd/fat/fat2"
-
-	"github.com/pegnet/pegnetd/node/pegnet"
-
-	jrpc "github.com/AdamSLevy/jsonrpc2/v11"
+	jrpc "github.com/AdamSLevy/jsonrpc2/v13"
 	"github.com/Factom-Asset-Tokens/factom"
+	"github.com/pegnet/pegnetd/fat/fat2"
+	"github.com/pegnet/pegnetd/node/pegnet"
 )
 
 type Params interface {
@@ -49,7 +47,7 @@ func (p ParamsToken) IsValid() error {
 	if p.ChainID != nil {
 		return nil
 	}
-	return jrpc.InvalidParams(`required: "chainid"`)
+	return jrpc.ErrorInvalidParams(`required: "chainid"`)
 }
 
 func (p ParamsToken) HasIncludePending() bool { return false }
@@ -74,7 +72,7 @@ func (p ParamsGetTransaction) IsValid() error {
 		return err
 	}
 	if p.Hash == nil {
-		return jrpc.InvalidParams(`required: "entryhash"`)
+		return jrpc.ErrorInvalidParams(`required: "entryhash"`)
 	}
 	return nil
 }
@@ -87,7 +85,7 @@ func (ParamsGetPegnetRates) HasIncludePending() bool { return false }
 
 func (p ParamsGetPegnetRates) IsValid() error {
 	if p.Height == nil {
-		return jrpc.InvalidParams(`required: "height"`)
+		return jrpc.ErrorInvalidParams(`required: "height"`)
 	}
 	return nil
 }
@@ -102,7 +100,7 @@ type ParamsGetPegnetTransactionStatus struct {
 func (p ParamsGetPegnetTransactionStatus) HasIncludePending() bool { return false }
 func (p ParamsGetPegnetTransactionStatus) IsValid() error {
 	if p.Hash == nil {
-		return jrpc.InvalidParams(`required: "entryhash"`)
+		return jrpc.ErrorInvalidParams(`required: "entryhash"`)
 	}
 	return nil
 }
@@ -136,7 +134,7 @@ type ParamsGetPegnetTransaction struct {
 func (p ParamsGetPegnetTransaction) HasIncludePending() bool { return false }
 func (p ParamsGetPegnetTransaction) IsValid() error {
 	if p.Offset < 0 {
-		return jrpc.InvalidParams(`offset must be >= 0`)
+		return jrpc.ErrorInvalidParams(`offset must be >= 0`)
 	}
 	// check that only one is set
 	var count int
@@ -154,34 +152,34 @@ func (p ParamsGetPegnetTransaction) IsValid() error {
 	}
 	if count != 1 {
 		if count == 0 {
-			return jrpc.InvalidParams(`need to specify either "entryhash" or "address", "txid", or "height"`)
+			return jrpc.ErrorInvalidParams(`need to specify either "entryhash" or "address", "txid", or "height"`)
 		}
-		return jrpc.InvalidParams(`cannot specify more than one of "entryhash", "address", "txid", or "height"`)
+		return jrpc.ErrorInvalidParams(`cannot specify more than one of "entryhash", "address", "txid", or "height"`)
 	}
 
 	if p.Asset != "" {
 		ticker := fat2.StringToTicker(p.Asset)
 		if ticker == fat2.PTickerInvalid {
-			return jrpc.InvalidParams("invalid asset filter")
+			return jrpc.ErrorInvalidParams("invalid asset filter")
 		}
 	}
 
 	// error check input
 	if p.Address != "" {
 		if _, err := factom.NewFAAddress(p.Address); err != nil {
-			return jrpc.InvalidParams("address: " + err.Error())
+			return jrpc.ErrorInvalidParams("address: " + err.Error())
 		}
 	}
 	if p.Hash != "" {
 		hash := new(factom.Bytes32)
 		if err := hash.UnmarshalText([]byte(p.Hash)); err != nil {
-			return jrpc.InvalidParams("entryhash: " + err.Error())
+			return jrpc.ErrorInvalidParams("entryhash: " + err.Error())
 		}
 	}
 	if p.TxID != "" {
 		_, _, err := pegnet.SplitTxID(p.TxID)
 		if err != nil {
-			return jrpc.InvalidParams("txid: " + err.Error())
+			return jrpc.ErrorInvalidParams("txid: " + err.Error())
 		}
 	}
 
@@ -199,7 +197,7 @@ func (p ParamsGetPegnetBalances) HasIncludePending() bool { return false }
 
 func (p ParamsGetPegnetBalances) IsValid() error {
 	if p.Address == nil {
-		return jrpc.InvalidParams(`required: "address"`)
+		return jrpc.ErrorInvalidParams(`required: "address"`)
 	}
 	return nil
 }
@@ -219,11 +217,11 @@ type ParamsSendTransaction struct {
 func (p *ParamsSendTransaction) IsValid() error {
 	if p.Raw != nil {
 		if p.ExtIDs != nil || p.Content != nil || p.ParamsToken != (ParamsToken{}) {
-			return jrpc.InvalidParams(
+			return jrpc.ErrorInvalidParams(
 				`"raw cannot be used with "content" or "extids"`)
 		}
 		if err := p.entry.UnmarshalBinary(p.Raw); err != nil {
-			return jrpc.InvalidParams(err)
+			return jrpc.ErrorInvalidParams(err)
 		}
 		p.entry.Timestamp = time.Now()
 		p.ChainID = p.entry.ChainID
@@ -233,7 +231,7 @@ func (p *ParamsSendTransaction) IsValid() error {
 		return err
 	}
 	if len(p.Content) == 0 || len(p.ExtIDs) == 0 {
-		return jrpc.InvalidParams(`required: "raw" or "content" and "extids"`)
+		return jrpc.ErrorInvalidParams(`required: "raw" or "content" and "extids"`)
 	}
 	p.entry = factom.Entry{
 		ExtIDs:    p.ExtIDs,
@@ -242,7 +240,7 @@ func (p *ParamsSendTransaction) IsValid() error {
 		ChainID:   p.ChainID,
 	}
 	if _, err := p.entry.Cost(false); err != nil {
-		return jrpc.InvalidParams(err)
+		return jrpc.ErrorInvalidParams(err)
 	}
 
 	return nil
