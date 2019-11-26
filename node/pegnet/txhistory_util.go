@@ -90,13 +90,13 @@ func historyQueryBuilder(field string, options HistoryQueryOptions) (string, str
 	case "address":
 		if types != nil || options.Asset != "" {
 			fromCount = "pn_history_lookup lookup, pn_history_transaction tx"
-			whereCount = "lookup.address = ? AND lookup.entry_hash = tx.entry_hash AND lookup.tx_index = tx.tx_index"
+			whereCount = "hex(lookup.address) = ? AND lookup.entry_hash = tx.entry_hash AND lookup.tx_index = tx.tx_index"
 		} else {
 			fromCount = "pn_history_lookup"
-			whereCount = "address = ?"
+			whereCount = "hex(address) = ?"
 		}
 		from = "pn_history_lookup lookup, pn_history_txbatch batch, pn_history_transaction tx"
-		where = "lookup.address = ? AND lookup.entry_hash = tx.entry_hash AND lookup.tx_index = tx.tx_index AND batch.entry_hash = tx.entry_hash"
+		where = "hex(lookup.address) = ? AND lookup.entry_hash = tx.entry_hash AND lookup.tx_index = tx.tx_index AND batch.entry_hash = tx.entry_hash"
 	case "entry_hash":
 		fallthrough
 	case "height":

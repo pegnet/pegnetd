@@ -2,8 +2,10 @@ package pegnet
 
 import (
 	"database/sql"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/Factom-Asset-Tokens/factom"
@@ -97,6 +99,8 @@ func (p *Pegnet) historySelectHelper(field string, data interface{}, options His
 		return nil, 0, err
 	}
 
+	//fmt.Println(dataQuery, "\n\n", countQuery)
+
 	var count int
 	err = p.DB.QueryRow(countQuery, data).Scan(&count)
 	if err != nil {
@@ -130,7 +134,7 @@ func (p *Pegnet) SelectTransactionHistoryActionsByHash(hash *factom.Bytes32, opt
 // SelectTransactionHistoryActionsByAddress uses the lookup table to retrieve all transactions that have
 // the specified address in either inputs or outputs
 func (p *Pegnet) SelectTransactionHistoryActionsByAddress(addr *factom.FAAddress, options HistoryQueryOptions) ([]HistoryTransaction, int, error) {
-	return p.historySelectHelper("address", addr[:], options)
+	return p.historySelectHelper("address", strings.ToUpper(hex.EncodeToString(addr[:])), options)
 }
 
 // SelectTransactionHistoryActionsByTxID uses the lookup table to retrieve all transactions that have
