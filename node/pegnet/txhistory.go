@@ -78,7 +78,7 @@ CREATE INDEX IF NOT EXISTS "idx_history_transaction_tx_index" ON "pn_history_tra
 `
 
 const createTableTxHistoryLookup = `CREATE TABLE IF NOT EXISTS "pn_history_lookup" (
-	"entry_hash"	INTEGER NOT NULL,
+	"entry_hash"	BLOB NOT NULL,
 	"tx_index"		INTEGER NOT NULL,
 	"address"		BLOB NOT NULL,
 
