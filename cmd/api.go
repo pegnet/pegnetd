@@ -82,7 +82,7 @@ func assetRich(cl *srv.Client, asset string, count int) {
 	params.Asset = asset
 	params.Count = count
 
-	var res srv.ResultGetRichList
+	var res []srv.ResultGetRichList
 	err := cl.Request("get-rich-list", params, &res)
 	if err != nil {
 		fmt.Println(err)
@@ -93,7 +93,7 @@ func assetRich(cl *srv.Client, asset string, count int) {
 	tw := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 	fmt.Fprintf(tw, "Pos\tAddress\t%s\tpUSD\t\n", asset)
 	fmt.Fprintf(tw, "---\t-------\t%s\t----\t\n", strings.Repeat("-", len(asset)))
-	for i, e := range res.List {
+	for i, e := range res {
 		fmt.Fprintf(tw, "%d\t%s\t%s\t%s\t\n", i+1, e.Address, FactoshiToFactoid(int64(e.Amount)), FactoshiToFactoid(int64(e.Equiv)))
 	}
 	tw.Flush()

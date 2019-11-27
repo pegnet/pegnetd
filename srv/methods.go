@@ -127,10 +127,6 @@ func (s *APIServer) getGlobalRichList(data json.RawMessage) interface{} {
 }
 
 type ResultGetRichList struct {
-	Asset string      `json:"asset"`
-	List  []RichEntry `json:"list"`
-}
-type RichEntry struct {
 	Address string `json:"address"`
 	Amount  uint64 `json:"amount"`
 	Equiv   uint64 `json:"pusd"`
@@ -160,11 +156,9 @@ func (s *APIServer) getRichList(data json.RawMessage) interface{} {
 		return err
 	}
 
-	var res ResultGetRichList
-	res.Asset = ticker.String()
-
+	var res []ResultGetRichList
 	for _, r := range rich {
-		var entry RichEntry
+		var entry ResultGetRichList
 		entry.Address = r.Address.String()
 		entry.Amount = r.Balance
 		c, err := conversions.Convert(int64(r.Balance), rates[ticker], rates[fat2.PTickerUSD])
@@ -173,7 +167,7 @@ func (s *APIServer) getRichList(data json.RawMessage) interface{} {
 		}
 		entry.Equiv = uint64(c)
 
-		res.List = append(res.List, entry)
+		res = append(res, entry)
 	}
 
 	return res
