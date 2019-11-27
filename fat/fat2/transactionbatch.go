@@ -3,6 +3,7 @@ package fat2
 import (
 	"encoding/json"
 	"fmt"
+
 	"github.com/Factom-Asset-Tokens/factom"
 	"github.com/Factom-Asset-Tokens/fatd/fat"
 	"github.com/Factom-Asset-Tokens/fatd/fat/jsonlen"
@@ -151,6 +152,16 @@ func (t TransactionBatch) ValidExtIDs() error {
 func (t *TransactionBatch) HasConversions() bool {
 	for _, tx := range t.Transactions {
 		if tx.IsConversion() {
+			return true
+		}
+	}
+	return false
+}
+
+// HasPEGRequest returns if the tx batch has a conversion request into PEG
+func (t *TransactionBatch) HasPEGRequest() bool {
+	for _, tx := range t.Transactions {
+		if tx.IsPEGRequest() {
 			return true
 		}
 	}

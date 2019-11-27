@@ -35,6 +35,8 @@ var (
 	// The only way to aquire pFCT is to burn FCT. The burn command will remain.
 	// Estimated to be Nov 25, 2019 17:47:00 UTC
 	OneWaypFCTConversions uint32 = 220346
+
+	PegnetConversionLimitActivation uint32 = 0
 )
 
 func SetAllActivations(act uint32) {
