@@ -36,6 +36,9 @@ var (
 	// Estimated to be Nov 25, 2019 17:47:00 UTC
 	OneWaypFCTConversions uint32 = 220346
 
+	// Once this is activated, a maximum amount of PEG of 5,000 can be
+	// converted per block. At a future height, a dynamic bank should be used.
+	// TODO: Determine this
 	PegnetConversionLimitActivation uint32 = 0
 )
 
