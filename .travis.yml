@@ -1,18 +1,15 @@
 language: go
 
-# Use latest go version
 go:
   - 1.x
 os:
   - linux
   - osx
-  - windows
 
 before_deploy:
   - go get github.com/karalabe/xgo
   - docker build --tag xgo-builder xgo
   - xgo -image xgo-builder --targets=windows/amd64,darwin/amd64,linux/amd64 .
-  - ls
 
 deploy:
   provider: releases
