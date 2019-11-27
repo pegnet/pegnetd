@@ -8,7 +8,7 @@ require (
 	github.com/Factom-Asset-Tokens/factom v0.0.0-20190911201853-7b283996f02a
 	github.com/Factom-Asset-Tokens/fatd v0.6.1-0.20190927200133-81408234a2b5
 	github.com/mattn/go-sqlite3 v1.11.0
-	github.com/pegnet/pegnet v0.1.0-rc4.0.20191127004205-9f6c2c5cc806
+	github.com/pegnet/pegnet v0.1.0-rc4.0.20191127163936-79dd18125075
 	github.com/rs/cors v1.7.0
 	github.com/sirupsen/logrus v1.4.2
 	github.com/spf13/cobra v0.0.5

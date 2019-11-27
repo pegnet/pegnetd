@@ -600,23 +600,17 @@ func (d *Pegnetd) recordPegnetRequests(sqlTx *sql.Tx, txBatchs []*fat2.Transacti
 
 	// Now we have all the PEG amounts and requests in, time to do the payouts.
 	pegPayouts := limit.Payouts()
-	for txid, paidPeg := range pegPayouts {
+	for txid, pegYield := range pegPayouts {
 		tx := txData[txid].Batch.Transactions[txData[txid].TxIndex]
 
-		pegRemaining := txData[txid].PegAmountRequested - paidPeg // Refund amt
-		refundAmt, err := conversions.Convert(int64(pegRemaining), rates[tx.Conversion], rates[tx.Input.Type])
-		if err != nil {
-			// TODO: Idk how to ever recover from this. We will be stuck
-			// 		forever here.
-			return err
-		}
+		refundAmt := conversions.Refund(int64(tx.Input.Amount), int64(pegYield), rates[tx.Input.Type], rates[tx.Conversion])
 
-		if err := d.Pegnet.SetTransactionHistoryPEGConvertedRequestAmount(sqlTx, txData[txid].Batch, txData[txid].TxIndex, int64(paidPeg), refundAmt); err != nil {
+		if err := d.Pegnet.SetTransactionHistoryPEGConvertedRequestAmount(sqlTx, txData[txid].Batch, txData[txid].TxIndex, int64(pegYield), refundAmt); err != nil {
 			return err
 		}
 
 		// PEG addition
-		if _, err := d.Pegnet.AddToBalance(sqlTx, &tx.Input.Address, tx.Conversion, paidPeg); err != nil {
+		if _, err := d.Pegnet.AddToBalance(sqlTx, &tx.Input.Address, tx.Conversion, pegYield); err != nil {
 			return err
 		}
 
