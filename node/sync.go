@@ -605,6 +605,14 @@ func (d *Pegnetd) recordPegnetRequests(sqlTx *sql.Tx, txBatchs []*fat2.Transacti
 
 		refundAmt := conversions.Refund(int64(tx.Input.Amount), int64(pegYield), rates[tx.Input.Type], rates[tx.Conversion])
 
+		log.WithFields(log.Fields{
+			"batch-entryhash": txData[txid].Batch.Entry.Hash.String(),
+			"txid":            txid,
+			"txindex":         txData[txid].TxIndex,
+			"refund":          refundAmt,
+			"pegyield":        pegYield,
+		}).Tracef("refund set")
+
 		if err := d.Pegnet.SetTransactionHistoryPEGConvertedRequestAmount(sqlTx, txData[txid].Batch, txData[txid].TxIndex, int64(pegYield), refundAmt); err != nil {
 			return err
 		}
