@@ -527,7 +527,7 @@ func (d *Pegnetd) recordBatch(sqlTx *sql.Tx, txBatch *fat2.TransactionBatch, rat
 			if err != nil {
 				return err
 			}
-			return nil // PEG Outputs are handled elsewhere
+			continue // PEG Outputs are handled elsewhere
 		}
 
 		// Outputs
