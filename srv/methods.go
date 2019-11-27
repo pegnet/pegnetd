@@ -28,10 +28,12 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"sort"
 
 	"github.com/AdamSLevy/jsonrpc2"
 	jrpc "github.com/AdamSLevy/jsonrpc2/v11"
 	"github.com/Factom-Asset-Tokens/factom"
+	"github.com/pegnet/pegnet/modules/conversions"
 	"github.com/pegnet/pegnetd/config"
 	"github.com/pegnet/pegnetd/fat/fat2"
 	"github.com/pegnet/pegnetd/node"
@@ -40,6 +42,8 @@ import (
 
 func (s *APIServer) jrpcMethods() jrpc.MethodMap {
 	return jrpc.MethodMap{
+		"get-rich-list":          s.getRichList,
+		"get-global-rich-list":   s.getGlobalRichList,
 		"get-transactions":       s.getTransactions(false),
 		"get-transaction-status": s.getTransactionStatus,
 		"get-transaction":        s.getTransactions(true),
@@ -52,6 +56,127 @@ func (s *APIServer) jrpcMethods() jrpc.MethodMap {
 		"get-pegnet-rates": s.getPegnetRates,
 	}
 
+}
+
+type ResultGlobalRichList struct {
+	Address string `json:"address"`
+	Equiv   uint64 `json:"pusd"`
+}
+
+func (s *APIServer) getGlobalRichList(data json.RawMessage) interface{} {
+	params := ParamsGetGlobalRichList{}
+	_, _, err := validate(data, &params)
+	if err != nil {
+		return err
+	}
+
+	if params.Count == 0 {
+		params.Count = 100
+	}
+
+	height := s.Node.GetCurrentSync()
+	rates, err := s.Node.Pegnet.SelectRates(nil, height)
+	if err != nil {
+		return err
+	}
+
+	rich, err := s.Node.Pegnet.SelectAllBalances()
+	if err != nil {
+		return err
+	}
+
+	var res []ResultGlobalRichList
+	for _, r := range rich {
+		var usd uint64
+
+		for i := fat2.PTicker(1); i < fat2.PTickerMax; i++ {
+			if r.Balances[i] == 0 {
+				continue
+			}
+			c, err := conversions.Convert(int64(r.Balances[i]), rates[i], rates[fat2.PTickerUSD])
+			if err != nil {
+				return err
+			}
+
+			usd += uint64(c)
+		}
+
+		if usd == 0 {
+			continue
+		}
+
+		var entry ResultGlobalRichList
+		entry.Address = r.Address.String()
+		entry.Equiv = usd
+
+		res = append(res, entry)
+	}
+
+	sort.Slice(res, func(i, j int) bool {
+		return res[i].Equiv > res[j].Equiv
+	})
+
+	if len(res) > params.Count {
+		res = res[:params.Count]
+	}
+
+	if len(res) == 0 {
+		return []ResultGlobalRichList{}
+	}
+	return res
+}
+
+type ResultGetRichList struct {
+	Asset string      `json:"asset"`
+	List  []RichEntry `json:"list"`
+}
+type RichEntry struct {
+	Address string `json:"address"`
+	Amount  uint64 `json:"amount"`
+	Equiv   uint64 `json:"pusd"`
+}
+
+func (s *APIServer) getRichList(data json.RawMessage) interface{} {
+	params := ParamsGetRichList{}
+	_, _, err := validate(data, &params)
+	if err != nil {
+		return err
+	}
+
+	if params.Count == 0 {
+		params.Count = 100
+	}
+
+	height := s.Node.GetCurrentSync()
+	rates, err := s.Node.Pegnet.SelectRates(nil, height)
+	if err != nil {
+		return err
+	}
+
+	ticker := fat2.StringToTicker(params.Asset) // already validated
+
+	rich, err := s.Node.Pegnet.SelectRichList(ticker, params.Count)
+	if err != nil {
+		return err
+	}
+
+	var res ResultGetRichList
+	res.Asset = ticker.String()
+
+	for _, r := range rich {
+		var entry RichEntry
+		entry.Address = r.Address.String()
+		entry.Amount = r.Balance
+		c, err := conversions.Convert(int64(r.Balance), rates[ticker], rates[fat2.PTickerUSD])
+		if err != nil {
+			return err
+		}
+		entry.Equiv = uint64(c)
+
+		res.List = append(res.List, entry)
+	}
+
+	return res
 }
 
 type ResultGetTransactionStatus struct {
