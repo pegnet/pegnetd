@@ -5,9 +5,9 @@ import (
 	"math/rand"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-
+	"github.com/pegnet/pegnet/modules/conversions"
 	. "github.com/pegnet/pegnetd/node/pegnet"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestFormatTxID(t *testing.T) {
@@ -115,4 +115,49 @@ func TestVerifyTransactionHash(t *testing.T) {
 		} else {
 		}
 	}
+}
+
+func TestPEGSupplyConversions(t *testing.T) {
+	min := func(a, b int64) int64 {
+		if a < b {
+			return a
+		}
+		return b
+	}
+
+	// Currently the PEG supply limit yields are calculated as such:
+	// amt pXXX -> yielded PEG + refund pXXX
+	t.Run("test equivalency", func(t *testing.T) {
+		for i := 0; i < 1; i++ {
+			amtR := rand.Uint64() % (5 * 1e6 * 1e8) // 50K max
+			pegR := rand.Uint64() % (5 * 1e6 * 1e8) // 50K max
+
+			amt := rand.Uint64() % (1 * 1e6 * 1e8) // 1million max
+			maxYield, err := conversions.Convert(int64(amt), amtR, pegR)
+			if err != nil {
+				continue // Likely an overflow or rate is 0
+			}
+
+			// Most yield possibilities for a 5K bank
+			for yield := int64(1); yield <= min(int64(amt), 5000*1e8); yield = yield + (rand.Int63() % 1e8) {
+				refundPEG := maxYield - yield
+				refund, err := conversions.Convert(refundPEG, pegR, amtR)
+				if err != nil {
+					t.Error(err) // This would be bad news
+				}
+
+				yieldInAsset, err := conversions.Convert(yield, pegR, amtR)
+				if err != nil {
+					t.Error(err) // This would be bad news
+				}
+
+				if refund+yieldInAsset != int64(amt) {
+					t.Errorf("input = refund + (yield PEG -> pXXX) does not hold true\n"+
+						"Amt: %d, Refund: %d, Add: %d\n"+
+						"Difference: %d", amt, refund, yieldInAsset, int64(amt)-(refund+yieldInAsset))
+				}
+			}
+
+		}
+	})
 }
