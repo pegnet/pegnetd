@@ -186,6 +186,32 @@ func (p *Pegnet) SetTransactionHistoryConvertedAmount(tx *sql.Tx, txbatch *fat2.
 	return nil
 }
 
+// SetTransactionHistoryPEGConvertedRequestAmount updates a peg conversion request
+// with the actual amount of PEG received and the refund amount. The refund amount
+// will appear as an output.
+// This is done in the same SQL Transaction as updating its executed status
+func (p *Pegnet) SetTransactionHistoryPEGConvertedRequestAmount(tx *sql.Tx, txbatch *fat2.TransactionBatch, index int, pegAmount, refundAmount int64) error {
+	outputs := make([]HistoryTransactionOutput, 1)
+	outputs[0] = HistoryTransactionOutput{
+		Address: txbatch.Transactions[index].Input.Address,
+		Amount:  refundAmount,
+	}
+	out, err := json.Marshal(outputs)
+	if err != nil {
+		return err
+	}
+
+	stmt, err := tx.Prepare(`UPDATE "pn_history_transaction" SET to_amount = ?, outputs = ? WHERE entry_hash = ? AND tx_index = ?`)
+	if err != nil {
+		return err
+	}
+	_, err = stmt.Exec(pegAmount, out, txbatch.Entry.Hash[:], index)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 // InsertTransactionHistoryTxBatch inserts a transaction from the transaction chain into the history system
 func (p *Pegnet) InsertTransactionHistoryTxBatch(tx *sql.Tx, blockorder int, txbatch *fat2.TransactionBatch, height uint32) error {
 	stmt, err := tx.Prepare(`INSERT INTO "pn_history_txbatch"

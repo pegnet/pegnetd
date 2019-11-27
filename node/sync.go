@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/pegnet/pegnet/modules/transactionid"
 	"github.com/pegnet/pegnetd/node/pegnet"
-
 	"github.com/Factom-Asset-Tokens/factom"
 	"github.com/pegnet/pegnet/modules/conversions"
 	"github.com/pegnet/pegnet/modules/grader"
@@ -308,7 +308,14 @@ func (d *Pegnetd) ApplyTransactionBatchesInHolding(ctx context.Context, sqlTx *s
 		if err != nil {
 			return err
 		}
-		for _, txBatch := range txBatches {
+
+		// All batches with a PEG conversion
+		var pegConversions []*fat2.TransactionBatch
+
+		// For all conversions, we need to apply the PEG conversion limit.
+		// This means, we need to find all valid conversions and pay them out
+		// on a proportional basis.
+		for i, txBatch := range txBatches {
 			// Re-validate transaction batch because timestamp might not be valid anymore
 			if err := txBatch.Validate(); err != nil {
 				d.Pegnet.SetTransactionHistoryExecuted(sqlTx, txBatch, -2)
@@ -321,6 +328,8 @@ func (d *Pegnetd) ApplyTransactionBatchesInHolding(ctx context.Context, sqlTx *s
 				continue
 			}
 
+			// This will apply all batche inputs, and all batch outputs except
+			// conversions to PEG if we are above the PegnetConversionLimit Act
 			err = d.applyTransactionBatch(sqlTx, txBatch, rates, currentHeight)
 			if err != nil && err != pegnet.InsufficientBalanceErr && err != pegnet.PFCTOneWayError {
 				return err
@@ -328,7 +337,23 @@ func (d *Pegnetd) ApplyTransactionBatchesInHolding(ctx context.Context, sqlTx *s
 				d.Pegnet.SetTransactionHistoryExecuted(sqlTx, txBatch, -1)
 			} else if err == pegnet.PFCTOneWayError {
 				d.Pegnet.SetTransactionHistoryExecuted(sqlTx, txBatch, -3)
+			} else if err == nil {
+				// If PegnetConversion limits are on, we process conversions to
+				// peg in a second pass.
+				if currentHeight >= PegnetConversionLimitActivation && txBatch.HasPEGRequest() {
+					// Batch applied, we need to do the PEG conversions at the end
+					pegConversions = append(pegConversions, txBatches[i])
+				}
 			}
+		}
+
+		// Apply all PEG Requests
+		// The `conversions.PerBlock` is the allowed amount of PEG to be
+		// converted. So when the bank is implemented, it should be passed in
+		// here.
+		err = d.recordPegnetRequests(sqlTx, pegConversions, rates, currentHeight, conversions.PerBlock)
+		if err != nil {
+			return err
 		}
 	}
 	return nil
@@ -459,54 +484,151 @@ func (d *Pegnetd) applyTransactionBatch(sqlTx *sql.Tx, txBatch *fat2.Transaction
 	}
 
 	// The tx batch should be 100% valid to apply
-	for txIndex, tx := range txBatch.Transactions {
-		_, txErr, err := d.Pegnet.SubFromBalance(sqlTx, &tx.Input.Address, tx.Input.Type, tx.Input.Amount)
-		if err != nil {
-			return err
-		} else if txErr != nil {
-			// This should fail the block
-			return fmt.Errorf("uncaught: %s", txErr.Error())
-		}
-		_, err = d.Pegnet.InsertTransactionRelation(sqlTx, tx.Input.Address, txBatch.Hash, uint64(txIndex), false, tx.IsConversion())
-		if err != nil {
-			return err
-		}
-
-		if err = d.Pegnet.SetTransactionHistoryExecuted(sqlTx, txBatch, int64(currentHeight)); err != nil {
-			return err
-		}
-
-		if tx.IsConversion() {
-			outputAmount, err := conversions.Convert(int64(tx.Input.Amount), rates[tx.Input.Type], rates[tx.Conversion])
-			if err != nil {
-				return err
-			}
-
-			if err = d.Pegnet.SetTransactionHistoryConvertedAmount(sqlTx, txBatch, txIndex, outputAmount); err != nil {
-				return err
-			}
-			_, err = d.Pegnet.AddToBalance(sqlTx, &tx.Input.Address, tx.Conversion, uint64(outputAmount))
-			if err != nil {
-				return err
-			}
-		} else {
-			for _, transfer := range tx.Transfers {
-				_, err = d.Pegnet.AddToBalance(sqlTx, &transfer.Address, tx.Input.Type, transfer.Amount)
-				if err != nil {
-					return err
-				}
-				_, err = d.Pegnet.InsertTransactionRelation(sqlTx, transfer.Address, txBatch.Hash, uint64(txIndex), true, false)
-				if err != nil {
-					return err
-				}
-			}
-		}
+	err := d.recordBatch(sqlTx, txBatch, rates, currentHeight)
+	if err != nil {
+		return err
 	}
+
 	log.WithFields(log.Fields{
 		"height":     currentHeight, // Just for log traces
 		"entryhash":  txBatch.Hash.String(),
 		"conversion": txBatch.HasConversions(),
 		"txs":        len(txBatch.Transactions)}).Tracef("tx applied")
+
+	return nil
+}
+
+func (d *Pegnetd) recordBatch(sqlTx *sql.Tx, txBatch *fat2.TransactionBatch, rates map[fat2.PTicker]uint64, currentHeight uint32) error {
+	for txIndex, tx := range txBatch.Transactions {
+		err := d.recordTx(sqlTx, tx, txIndex, txBatch, rates, currentHeight)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (d *Pegnetd) recordTx(sqlTx *sql.Tx, tx fat2.Transaction,
+	txIndex int, txBatch *fat2.TransactionBatch, rates map[fat2.PTicker]uint64, currentHeight uint32) error {
+	_, txErr, err := d.Pegnet.SubFromBalance(sqlTx, &tx.Input.Address, tx.Input.Type, tx.Input.Amount)
+	if err != nil {
+		return err
+	} else if txErr != nil {
+		// This should fail the block
+		return fmt.Errorf("uncaught: %s", txErr.Error())
+	}
+
+	_, err = d.Pegnet.InsertTransactionRelation(sqlTx, tx.Input.Address, txBatch.Hash, uint64(txIndex), false, tx.IsConversion())
+	if err != nil {
+		return err
+	}
+
+	if err = d.Pegnet.SetTransactionHistoryExecuted(sqlTx, txBatch, int64(currentHeight)); err != nil {
+		return err
+	}
+
+	if currentHeight >= PegnetConversionLimitActivation && tx.IsPEGRequest() {
+		// Ensure the output is valid, as we will process it later
+		_, err := conversions.Convert(int64(tx.Input.Amount), rates[tx.Input.Type], rates[tx.Conversion])
+		if err != nil {
+			return err
+		}
+		return nil // PEG Outputs are handled elsewhere
+	}
+
+	if tx.IsConversion() {
+		outputAmount, err := conversions.Convert(int64(tx.Input.Amount), rates[tx.Input.Type], rates[tx.Conversion])
+		if err != nil {
+			return err
+		}
+
+		if err = d.Pegnet.SetTransactionHistoryConvertedAmount(sqlTx, txBatch, txIndex, outputAmount); err != nil {
+			return err
+		}
+		_, err = d.Pegnet.AddToBalance(sqlTx, &tx.Input.Address, tx.Conversion, uint64(outputAmount))
+		if err != nil {
+			return err
+		}
+	} else {
+		for _, transfer := range tx.Transfers {
+			_, err = d.Pegnet.AddToBalance(sqlTx, &transfer.Address, tx.Input.Type, transfer.Amount)
+			if err != nil {
+				return err
+			}
+			_, err = d.Pegnet.InsertTransactionRelation(sqlTx, transfer.Address, txBatch.Hash, uint64(txIndex), true, false)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+type pegRequest struct {
+	TxID               string
+	Batch              *fat2.TransactionBatch
+	PegAmountRequested uint64
+	TxIndex            int
+}
+
+func (d *Pegnetd) recordPegnetRequests(sqlTx *sql.Tx, txBatchs []*fat2.TransactionBatch, rates map[fat2.PTicker]uint64, currentHeight uint32, bank uint64) error {
+	limit := conversions.NewConversionSupply(bank)
+	txData := make(map[string]pegRequest)
+
+	// First we need to extract all the txs that are pegnet requests
+	// The batches we are given might contain 0 or more pegnet requests.
+	for i := range txBatchs {
+		for j := range txBatchs[i].Transactions {
+			// Retrieve each tx individually.
+			tx := txBatchs[i].Transactions[j]
+			// The txid helps determine the order when deciding who
+			// gets the dust
+			txid := transactionid.FormatTxID(j, txBatchs[i].Hash.String())
+
+			// We caught the error earlier, so we can ignore it here.
+			pegAmt, _ := conversions.Convert(int64(tx.Input.Amount), rates[tx.Input.Type], rates[tx.Conversion])
+			txData[txid] = pegRequest{
+				TxID:               txid,
+				Batch:              txBatchs[i],
+				PegAmountRequested: uint64(pegAmt),
+				TxIndex:            j,
+			}
+
+			// limit calculates how much each PEG each tx is allocted
+			err := limit.AddConversion(txid, txData[txid].PegAmountRequested)
+			if err != nil {
+				return err // No recovery
+			}
+		}
+	}
+
+	// Now we have all the PEG amounts and requests in, time to do the payouts.
+	pegPayouts := limit.Payouts()
+	for txid, paidPeg := range pegPayouts {
+		tx := txData[txid].Batch.Transactions[txData[txid].TxIndex]
+
+		pegRemaining := txData[txid].PegAmountRequested - paidPeg
+		refundAmt, err := conversions.Convert(int64(pegRemaining), rates[tx.Conversion], rates[tx.Input.Type])
+		if err != nil {
+			// TODO: Idk how to ever recover from this. We will be stuck
+			// 		forever here.
+			return err
+		}
+
+		if err := d.Pegnet.SetTransactionHistoryPEGConvertedRequestAmount(sqlTx, txData[txid].Batch, txData[txid].TxIndex, int64(paidPeg), refundAmt); err != nil {
+			return err
+		}
+
+		// PEG addition
+		if _, err := d.Pegnet.AddToBalance(sqlTx, &tx.Input.Address, tx.Conversion, paidPeg); err != nil {
+			return err
+		}
+
+		// Refund
+		if _, err := d.Pegnet.AddToBalance(sqlTx, &tx.Input.Address, tx.Input.Type, uint64(refundAmt)); err != nil {
+			return err
+		}
+	}
 
 	return nil
 }

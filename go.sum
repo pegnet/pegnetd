@@ -16,8 +16,8 @@ github.com/AdamSLevy/sqlitechangeset v0.0.0-20190925183646-3ddb70fb709d h1:yPm4A
 github.com/AdamSLevy/sqlitechangeset v0.0.0-20190925183646-3ddb70fb709d/go.mod h1:kQNmmf+2gf3uGKHt0LS4guxdp4Ay44SXA4+Is8/Gxm8=
 github.com/BurntSushi/toml v0.3.1 h1:WXkYYl6Yr3qBf1K79EBnL4mak0OimBfB0XUf9Vl28OQ=
 github.com/BurntSushi/toml v0.3.1/go.mod h1:xHWCNGjB5oqiDr8zfno3MHue2Ht5sIBksp03qcyfWMU=
-github.com/Emyrk/factom v0.0.0-20191001194233-40c0cdc2f2a0 h1:blIsTi+ppAojepc46TFXMtHaTMRXI5Ga3cddTC8P0U4=
-github.com/Emyrk/factom v0.0.0-20191001194233-40c0cdc2f2a0/go.mod h1:XbZ9AweH09WKgxrfPIEauJ5/2XL/zroNmDAbd3TdKXk=
+github.com/Emyrk/factom v0.0.0-20191126234138-6aa6339749f6 h1:uHLh0l+G2jHShpxtuYEJOHKfsHIRBZsZvj5b+0iq7A0=
+github.com/Emyrk/factom v0.0.0-20191126234138-6aa6339749f6/go.mod h1:XbZ9AweH09WKgxrfPIEauJ5/2XL/zroNmDAbd3TdKXk=
 github.com/Factom-Asset-Tokens/base58 v0.0.0-20181227014902-61655c4dd885 h1:rfy2fwMrOZPqQgjsH7VCreGMSPzcvqQrfjeSs8nf+sY=
 github.com/Factom-Asset-Tokens/base58 v0.0.0-20181227014902-61655c4dd885/go.mod h1:RVXsRSp6VzXw5l1uiGazuf3qo23Qk0h1HzMcQk+X4LE=
 github.com/Factom-Asset-Tokens/fatd v0.6.1-0.20190927200133-81408234a2b5 h1:nJgckkWLVJxlZyfc5Wv8unMV9QmOQz6InW87MU8x0fg=
@@ -207,8 +207,10 @@ github.com/pegnet/LXRHash v0.0.0-20191028162532-138fe8d191a2 h1:ec8NDi02ydYYKw/R
 github.com/pegnet/LXRHash v0.0.0-20191028162532-138fe8d191a2/go.mod h1:0zBp9GFy9F77zuQbPkAmdUBRiptMaJ1V96eVFdMnXZA=
 github.com/pegnet/OracleRecord v0.0.2/go.mod h1:VrY7Shn4oSCli47CsUYBFjH68IenGYtnLaXaaivepu4=
 github.com/pegnet/pegnet v0.0.2/go.mod h1:FUyEs8fyLOzPXZgyqXcqiOhQi58loNtujykIbxxoKbQ=
-github.com/pegnet/pegnet v0.1.0-rc4.0.20191105153926-e82140e1ce44 h1:vLxdLGSKJUelA++6bBjZte1vyjKv1ZtdemSIdsgJTEo=
-github.com/pegnet/pegnet v0.1.0-rc4.0.20191105153926-e82140e1ce44/go.mod h1:Fy8Qohe9zIuqO9Q/ZOLUNpP2kuiFqxjevzaS3IL62+E=
+github.com/pegnet/pegnet v0.1.0-rc4.0.20191125193202-714f7e8ac93e h1:Dz6qIPZsziJHBtHLUToUDNTZEar0I5Tc1O4vfaA+cRI=
+github.com/pegnet/pegnet v0.1.0-rc4.0.20191125193202-714f7e8ac93e/go.mod h1:Fy8Qohe9zIuqO9Q/ZOLUNpP2kuiFqxjevzaS3IL62+E=
+github.com/pegnet/pegnet v0.1.0-rc4.0.20191127004205-9f6c2c5cc806 h1:t1tkZHWhE5oGOf582Dr4jpez1hceG7UMWX99a9AMxPY=
+github.com/pegnet/pegnet v0.1.0-rc4.0.20191127004205-9f6c2c5cc806/go.mod h1:Fy8Qohe9zIuqO9Q/ZOLUNpP2kuiFqxjevzaS3IL62+E=
 github.com/pelletier/go-toml v1.2.0 h1:T5zMGML61Wp+FlcbWjRDT7yAxhJNAiPPLOFECq181zc=
 github.com/pelletier/go-toml v1.2.0/go.mod h1:5z9KED0ma1S8pY6P1sdut58dfprrGBbd/94hg7ilaic=
 github.com/pkg/errors v0.8.0/go.mod h1:bwawxfHBFNV+L2hUp1rHADufV3IMtnDRdf1r5NINEl0=
