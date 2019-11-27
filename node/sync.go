@@ -607,6 +607,7 @@ func (d *Pegnetd) recordPegnetRequests(sqlTx *sql.Tx, txBatchs []*fat2.Transacti
 
 		log.WithFields(log.Fields{
 			"batch-entryhash": txData[txid].Batch.Entry.Hash.String(),
+			"height":          currentHeight,
 			"txid":            txid,
 			"txindex":         txData[txid].TxIndex,
 			"refund":          refundAmt,
