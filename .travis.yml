@@ -5,6 +5,10 @@ go:
 os:
   - linux
   - osx
+  - windows
+
+allow_failures:
+    - os: windows
 
 before_deploy:
   - go get github.com/karalabe/xgo
@@ -21,5 +25,6 @@ deploy:
     - pegnetd-windows.exe
   skip_cleanup: true
   on:
-     tags: true
+    tags: true
+    condition: $TRAVIS_OS_NAME = linux
 
