@@ -75,9 +75,14 @@ func (s *APIServer) getGlobalRichList(data json.RawMessage) interface{} {
 	}
 
 	height := s.Node.GetCurrentSync()
-	rates, err := s.Node.Pegnet.SelectRates(nil, height)
+	rates, realHeight, err := s.Node.Pegnet.SelectMostRecentRatesBeforeHeight(nil, s.Node.Pegnet.DB, height+1)
 	if err != nil {
 		return err
+	}
+
+	res := make([]ResultGlobalRichList, 0)
+	if realHeight == 0 {
+		return res
 	}
 
 	rich, err := s.Node.Pegnet.SelectAllBalances()
@@ -85,7 +90,6 @@ func (s *APIServer) getGlobalRichList(data json.RawMessage) interface{} {
 		return err
 	}
 
-	var res []ResultGlobalRichList
 	for _, r := range rich {
 		var usd uint64
 
@@ -120,9 +124,6 @@ func (s *APIServer) getGlobalRichList(data json.RawMessage) interface{} {
 		res = res[:params.Count]
 	}
 
-	if len(res) == 0 {
-		return []ResultGlobalRichList{}
-	}
 	return res
 }
 
@@ -144,7 +145,7 @@ func (s *APIServer) getRichList(data json.RawMessage) interface{} {
 	}
 
 	height := s.Node.GetCurrentSync()
-	rates, err := s.Node.Pegnet.SelectRates(nil, height)
+	rates, rateHeight, err := s.Node.Pegnet.SelectMostRecentRatesBeforeHeight(nil, s.Node.Pegnet.DB, height+1)
 	if err != nil {
 		return err
 	}
@@ -156,16 +157,18 @@ func (s *APIServer) getRichList(data json.RawMessage) interface{} {
 		return err
 	}
 
-	var res []ResultGetRichList
+	res := make([]ResultGetRichList, 0)
 	for _, r := range rich {
 		var entry ResultGetRichList
 		entry.Address = r.Address.String()
 		entry.Amount = r.Balance
-		c, err := conversions.Convert(int64(r.Balance), rates[ticker], rates[fat2.PTickerUSD])
-		if err != nil {
-			return err
+		if rateHeight > 0 {
+			c, err := conversions.Convert(int64(r.Balance), rates[ticker], rates[fat2.PTickerUSD])
+			if err != nil {
+				return err
+			}
+			entry.Equiv = uint64(c)
 		}
-		entry.Equiv = uint64(c)
 
 		res = append(res, entry)
 	}
