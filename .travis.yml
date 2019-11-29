@@ -8,7 +8,10 @@ os:
   - osx
   - windows
 
-job:
+matrix:
+  fast_finish: true
+
+jobs:
   allow_failures:
     - os: windows
 
@@ -28,4 +31,3 @@ deploy:
   on:
     tags: true
     condition: $TRAVIS_OS_NAME = linux
-
