@@ -10,8 +10,6 @@ os:
 
 matrix:
   fast_finish: true
-
-jobs:
   allow_failures:
     - os: windows
 
