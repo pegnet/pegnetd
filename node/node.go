@@ -35,6 +35,10 @@ var (
 	// The only way to aquire pFCT is to burn FCT. The burn command will remain.
 	// Estimated to be Nov 25, 2019 17:47:00 UTC
 	OneWaypFCTConversions uint32 = 220346
+
+	// This is when PEG price is determined by the exchange price
+	// TODO: Set this to an actual height
+	PEGFreeFloatingPriceActivation uint32 = 270
 )
 
 func SetAllActivations(act uint32) {

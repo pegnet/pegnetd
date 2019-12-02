@@ -196,8 +196,22 @@ func (d *Pegnetd) SyncBlock(ctx context.Context, tx *sql.Tx, height uint32) erro
 		}
 		winners := gradedBlock.Winners()
 		if 0 < len(winners) {
-			shouldPricePEG := PEGPricingActivation <= height
-			err = d.Pegnet.InsertRates(tx, height, winners[0].OPR.GetOrderedAssetsUint(), shouldPricePEG)
+			// PEG has 3 current pricing phases
+			// 1: Price is 0
+			// 2: Price is determined by equation
+			// 3: Price is determine by miners
+			var phase pegnet.PEGPricingPhase
+			if height < PEGPricingActivation {
+				phase = pegnet.PEGPriceIsZero
+			}
+			if height >= PEGPricingActivation {
+				phase = pegnet.PEGPriceIsEquation
+			}
+			if height >= PEGFreeFloatingPriceActivation {
+				phase = pegnet.PEGPriceIsFloating
+			}
+
+			err = d.Pegnet.InsertRates(tx, height, winners[0].OPR.GetOrderedAssetsUint(), phase)
 			if err != nil {
 				return err
 			}
