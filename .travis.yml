@@ -10,8 +10,17 @@ os:
 
 matrix:
   fast_finish: true
+  include:
+    - os: linux
+      script:
+        - ./.gofmt.sh
+        - go test -v ./...
   allow_failures:
     - os: windows
+
+# Modifies LXRHASH bit size for quick hashtable generation
+env:
+  - LXRBITSIZE=10
 
 before_deploy:
   - go get github.com/karalabe/xgo
