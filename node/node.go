@@ -43,7 +43,7 @@ var (
 
 	// This is when PEG price is determined by the exchange price
 	// TODO: Set this to an actual height
-	PEGFreeFloatingPriceActivation uint32 = 0
+	PEGFreeFloatingPriceActivation uint32 = 999999
 )
 
 func SetAllActivations(act uint32) {
