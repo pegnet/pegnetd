@@ -168,7 +168,7 @@ func (p *Pegnet) SelectRatesByKeyMR(ctx context.Context, keymr *factom.Bytes32) 
 	return _extractAssets(rows)
 }
 
-func (p *Pegnet) SelectMostRecentRatesBeforeHeight(ctx context.Context, tx *sql.Tx, height uint32) (map[fat2.PTicker]uint64, uint32, error) {
+func (p *Pegnet) SelectMostRecentRatesBeforeHeight(ctx context.Context, tx QueryAble, height uint32) (map[fat2.PTicker]uint64, uint32, error) {
 	assets := make(map[fat2.PTicker]uint64)
 	var rateHeight uint32
 	queryString := `SELECT "token", "value", "height"

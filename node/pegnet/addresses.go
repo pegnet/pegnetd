@@ -183,6 +183,53 @@ func (p *Pegnet) SelectBalance(adr *factom.FAAddress, ticker fat2.PTicker) (uint
 	return balance, nil
 }
 
+type BalancePair struct {
+	Address *factom.FAAddress
+	Balance uint64
+}
+type BalancesPair struct {
+	Address  *factom.FAAddress
+	Balances []uint64
+}
+
+// SelectRichList returns the balance of all addresses for a given ticker
+func (p *Pegnet) SelectRichList(ticker fat2.PTicker, count int) ([]BalancePair, error) {
+	if ticker <= fat2.PTickerInvalid || fat2.PTickerMax <= ticker {
+		return nil, fmt.Errorf("invalid token type")
+	}
+	if count < 1 {
+		return nil, fmt.Errorf("invalid count")
+	}
+	var res []BalancePair
+	stmtStringFmt := `SELECT address, %[1]s_balance FROM pn_addresses WHERE %[1]s_balance > 0 ORDER BY %[1]s_balance DESC LIMIT ?;`
+	stmt := fmt.Sprintf(stmtStringFmt, strings.ToLower(ticker.String()))
+	rows, err := p.DB.Query(stmt, count)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		return nil, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var pair BalancePair
+		var adr []byte
+
+		if err := rows.Scan(&adr, &pair.Balance); err != nil {
+			return nil, err
+		}
+
+		var fa factom.FAAddress
+		copy(fa[:], adr)
+		pair.Address = &fa
+
+		res = append(res, pair)
+	}
+
+	return res, nil
+}
+
 // SelectPendingBalances returns a map of all valid PTickers and their associated
 // balances for the given address. If the address is not in the database,
 // the map will contain 0 for all valid PTickers. This works on the pending tx
@@ -253,6 +300,70 @@ func (Pegnet) selectBalances(q QueryAble, adr *factom.FAAddress) (map[fat2.PTick
 		balanceMap[i] = balances[i]
 	}
 	return balanceMap, nil
+}
+
+// SelectPendingBalances returns a map of all valid PTickers and their associated
+// balances for the given address. If the address is not in the database,
+// the map will contain 0 for all valid PTickers. This works on the pending tx
+func (p *Pegnet) SelectAllBalances() ([]BalancesPair, error) {
+	rows, err := p.DB.Query(`SELECT * FROM pn_addresses;`)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		return nil, err
+	}
+	defer rows.Close()
+
+	var res []BalancesPair
+	for rows.Next() {
+		var bp BalancesPair
+		bp.Balances = make([]uint64, int(fat2.PTickerMax))
+
+		var id int
+		var address []byte
+		rows.Scan(
+			&id,
+			&address,
+			&bp.Balances[fat2.PTickerPEG],
+			&bp.Balances[fat2.PTickerUSD],
+			&bp.Balances[fat2.PTickerEUR],
+			&bp.Balances[fat2.PTickerJPY],
+			&bp.Balances[fat2.PTickerGBP],
+			&bp.Balances[fat2.PTickerCAD],
+			&bp.Balances[fat2.PTickerCHF],
+			&bp.Balances[fat2.PTickerINR],
+			&bp.Balances[fat2.PTickerSGD],
+			&bp.Balances[fat2.PTickerCNY],
+			&bp.Balances[fat2.PTickerHKD],
+			&bp.Balances[fat2.PTickerKRW],
+			&bp.Balances[fat2.PTickerBRL],
+			&bp.Balances[fat2.PTickerPHP],
+			&bp.Balances[fat2.PTickerMXN],
+			&bp.Balances[fat2.PTickerXAU],
+			&bp.Balances[fat2.PTickerXAG],
+			&bp.Balances[fat2.PTickerXBT],
+			&bp.Balances[fat2.PTickerETH],
+			&bp.Balances[fat2.PTickerLTC],
+			&bp.Balances[fat2.PTickerRVN],
+			&bp.Balances[fat2.PTickerXBC],
+			&bp.Balances[fat2.PTickerFCT],
+			&bp.Balances[fat2.PTickerBNB],
+			&bp.Balances[fat2.PTickerXLM],
+			&bp.Balances[fat2.PTickerADA],
+			&bp.Balances[fat2.PTickerXMR],
+			&bp.Balances[fat2.PTickerDASH],
+			&bp.Balances[fat2.PTickerZEC],
+			&bp.Balances[fat2.PTickerDCR],
+		)
+
+		var fa factom.FAAddress
+		copy(fa[:], address)
+		bp.Address = &fa
+
+		res = append(res, bp)
+	}
+	return res, nil
 }
 
 func (p *Pegnet) SelectIssuances() (map[fat2.PTicker]uint64, error) {
