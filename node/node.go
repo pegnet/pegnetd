@@ -40,6 +40,10 @@ var (
 	// converted per block. At a future height, a dynamic bank should be used.
 	// TODO: Determine this
 	PegnetConversionLimitActivation uint32 = 999999
+
+	// This is when PEG price is determined by the exchange price
+	// TODO: Set this to an actual height
+	PEGFreeFloatingPriceActivation uint32 = 270
 )
 
 func SetAllActivations(act uint32) {
