@@ -29,7 +29,6 @@ before_deploy:
     # xgo cross compile for github releases
   - go get github.com/karalabe/xgo
   - xgo --targets=windows/amd64,darwin/amd64,linux/amd64 .
-
     # Build and push image to dockerhub
   - docker build -t $DOCKERORG/$REPO:$TRAVIS_TAG .
   - docker login -u $DOCKERORG -p $DOCKERHUBTOKEN
