@@ -52,6 +52,8 @@ func SetAllActivations(act uint32) {
 	TransactionConversionActivation = act
 	PEGPricingActivation = act
 	OneWaypFCTConversions = act
+	PegnetConversionLimitActivation = act
+	PEGFreeFloatingPriceActivation = act
 }
 
 type Pegnetd struct {
