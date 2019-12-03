@@ -19,7 +19,7 @@ matrix:
   allow_failures:
     - os: windows
 
-# Modifies LXRHASH bit size, set docker organisation for deployment
+# Modifies LXRHASH bit size, set docker organisation for deployment 
 env:
   - LXRBITSIZE=10 REPO=pegnetd DOCKERORG=mitchellberry
 
