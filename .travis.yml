@@ -7,6 +7,7 @@ os:
   - osx
   - windows
 
+# Run gofmt and tests on linux
 matrix:
   fast_finish: true
   include:
@@ -18,27 +19,27 @@ matrix:
   allow_failures:
     - os: windows
 
-# Modifies LXRHASH bit size for quick hashtable generation
+# Modifies LXRHASH bit size, set docker organisation for deployment
 env:
   - LXRBITSIZE=10 REPO=pegnetd DOCKERORG=pegnet
 
-script: echo "Not running travis_script_go on windows and osx"
+script: echo "Not running $travis_script_go on windows and osx"
 
 before_deploy:
-    # xgo cross compile for github deploy
+    # xgo cross compile for github releases
   - go get github.com/karalabe/xgo
   - xgo --targets=windows/amd64,darwin/amd64,linux/amd64 .
 
-    # Docker hub push
+    # Build and push image to dockerhub
   - docker build -t $DOCKERORG/$REPO:$TRAVIS_TAG .
   - docker login -u $DOCKERORG -p $DOCKERHUBTOKEN
   - docker push $DOCKERORG/$REPO:$TRAVIS_TAG
 
 deploy:
   provider: releases
-  token:
+  api_key:
     secure: $GITHUBTOKEN
-  cleanup: true
+  skip_cleanup: true
   file:
     - pegnetd-darwin-10.6-amd64
     - pegnetd-linux-amd64
