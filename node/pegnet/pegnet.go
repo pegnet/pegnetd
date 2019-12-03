@@ -84,6 +84,10 @@ func (p *Pegnet) createTables() error {
 			return err
 		}
 	}
+
+	// migrate pn_history_lookup alter column
+	txhistoryMigrateLookup1(p)
+
 	return nil
 }
 
