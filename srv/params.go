@@ -44,7 +44,7 @@ type ParamsGetGlobalRichList struct {
 func (p ParamsGetGlobalRichList) HasIncludePending() bool { return false }
 func (p ParamsGetGlobalRichList) IsValid() error {
 	if p.Count < 0 {
-		return jrpc.InvalidParams("count must be >= 0")
+		return jrpc.ErrorInvalidParams("count must be >= 0")
 	}
 	return nil
 }
@@ -61,10 +61,10 @@ func (p ParamsGetRichList) HasIncludePending() bool { return false }
 func (p ParamsGetRichList) IsValid() error {
 	ticker := fat2.StringToTicker(p.Asset)
 	if ticker == fat2.PTickerInvalid {
-		return jrpc.InvalidParams("invalid asset")
+		return jrpc.ErrorInvalidParams("invalid asset")
 	}
 	if p.Count < 0 {
-		return jrpc.InvalidParams("count must be >= 0")
+		return jrpc.ErrorInvalidParams("count must be >= 0")
 	}
 	return nil
 }

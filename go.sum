@@ -19,8 +19,6 @@ github.com/AdamSLevy/sqlitechangeset v0.0.0-20190925183646-3ddb70fb709d h1:yPm4A
 github.com/AdamSLevy/sqlitechangeset v0.0.0-20190925183646-3ddb70fb709d/go.mod h1:kQNmmf+2gf3uGKHt0LS4guxdp4Ay44SXA4+Is8/Gxm8=
 github.com/BurntSushi/toml v0.3.1 h1:WXkYYl6Yr3qBf1K79EBnL4mak0OimBfB0XUf9Vl28OQ=
 github.com/BurntSushi/toml v0.3.1/go.mod h1:xHWCNGjB5oqiDr8zfno3MHue2Ht5sIBksp03qcyfWMU=
-github.com/Emyrk/factom v0.0.0-20191001194233-40c0cdc2f2a0 h1:blIsTi+ppAojepc46TFXMtHaTMRXI5Ga3cddTC8P0U4=
-github.com/Emyrk/factom v0.0.0-20191001194233-40c0cdc2f2a0/go.mod h1:XbZ9AweH09WKgxrfPIEauJ5/2XL/zroNmDAbd3TdKXk=
 github.com/Emyrk/factom v0.0.0-20191126143921-b5fc57ecd146 h1:2VcBtt+1ysKrzL5s5EIZDS49PsflfeOepJ2LrjOcekI=
 github.com/Emyrk/factom v0.0.0-20191126143921-b5fc57ecd146/go.mod h1:XbZ9AweH09WKgxrfPIEauJ5/2XL/zroNmDAbd3TdKXk=
 github.com/Factom-Asset-Tokens/base58 v0.0.0-20181227014902-61655c4dd885 h1:rfy2fwMrOZPqQgjsH7VCreGMSPzcvqQrfjeSs8nf+sY=

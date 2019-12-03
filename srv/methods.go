@@ -62,7 +62,7 @@ type ResultGlobalRichList struct {
 	Equiv   uint64 `json:"pusd"`
 }
 
-func (s *APIServer) getGlobalRichList(data json.RawMessage) interface{} {
+func (s *APIServer) getGlobalRichList(_ context.Context, data json.RawMessage) interface{} {
 	params := ParamsGetGlobalRichList{}
 	_, _, err := validate(data, &params)
 	if err != nil {
@@ -132,7 +132,7 @@ type ResultGetRichList struct {
 	Equiv   uint64 `json:"pusd"`
 }
 
-func (s *APIServer) getRichList(data json.RawMessage) interface{} {
+func (s *APIServer) getRichList(_ context.Context, data json.RawMessage) interface{} {
 	params := ParamsGetRichList{}
 	_, _, err := validate(data, &params)
 	if err != nil {
