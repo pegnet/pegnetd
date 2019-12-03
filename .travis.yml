@@ -4,7 +4,6 @@ go:
   - 1.x
 
 os:
-  - linux
   - osx
   - windows
 
@@ -15,26 +14,35 @@ matrix:
       script:
         - ./.gofmt.sh
         - go test -v ./...
+      services: docker
   allow_failures:
     - os: windows
 
 # Modifies LXRHASH bit size for quick hashtable generation
 env:
-  - LXRBITSIZE=10
+  - LXRBITSIZE=10 REPO=pegnetd DOCKERORG=pegnet
+
+script: echo "Not running travis_script_go on windows and osx"
 
 before_deploy:
+    # xgo cross compile for github deploy
   - go get github.com/karalabe/xgo
-  - docker build --tag xgo-builder xgo
-  - xgo -image xgo-builder --targets=windows/amd64,darwin/amd64,linux/amd64 .
+  - xgo --targets=windows/amd64,darwin/amd64,linux/amd64 .
+
+    # Docker hub push
+  - docker build -t $DOCKERORG/$REPO:$TRAVIS_TAG .
+  - docker login -u $DOCKERORG -p $DOCKERHUBTOKEN
+  - docker push $DOCKERORG/$REPO:$TRAVIS_TAG
 
 deploy:
   provider: releases
-  api_key:
-    secure: olgjR93AxZChmTriGo4DkofTJIhCqymhRPl1qGcO3uD3xBMsmX760kQhGjkMUcgzenhOhtqxiRB9acYPoqPb2LGYNU2Ff8sMXfx5Oa3JMb9yEnosLbPDwM5D0nTdWhgn
+  token:
+    secure: $GITHUBTOKEN
+  cleanup: true
   file:
     - pegnetd-darwin-10.6-amd64
     - pegnetd-linux-amd64
-    - pegnetd-windows.exe
+    - pegnetd-windows-4.0-amd64.exe
   on:
     tags: true
-    condition: $TRAVIS_OS_NAME = linux
+    condition: "$TRAVIS_OS_NAME = linux"
