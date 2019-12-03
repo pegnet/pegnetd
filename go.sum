@@ -211,12 +211,17 @@ github.com/pegnet/LXRHash v0.0.0-20191028162532-138fe8d191a2/go.mod h1:0zBp9GFy9
 github.com/pegnet/OracleRecord v0.0.2/go.mod h1:VrY7Shn4oSCli47CsUYBFjH68IenGYtnLaXaaivepu4=
 github.com/pegnet/pegnet v0.0.2/go.mod h1:FUyEs8fyLOzPXZgyqXcqiOhQi58loNtujykIbxxoKbQ=
 <<<<<<< HEAD
+<<<<<<< HEAD
 github.com/pegnet/pegnet v0.1.0-rc4.0.20191105153926-e82140e1ce44 h1:vLxdLGSKJUelA++6bBjZte1vyjKv1ZtdemSIdsgJTEo=
 github.com/pegnet/pegnet v0.1.0-rc4.0.20191105153926-e82140e1ce44/go.mod h1:Fy8Qohe9zIuqO9Q/ZOLUNpP2kuiFqxjevzaS3IL62+E=
 =======
 github.com/pegnet/pegnet v0.1.0-rc4.0.20191203183635-35ca4159ff30 h1:IAZHh/bAR/soyv9wKLlm9s+U4bx/eRcAhSDsPuFXaMs=
 github.com/pegnet/pegnet v0.1.0-rc4.0.20191203183635-35ca4159ff30/go.mod h1:Fy8Qohe9zIuqO9Q/ZOLUNpP2kuiFqxjevzaS3IL62+E=
 >>>>>>> Update pegnet dep
+=======
+github.com/pegnet/pegnet v0.2.3-0.20191203221152-328fdbaacef3 h1:rvXhGAJ58ZCT2Yp+p7HbSUsWt8taxbiutRFV91JHWhM=
+github.com/pegnet/pegnet v0.2.3-0.20191203221152-328fdbaacef3/go.mod h1:Fy8Qohe9zIuqO9Q/ZOLUNpP2kuiFqxjevzaS3IL62+E=
+>>>>>>> Update pegnet dep to latest master commit
 github.com/pelletier/go-toml v1.2.0 h1:T5zMGML61Wp+FlcbWjRDT7yAxhJNAiPPLOFECq181zc=
 github.com/pelletier/go-toml v1.2.0/go.mod h1:5z9KED0ma1S8pY6P1sdut58dfprrGBbd/94hg7ilaic=
 github.com/pkg/errors v0.8.0/go.mod h1:bwawxfHBFNV+L2hUp1rHADufV3IMtnDRdf1r5NINEl0=
