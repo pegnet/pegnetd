@@ -4,11 +4,13 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/Factom-Asset-Tokens/factom"
 	"github.com/pegnet/pegnet/modules/grader"
 	"github.com/pegnet/pegnetd/fat/fat2"
+	log "github.com/sirupsen/logrus"
 )
 
 // HistoryTransaction is a flattened entry of the history table structure.
@@ -78,7 +80,7 @@ CREATE INDEX IF NOT EXISTS "idx_history_transaction_tx_index" ON "pn_history_tra
 `
 
 const createTableTxHistoryLookup = `CREATE TABLE IF NOT EXISTS "pn_history_lookup" (
-	"entry_hash"	INTEGER NOT NULL,
+	"entry_hash"	BLOB NOT NULL,
 	"tx_index"		INTEGER NOT NULL,
 	"address"		BLOB NOT NULL,
 
@@ -87,6 +89,30 @@ const createTableTxHistoryLookup = `CREATE TABLE IF NOT EXISTS "pn_history_looku
 );
 CREATE INDEX IF NOT EXISTS "idx_history_lookup_address" ON "pn_history_lookup"("address");
 CREATE INDEX IF NOT EXISTS "idx_history_lookup_entry_index" ON "pn_history_lookup"("entry_hash", "tx_index");`
+
+func txhistoryMigrateLookup1(p *Pegnet) {
+	var sql string
+	if err := p.DB.QueryRow(`SELECT sql FROM sqlite_master WHERE name = 'pn_history_lookup'`).Scan(&sql); err != nil {
+		log.WithError(err).Errorf("failed migration txhistoryMigrateLookup1 lookup")
+	}
+
+	if strings.Contains(sql, "\"entry_hash\"\tINTEGER") {
+		migrationQuery := `
+BEGIN TRANSACTION;
+ALTER TABLE "pn_history_lookup" RENAME TO "old_pn_history_lookup";
+%s
+INSERT INTO "pn_history_lookup" (entry_hash, tx_index, address)
+		SELECT entry_hash, tx_index, address FROM "old_pn_history_lookup";
+DROP TABLE "old_pn_history_lookup";
+COMMIT;
+`
+		if _, err := p.DB.Exec(fmt.Sprintf(migrationQuery, createTableTxHistoryLookup)); err != nil {
+			log.WithError(err).Errorf("failed migration txhistoryMigrateLookup1 execution")
+		} else {
+			log.Info("Successful DB Migration txhistoryMigrateLookup1")
+		}
+	}
+}
 
 // only add a lookup reference if one doesn't already exist
 const insertLookupQuery = `INSERT INTO pn_history_lookup (entry_hash, tx_index, address) VALUES (?, ?, ?) ON CONFLICT DO NOTHING;`
@@ -180,6 +206,32 @@ func (p *Pegnet) SetTransactionHistoryConvertedAmount(tx *sql.Tx, txbatch *fat2.
 		return err
 	}
 	_, err = stmt.Exec(amount, txbatch.Entry.Hash[:], index)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// SetTransactionHistoryPEGConvertedRequestAmount updates a peg conversion request
+// with the actual amount of PEG received and the refund amount. The refund amount
+// will appear as an output.
+// This is done in the same SQL Transaction as updating its executed status
+func (p *Pegnet) SetTransactionHistoryPEGConvertedRequestAmount(tx *sql.Tx, txbatch *fat2.TransactionBatch, index int, pegAmount, refundAmount int64) error {
+	outputs := make([]HistoryTransactionOutput, 1)
+	outputs[0] = HistoryTransactionOutput{
+		Address: txbatch.Transactions[index].Input.Address,
+		Amount:  refundAmount,
+	}
+	out, err := json.Marshal(outputs)
+	if err != nil {
+		return err
+	}
+
+	stmt, err := tx.Prepare(`UPDATE "pn_history_transaction" SET to_amount = ?, outputs = ? WHERE entry_hash = ? AND tx_index = ?`)
+	if err != nil {
+		return err
+	}
+	_, err = stmt.Exec(pegAmount, out, txbatch.Entry.Hash[:], index)
 	if err != nil {
 		return err
 	}

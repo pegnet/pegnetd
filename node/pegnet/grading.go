@@ -59,10 +59,25 @@ func (p *Pegnet) insertRate(tx *sql.Tx, height uint32, tickerString string, rate
 	return nil
 }
 
+type PEGPricingPhase int
+
+const (
+	_                  PEGPricingPhase = iota
+	PEGPriceIsZero                     // PEG == 0
+	PEGPriceIsEquation                 // PEG == MarketCap / Peg Supply
+	PEGPriceIsFloating                 // PEG == ExchRate
+)
+
 // InsertRates adds all asset rates as rows, computing the rate for PEG if necessary
-func (p *Pegnet) InsertRates(tx *sql.Tx, height uint32, rates []opr.AssetUint, pricePEG bool) error {
+func (p *Pegnet) InsertRates(tx *sql.Tx, height uint32, rates []opr.AssetUint, phase PEGPricingPhase) error {
+	if phase == 0 {
+		return fmt.Errorf("undefined PEG phase")
+	}
+
+	ratePEG := new(big.Int)
 	for i := range rates {
 		if rates[i].Name == "PEG" {
+			ratePEG.SetUint64(rates[i].Value)
 			continue
 		}
 		// Correct rates to use `pAsset`
@@ -72,8 +87,14 @@ func (p *Pegnet) InsertRates(tx *sql.Tx, height uint32, rates []opr.AssetUint, p
 			return err
 		}
 	}
-	ratePEG := new(big.Int)
-	if pricePEG {
+
+	// Now to insert the PEG rate. All other rates are set above.
+	// The PEG rate depends on what activation phase we are in. There are
+	// multiple ways to set the PEG price.
+	switch phase {
+	case PEGPriceIsZero: // PEG Price is 0
+		ratePEG.SetUint64(0)
+	case PEGPriceIsEquation: // Market Cap Equation
 		// PEG price = (total capitalization of all other assets) / (total supply of all other assets at height - 1)
 		issuance, err := p.SelectIssuances()
 		if err != nil {
@@ -93,7 +114,9 @@ func (p *Pegnet) InsertRates(tx *sql.Tx, height uint32, rates []opr.AssetUint, p
 		} else {
 			ratePEG.Div(totalCapitalization, new(big.Int).SetUint64(issuance[fat2.PTickerPEG]))
 		}
+	case PEGPriceIsFloating: // Rate in opr is the rate
 	}
+
 	err := p.insertRate(tx, height, fat2.PTickerPEG.String(), ratePEG.Uint64())
 	if err != nil {
 		return err
@@ -168,7 +191,7 @@ func (p *Pegnet) SelectRatesByKeyMR(ctx context.Context, keymr *factom.Bytes32) 
 	return _extractAssets(rows)
 }
 
-func (p *Pegnet) SelectMostRecentRatesBeforeHeight(ctx context.Context, tx *sql.Tx, height uint32) (map[fat2.PTicker]uint64, uint32, error) {
+func (p *Pegnet) SelectMostRecentRatesBeforeHeight(ctx context.Context, tx QueryAble, height uint32) (map[fat2.PTicker]uint64, uint32, error) {
 	assets := make(map[fat2.PTicker]uint64)
 	var rateHeight uint32
 	queryString := `SELECT "token", "value", "height"

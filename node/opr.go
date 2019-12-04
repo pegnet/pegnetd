@@ -24,6 +24,9 @@ func (d *Pegnetd) Grade(ctx context.Context, block *factom.EBlock) (grader.Grade
 	if block.Height >= GradingV2Activation {
 		ver = 2
 	}
+	if block.Height >= PEGFreeFloatingPriceActivation {
+		ver = 3
+	}
 
 	var prevWinners []string = nil
 	prev, err := d.Pegnet.SelectPreviousWinners(ctx, block.Height)

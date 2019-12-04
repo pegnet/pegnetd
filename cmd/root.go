@@ -33,6 +33,8 @@ func init() {
 	// This is for testing purposes
 	rootCmd.PersistentFlags().Bool("testing", false, "If this flag is set, all activations heights are set to 0.")
 	rootCmd.PersistentFlags().Int("act", -1, "Able to manually set the activation heights")
+	rootCmd.PersistentFlags().Int32("testingact", -1, "This is a hidden flag that can be used by QA and developers to set some custom activation heights.")
+	_ = rootCmd.PersistentFlags().MarkHidden("testingact")
 }
 
 // Execute is cobra's entry point
@@ -81,6 +83,11 @@ func always(cmd *cobra.Command, args []string) {
 
 		// Set all activations for testing
 		node.SetAllActivations(uint32(act))
+	}
+
+	if testingact, _ := cmd.Flags().GetInt32("testingact"); testingact >= 0 {
+		node.PegnetConversionLimitActivation = uint32(testingact)
+		node.PEGFreeFloatingPriceActivation = uint32(testingact)
 	}
 
 	// Setup config reading

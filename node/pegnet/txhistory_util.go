@@ -152,7 +152,13 @@ func turnRowsIntoHistoryTransactions(rows *sql.Rows) ([]HistoryTransaction, erro
 		addr = factom.FAAddress(*factom.NewBytes32(from))
 		tx.FromAddress = &addr
 
-		if tx.TxAction == Transfer {
+		// Conversions into PEG
+		if tx.TxAction == Transfer || tx.ToAsset == "PEG" {
+			if tx.ToAsset == "PEG" && len(outputs) == 0 {
+				// If before the activation height, there is no json marshal
+				// here.
+				outputs = []byte("[]")
+			}
 			var output []HistoryTransactionOutput
 			if err = json.Unmarshal(outputs, &output); err != nil { // should never fail unless database data is corrupt
 				return nil, fmt.Errorf("database corruption %d %v", id, err)

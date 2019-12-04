@@ -28,10 +28,11 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"sort"
 
-	"github.com/AdamSLevy/jsonrpc2"
-	jrpc "github.com/AdamSLevy/jsonrpc2/v11"
+	jrpc "github.com/AdamSLevy/jsonrpc2/v13"
 	"github.com/Factom-Asset-Tokens/factom"
+	"github.com/pegnet/pegnet/modules/conversions"
 	"github.com/pegnet/pegnetd/config"
 	"github.com/pegnet/pegnetd/fat/fat2"
 	"github.com/pegnet/pegnetd/node"
@@ -40,6 +41,8 @@ import (
 
 func (s *APIServer) jrpcMethods() jrpc.MethodMap {
 	return jrpc.MethodMap{
+		"get-rich-list":          s.getRichList,
+		"get-global-rich-list":   s.getGlobalRichList,
 		"get-transactions":       s.getTransactions(false),
 		"get-transaction-status": s.getTransactionStatus,
 		"get-transaction":        s.getTransactions(true),
@@ -54,12 +57,130 @@ func (s *APIServer) jrpcMethods() jrpc.MethodMap {
 
 }
 
+type ResultGlobalRichList struct {
+	Address string `json:"address"`
+	Equiv   uint64 `json:"pusd"`
+}
+
+func (s *APIServer) getGlobalRichList(_ context.Context, data json.RawMessage) interface{} {
+	params := ParamsGetGlobalRichList{}
+	_, _, err := validate(data, &params)
+	if err != nil {
+		return err
+	}
+
+	if params.Count == 0 {
+		params.Count = 100
+	}
+
+	height := s.Node.GetCurrentSync()
+	rates, realHeight, err := s.Node.Pegnet.SelectMostRecentRatesBeforeHeight(nil, s.Node.Pegnet.DB, height+1)
+	if err != nil {
+		return err
+	}
+
+	res := make([]ResultGlobalRichList, 0)
+	if realHeight == 0 {
+		return res
+	}
+
+	rich, err := s.Node.Pegnet.SelectAllBalances()
+	if err != nil {
+		return err
+	}
+
+	for _, r := range rich {
+		var usd uint64
+
+		for i := fat2.PTicker(1); i < fat2.PTickerMax; i++ {
+			if r.Balances[i] == 0 {
+				continue
+			}
+			c, err := conversions.Convert(int64(r.Balances[i]), rates[i], rates[fat2.PTickerUSD])
+			if err != nil {
+				return err
+			}
+
+			usd += uint64(c)
+		}
+
+		if usd == 0 {
+			continue
+		}
+
+		var entry ResultGlobalRichList
+		entry.Address = r.Address.String()
+		entry.Equiv = usd
+
+		res = append(res, entry)
+	}
+
+	sort.Slice(res, func(i, j int) bool {
+		return res[i].Equiv > res[j].Equiv
+	})
+
+	if len(res) > params.Count {
+		res = res[:params.Count]
+	}
+
+	return res
+}
+
+type ResultGetRichList struct {
+	Address string `json:"address"`
+	Amount  uint64 `json:"amount"`
+	Equiv   uint64 `json:"pusd"`
+}
+
+func (s *APIServer) getRichList(_ context.Context, data json.RawMessage) interface{} {
+	params := ParamsGetRichList{}
+	_, _, err := validate(data, &params)
+	if err != nil {
+		return err
+	}
+
+	if params.Count == 0 {
+		params.Count = 100
+	}
+
+	height := s.Node.GetCurrentSync()
+	rates, rateHeight, err := s.Node.Pegnet.SelectMostRecentRatesBeforeHeight(nil, s.Node.Pegnet.DB, height+1)
+	if err != nil {
+		return err
+	}
+
+	ticker := fat2.StringToTicker(params.Asset) // already validated
+
+	rich, err := s.Node.Pegnet.SelectRichList(ticker, params.Count)
+	if err != nil {
+		return err
+	}
+
+	res := make([]ResultGetRichList, 0)
+	for _, r := range rich {
+		var entry ResultGetRichList
+		entry.Address = r.Address.String()
+		entry.Amount = r.Balance
+		if rateHeight > 0 {
+			c, err := conversions.Convert(int64(r.Balance), rates[ticker], rates[fat2.PTickerUSD])
+			if err != nil {
+				return err
+			}
+			entry.Equiv = uint64(c)
+		}
+
+		res = append(res, entry)
+	}
+
+	return res
+}
+
 type ResultGetTransactionStatus struct {
 	Height   uint32 `json:"height"`
 	Executed uint32 `json:"executed"`
 }
 
-func (s *APIServer) getTransactionStatus(data json.RawMessage) interface{} {
+func (s *APIServer) getTransactionStatus(_ context.Context, data json.RawMessage) interface{} {
 	params := ParamsGetPegnetTransactionStatus{}
 	_, _, err := validate(data, &params)
 	if err != nil {
@@ -68,7 +189,7 @@ func (s *APIServer) getTransactionStatus(data json.RawMessage) interface{} {
 
 	height, executed, err := s.Node.Pegnet.SelectTransactionHistoryStatus(params.Hash)
 	if err != nil {
-		return jrpc.InvalidParams(err.Error())
+		return jrpc.ErrorInvalidParams(err)
 	}
 
 	if height == 0 {
@@ -93,8 +214,8 @@ type ResultGetTransactions struct {
 	NextOffset int         `json:"nextoffset"`
 }
 
-func (s *APIServer) getTransactions(forceTxId bool) func(data json.RawMessage) interface{} {
-	return func(data json.RawMessage) interface{} {
+func (s *APIServer) getTransactions(forceTxId bool) func(_ context.Context, data json.RawMessage) interface{} {
+	return func(_ context.Context, data json.RawMessage) interface{} {
 		params := ParamsGetPegnetTransaction{}
 		_, _, err := validate(data, &params)
 		if err != nil {
@@ -102,7 +223,7 @@ func (s *APIServer) getTransactions(forceTxId bool) func(data json.RawMessage) i
 		}
 
 		if forceTxId && params.TxID == "" {
-			return jrpc.InvalidParams(fmt.Errorf("expect txid param to be populated"))
+			return jrpc.ErrorInvalidParams(fmt.Errorf("expect txid param to be populated"))
 		}
 
 		// using a separate options struct due to golang's circular import restrictions
@@ -119,7 +240,7 @@ func (s *APIServer) getTransactions(forceTxId bool) func(data json.RawMessage) i
 		if params.TxID != "" {
 			idx, entryhash, err := pegnet.SplitTxID(params.TxID)
 			if err != nil {
-				return jrpc.InvalidParams(err.Error())
+				return jrpc.ErrorInvalidParams(err.Error())
 			}
 			options.TxIndex = idx
 			options.UseTxIndex = true
@@ -145,7 +266,7 @@ func (s *APIServer) getTransactions(forceTxId bool) func(data json.RawMessage) i
 		}
 
 		if err != nil {
-			return jrpc.InvalidParams(err.Error())
+			return jrpc.ErrorInvalidParams(err.Error())
 		}
 
 		if len(actions) == 0 {
@@ -192,7 +313,7 @@ func (r *ResultPegnetTickerMap) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-func (s *APIServer) getPegnetBalances(data json.RawMessage) interface{} {
+func (s *APIServer) getPegnetBalances(_ context.Context, data json.RawMessage) interface{} {
 	params := ParamsGetPegnetBalances{}
 	if _, _, err := validate(data, &params); err != nil {
 		return err
@@ -202,7 +323,7 @@ func (s *APIServer) getPegnetBalances(data json.RawMessage) interface{} {
 		return ErrorAddressNotFound
 	}
 	if err != nil {
-		return jsonrpc2.InternalError
+		panic(err) // This is an internal error
 	}
 	return ResultPegnetTickerMap(bals)
 }
@@ -212,23 +333,23 @@ type ResultGetIssuance struct {
 	Issuance   ResultPegnetTickerMap `json:"issuance"`
 }
 
-func (s *APIServer) getPegnetIssuance(data json.RawMessage) interface{} {
+func (s *APIServer) getPegnetIssuance(_ context.Context, data json.RawMessage) interface{} {
 	issuance, err := s.Node.Pegnet.SelectIssuances()
 	if err == sql.ErrNoRows {
 		return ErrorAddressNotFound
 	}
 	if err != nil {
-		return jsonrpc2.InternalError
+		panic(err) // This is an internal error
 	}
 
-	syncStatus := s.getSyncStatus(nil)
+	syncStatus := s.getSyncStatus(context.Background(), nil)
 	return ResultGetIssuance{
 		SyncStatus: syncStatus.(ResultGetSyncStatus),
 		Issuance:   issuance,
 	}
 }
 
-func (s *APIServer) getPegnetRates(data json.RawMessage) interface{} {
+func (s *APIServer) getPegnetRates(_ context.Context, data json.RawMessage) interface{} {
 	params := ParamsGetPegnetRates{}
 	if _, _, err := validate(data, &params); err != nil {
 		return err
@@ -238,14 +359,14 @@ func (s *APIServer) getPegnetRates(data json.RawMessage) interface{} {
 		return ErrorNotFound
 	}
 	if err != nil {
-		return jsonrpc2.InternalError
+		panic(err) // This is an internal error
 	}
 
 	// The balance results actually works for rates too
 	return ResultPegnetTickerMap(rates)
 }
 
-func (s *APIServer) sendTransaction(data json.RawMessage) interface{} {
+func (s *APIServer) sendTransaction(_ context.Context, data json.RawMessage) interface{} {
 	params := ParamsSendTransaction{}
 	_, _, err := validate(data, &params)
 	if err != nil {
@@ -256,7 +377,7 @@ func (s *APIServer) sendTransaction(data json.RawMessage) interface{} {
 	ecPrivateKeyString := s.Config.GetString(config.ECPrivateKey)
 	var ecPrivateKey factom.EsAddress
 	if err = ecPrivateKey.Set(ecPrivateKeyString); err != nil {
-		return jsonrpc2.InternalError
+		panic(err) // This is an internal error
 	}
 
 	entry := params.Entry()
@@ -326,7 +447,7 @@ type ResultGetSyncStatus struct {
 	Current int32  `json:"factomheight"`
 }
 
-func (s *APIServer) getSyncStatus(data json.RawMessage) interface{} {
+func (s *APIServer) getSyncStatus(_ context.Context, data json.RawMessage) interface{} {
 	heights := new(factom.Heights)
 	err := heights.Get(s.Node.FactomClient)
 	if err != nil {
@@ -340,7 +461,7 @@ func (s *APIServer) getSyncStatus(data json.RawMessage) interface{} {
 func validate(data json.RawMessage, params Params) (interface{}, func(), error) {
 	if params == nil {
 		if len(data) > 0 {
-			return nil, nil, jrpc.InvalidParams(`no "params" accepted`)
+			return nil, nil, jrpc.ErrorInvalidParams(`no "params" accepted`)
 		}
 		return nil, nil, nil
 	}
@@ -348,7 +469,7 @@ func validate(data json.RawMessage, params Params) (interface{}, func(), error) 
 		return nil, nil, params.IsValid()
 	}
 	if err := unmarshalStrict(data, params); err != nil {
-		return nil, nil, jrpc.InvalidParams(err.Error())
+		return nil, nil, jrpc.ErrorInvalidParams(err.Error())
 	}
 	if err := params.IsValid(); err != nil {
 		return nil, nil, err

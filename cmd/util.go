@@ -28,7 +28,7 @@ func FactoshiToFactoid(i int64) string {
 func FactoidToFactoshi(amt string) (uint64, error) {
 	valid := regexp.MustCompile(`^([0-9]+)?(\.[0-9]+)?$`)
 	if !valid.MatchString(amt) {
-		return 0, nil
+		return 0, fmt.Errorf("invalid input string")
 	}
 
 	var total uint64 = 0
