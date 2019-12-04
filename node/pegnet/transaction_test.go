@@ -5,9 +5,8 @@ import (
 	"math/rand"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-
 	. "github.com/pegnet/pegnetd/node/pegnet"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestFormatTxID(t *testing.T) {

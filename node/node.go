@@ -35,6 +35,15 @@ var (
 	// The only way to aquire pFCT is to burn FCT. The burn command will remain.
 	// Estimated to be Nov 25, 2019 17:47:00 UTC
 	OneWaypFCTConversions uint32 = 220346
+
+	// Once this is activated, a maximum amount of PEG of 5,000 can be
+	// converted per block. At a future height, a dynamic bank should be used.
+	// Estimated to be  Dec 9, 2019, 17:00 UTC
+	PegnetConversionLimitActivation uint32 = 222270
+
+	// This is when PEG price is determined by the exchange price
+	// Estimated to be  Dec 9, 2019, 17:00 UTC
+	PEGFreeFloatingPriceActivation uint32 = 222270
 )
 
 func SetAllActivations(act uint32) {
@@ -43,6 +52,8 @@ func SetAllActivations(act uint32) {
 	TransactionConversionActivation = act
 	PEGPricingActivation = act
 	OneWaypFCTConversions = act
+	PegnetConversionLimitActivation = act
+	PEGFreeFloatingPriceActivation = act
 }
 
 type Pegnetd struct {

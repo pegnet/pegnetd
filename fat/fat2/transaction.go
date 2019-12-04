@@ -170,3 +170,9 @@ func (t *Transaction) Validate() error {
 func (t *Transaction) IsConversion() bool {
 	return len(t.Transfers) == 0 && PTickerInvalid < t.Conversion && t.Conversion < PTickerMax
 }
+
+// IsConversion returns true if this transaction has zero transfers and a
+// valid conversion into PEG
+func (t *Transaction) IsPEGRequest() bool {
+	return len(t.Transfers) == 0 && t.Conversion == PTickerPEG
+}
