@@ -35,8 +35,6 @@ func init() {
 	rootCmd.PersistentFlags().Int("act", -1, "Able to manually set the activation heights")
 	rootCmd.PersistentFlags().Int32("testingact", -1, "This is a hidden flag that can be used by QA and developers to set some custom activation heights.")
 	_ = rootCmd.PersistentFlags().MarkHidden("testingact")
-
-	rootCmd.PersistentFlags().Uint32Var(&node.PEGFreeFloatingPriceActivation, "v3", 0, "Sets the v3 activation height")
 }
 
 // Execute is cobra's entry point
