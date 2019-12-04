@@ -23,10 +23,11 @@
 package srv
 
 import (
+	"context"
 	"fmt"
 	"time"
 
-	jrpc "github.com/AdamSLevy/jsonrpc2/v11"
+	jrpc "github.com/AdamSLevy/jsonrpc2/v13"
 )
 
 // Client makes RPC requests to pegnetd's APIs. Client embeds a jsonrpc2.Client,
@@ -57,5 +58,5 @@ func (c *Client) Request(method string, params, result interface{}) error {
 	if c.DebugRequest {
 		fmt.Println("pegnetdd:", url)
 	}
-	return c.Client.Request(url, method, params, result)
+	return c.Client.Request(context.Background(), url, method, params, result)
 }
