@@ -3,20 +3,7 @@ crawshaw.io/iox v0.0.0-20181124134642-c51c3df30797 h1:yDf7ARQc637HoxDho7xjqdvO5Z
 crawshaw.io/iox v0.0.0-20181124134642-c51c3df30797/go.mod h1:sXBiorCo8c46JlQV3oXPKINnZ8mcqnye1EkVkqsectk=
 github.com/AdamSLevy/go-merkle v0.0.0-20190611101253-ca33344a884d h1:FWutTJGVqBnL4rLgeNaspUYnmnvkXcmDA3QO3rHBGgU=
 github.com/AdamSLevy/go-merkle v0.0.0-20190611101253-ca33344a884d/go.mod h1:Nw3sh5L40Xs1wno7ndbD/dYWg+vARpBvpX9Zz1YSxbo=
-github.com/AdamSLevy/jsonrpc2 v2.0.0+incompatible h1:ut4YIGFeO2Mzyj7pNEmcHBAm/88qCDmZMyUn6EeuXI4=
-github.com/AdamSLevy/jsonrpc2 v2.0.0+incompatible/go.mod h1:6enYNa3tk//n6m8F7zXGhRbtTqpSeysaUcwZbLIHGYQ=
-github.com/AdamSLevy/jsonrpc2/v11 v11.3.2 h1:McSW/pP7K0/Ucjig6AJwW7Khph/XOMYhSB8v3YxMBl4=
-github.com/AdamSLevy/jsonrpc2/v11 v11.3.2/go.mod h1:7fNjH6BXM0KVswWqj+K/mnOS8wiSke0sE8X46hS+nsc=
 github.com/AdamSLevy/jsonrpc2/v12 v12.0.1/go.mod h1:UUmIu8A7Sjw+yI0tIc/iGQHoSu/7loifZ7E/AbjFFcI=
-<<<<<<< HEAD
-github.com/AdamSLevy/jsonrpc2/v12 v12.0.2-0.20190929214639-94306464b409 h1:s7+6wUZJvorkJWm6Eyifm4NDbmqGqJfFsZvtz416L2A=
-github.com/AdamSLevy/jsonrpc2/v12 v12.0.2-0.20190929214639-94306464b409/go.mod h1:UUmIu8A7Sjw+yI0tIc/iGQHoSu/7loifZ7E/AbjFFcI=
-<<<<<<< HEAD
-github.com/AdamSLevy/jsonrpc2/v13 v13.0.1 h1:hQ5rfCFBQrXQNtvP+2mtH6EmsUAEN61ZF1n8UGVNis0=
-github.com/AdamSLevy/jsonrpc2/v13 v13.0.1/go.mod h1:8QsYqGKdPEim+n/j9KFTYB2tIj250f044Vxh2XRKhP4=
-=======
-=======
->>>>>>> Correct imports
 github.com/AdamSLevy/jsonrpc2/v12 v12.0.2-0.20191015223217-9181d6ac9347 h1:bnHpux+c+kROwUL+2nscrUODAa33JQWlViGCBD2W5bg=
 github.com/AdamSLevy/jsonrpc2/v12 v12.0.2-0.20191015223217-9181d6ac9347/go.mod h1:UUmIu8A7Sjw+yI0tIc/iGQHoSu/7loifZ7E/AbjFFcI=
 github.com/AdamSLevy/jsonrpc2/v13 v13.0.1 h1:hQ5rfCFBQrXQNtvP+2mtH6EmsUAEN61ZF1n8UGVNis0=
@@ -24,25 +11,11 @@ github.com/AdamSLevy/jsonrpc2/v13 v13.0.1/go.mod h1:8QsYqGKdPEim+n/j9KFTYB2tIj25
 github.com/AdamSLevy/pflag v1.0.4 h1:oykgyxDWo391JRRNOLr892UzaK2SmLiAvza8OBLX24U=
 github.com/AdamSLevy/pflag v1.0.4/go.mod h1:UeCxQpw/gAoTUVBfjr8n7qcGZZNmECgohVFOAdlRMtA=
 github.com/AdamSLevy/sqlite v0.1.3-0.20191014215059-b98bb18889de/go.mod h1:igAO5JulrQ1DbdZdtVq48mnZUBAPOeFzer7VhDWNtW4=
->>>>>>> Begin work to match refactor in fat
-github.com/AdamSLevy/sqlitechangeset v0.0.0-20190925183646-3ddb70fb709d h1:yPm4An70OhM4k4WUq7M9sWaVlFas2+hJB+I3Fsgw38A=
 github.com/AdamSLevy/sqlitechangeset v0.0.0-20190925183646-3ddb70fb709d/go.mod h1:kQNmmf+2gf3uGKHt0LS4guxdp4Ay44SXA4+Is8/Gxm8=
 github.com/BurntSushi/toml v0.3.1 h1:WXkYYl6Yr3qBf1K79EBnL4mak0OimBfB0XUf9Vl28OQ=
 github.com/BurntSushi/toml v0.3.1/go.mod h1:xHWCNGjB5oqiDr8zfno3MHue2Ht5sIBksp03qcyfWMU=
-<<<<<<< HEAD
-<<<<<<< HEAD
-github.com/Emyrk/factom v0.0.0-20191126143921-b5fc57ecd146 h1:2VcBtt+1ysKrzL5s5EIZDS49PsflfeOepJ2LrjOcekI=
-github.com/Emyrk/factom v0.0.0-20191126143921-b5fc57ecd146/go.mod h1:XbZ9AweH09WKgxrfPIEauJ5/2XL/zroNmDAbd3TdKXk=
-=======
-github.com/Emyrk/factom v0.0.0-20191001194233-40c0cdc2f2a0 h1:blIsTi+ppAojepc46TFXMtHaTMRXI5Ga3cddTC8P0U4=
-github.com/Emyrk/factom v0.0.0-20191001194233-40c0cdc2f2a0/go.mod h1:XbZ9AweH09WKgxrfPIEauJ5/2XL/zroNmDAbd3TdKXk=
-github.com/Emyrk/factom v0.0.0-20191115203952-1520e3ca4f6a h1:KH2LS+g2L7Jj3YgV4crgzsFIse7Ox8Ltwrv9XmcYT1I=
-github.com/Emyrk/factom v0.0.0-20191115203952-1520e3ca4f6a/go.mod h1:VYH2CT47swOogDIz1ptrGXnrX4JZeLQUIfNWXScJUQA=
->>>>>>> Begin work to match refactor in fat
-=======
 github.com/Emyrk/factom v0.0.0-20191121205237-77d7cc617344 h1:Pn6Dt3IU7OH8VFuExV71CNxE6pOyd8CZr2fNL+ngmGg=
 github.com/Emyrk/factom v0.0.0-20191121205237-77d7cc617344/go.mod h1:QwTTrmYvbvsDC7+ZzonzR0jmoT9BgPzaM0XsMJqCJFs=
->>>>>>> Correct imports
 github.com/Factom-Asset-Tokens/base58 v0.0.0-20181227014902-61655c4dd885 h1:rfy2fwMrOZPqQgjsH7VCreGMSPzcvqQrfjeSs8nf+sY=
 github.com/Factom-Asset-Tokens/base58 v0.0.0-20181227014902-61655c4dd885/go.mod h1:RVXsRSp6VzXw5l1uiGazuf3qo23Qk0h1HzMcQk+X4LE=
 github.com/Factom-Asset-Tokens/fatd v1.0.1-0.20191115033315-aa22fa985791 h1:yQiBURzeL5SomMe4zDflmbU2aeNZnGPc/QeYNtA7K7k=

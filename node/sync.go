@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/pegnet/pegnetd/node/pegnet"
-
 	"github.com/Factom-Asset-Tokens/factom"
 	"github.com/pegnet/pegnet/modules/conversions"
 	"github.com/pegnet/pegnet/modules/grader"
@@ -506,7 +504,7 @@ func (d *Pegnetd) applyTransactionBatch(sqlTx *sql.Tx, txBatch *fat2.Transaction
 
 	log.WithFields(log.Fields{
 		"height":     currentHeight, // Just for log traces
-		"entryhash":  txBatch.Hash.String(),
+		"entryhash":  txBatch.Entry.Hash.String(),
 		"conversion": txBatch.HasConversions(),
 		"txs":        len(txBatch.Transactions)}).Tracef("tx applied")
 
@@ -593,7 +591,7 @@ func (d *Pegnetd) recordPegnetRequests(sqlTx *sql.Tx, txBatchs []*fat2.Transacti
 			tx := txBatchs[i].Transactions[j]
 			// The txid helps determine the order when deciding who
 			// gets the dust
-			txid := transactionid.FormatTxID(j, txBatchs[i].Hash.String())
+			txid := transactionid.FormatTxID(j, txBatchs[i].Entry.Hash.String())
 
 			// We caught the error earlier, so we can ignore it here.
 			pegAmt, _ := conversions.Convert(int64(tx.Input.Amount), rates[tx.Input.Type], rates[tx.Conversion])
