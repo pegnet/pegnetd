@@ -119,6 +119,7 @@ OuterSyncLoop:
 				d.Sync.Synced--
 				hLog.WithError(err).Errorf("unable to commit transaction")
 				err = tx.Rollback()
+				time.Since(5 * time.Second) // Do not thrash
 				// Just go back to the outer loop and try again. Do not fatal crash.
 				continue OuterSyncLoop
 				if err != nil {
