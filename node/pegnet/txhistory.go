@@ -87,7 +87,7 @@ const createTableTxHistoryLookup = `CREATE TABLE IF NOT EXISTS "pn_history_looku
 	PRIMARY KEY("entry_hash", "tx_index", "address"),
 	FOREIGN KEY("entry_hash", "tx_index") REFERENCES "pn_history_transaction"
 );
-CREATE INDEX IF NOT EXISTS "idx_history_lookup_address" ON "pn_history_lookup"("address");
+DROP INDEX IF EXISTS idx_history_lookup_address;
 CREATE INDEX IF NOT EXISTS "idx_history_lookup_entry_index" ON "pn_history_lookup"("entry_hash", "tx_index");`
 
 func txhistoryMigrateLookup1(p *Pegnet) {
