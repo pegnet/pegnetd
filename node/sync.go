@@ -94,7 +94,7 @@ OuterSyncLoop:
 				err = tx.Rollback()
 				if err != nil {
 					// TODO evaluate if we can recover from this point or not
-					hLog.WithError(err).Fatal("unable to roll back transaction")
+					hLog.WithError(err).Fatal("(1) unable to roll back transaction")
 				}
 				continue OuterSyncLoop
 			}
@@ -109,7 +109,7 @@ OuterSyncLoop:
 				err = tx.Rollback()
 				if err != nil {
 					// TODO evaluate if we can recover from this point or not
-					hLog.WithError(err).Fatal("unable to roll back transaction")
+					hLog.WithError(err).Fatal("(2) unable to roll back transaction")
 				}
 				continue OuterSyncLoop
 			}
@@ -119,9 +119,11 @@ OuterSyncLoop:
 				d.Sync.Synced--
 				hLog.WithError(err).Errorf("unable to commit transaction")
 				err = tx.Rollback()
+				// Just go back to the outer loop and try again. Do not fatal crash.
+				continue OuterSyncLoop
 				if err != nil {
 					// TODO evaluate if we can recover from this point or not
-					hLog.WithError(err).Fatal("unable to roll back transaction")
+					hLog.WithError(err).Fatal("(3) unable to roll back transaction")
 				}
 			}
 
