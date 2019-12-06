@@ -75,11 +75,11 @@ func (p *Pegnet) SelectTransactionBatchesInHoldingAtHeight(height uint64) ([]*fa
 		if err != nil {
 			return nil, err
 		}
+		entry.Timestamp = time.Unix(unix, 0)
 		txBatch, err := fat2.NewTransactionBatch(entry)
 		if err != nil {
 			continue // TODO: this should never happen?
 		}
-		txBatch.Entry.Timestamp = time.Unix(unix, 0)
 		txBatches = append(txBatches, txBatch)
 	}
 	return txBatches, nil
