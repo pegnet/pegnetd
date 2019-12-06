@@ -1,6 +1,7 @@
 package pegnet
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -119,14 +120,17 @@ COMMIT;
 // only add a lookup reference if one doesn't already exist
 const insertLookupQuery = `INSERT INTO pn_history_lookup (entry_hash, tx_index, address) VALUES (?, ?, ?) ON CONFLICT DO NOTHING;`
 
-func (p *Pegnet) historySelectHelper(field string, data interface{}, options HistoryQueryOptions) ([]HistoryTransaction, int, error) {
+func (p *Pegnet) historySelectHelper(ctx context.Context, field string, data interface{}, options HistoryQueryOptions) ([]HistoryTransaction, int, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	countQuery, dataQuery, err := historyQueryBuilder(field, options)
 	if err != nil {
 		return nil, 0, err
 	}
 
 	var count int
-	err = p.DB.QueryRow(countQuery, data).Scan(&count)
+	err = p.DB.QueryRowContext(ctx, countQuery, data).Scan(&count)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -139,7 +143,7 @@ func (p *Pegnet) historySelectHelper(field string, data interface{}, options His
 		return nil, 0, fmt.Errorf("offset too big")
 	}
 
-	rows, err := p.DB.Query(dataQuery, data)
+	rows, err := p.DB.QueryContext(ctx, dataQuery, data)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -151,25 +155,25 @@ func (p *Pegnet) historySelectHelper(field string, data interface{}, options His
 
 // SelectTransactionHistoryActionsByHash returns the specified amount of transactions based on the hash.
 // Hash can be an entry hash from the opr and transaction chains, or a transaction hash from an fblock.
-func (p *Pegnet) SelectTransactionHistoryActionsByHash(hash *factom.Bytes32, options HistoryQueryOptions) ([]HistoryTransaction, int, error) {
-	return p.historySelectHelper("entry_hash", hash[:], options)
+func (p *Pegnet) SelectTransactionHistoryActionsByHash(ctx context.Context, hash *factom.Bytes32, options HistoryQueryOptions) ([]HistoryTransaction, int, error) {
+	return p.historySelectHelper(ctx, "entry_hash", hash[:], options)
 }
 
 // SelectTransactionHistoryActionsByAddress uses the lookup table to retrieve all transactions that have
 // the specified address in either inputs or outputs
-func (p *Pegnet) SelectTransactionHistoryActionsByAddress(addr *factom.FAAddress, options HistoryQueryOptions) ([]HistoryTransaction, int, error) {
-	return p.historySelectHelper("address", addr[:], options)
+func (p *Pegnet) SelectTransactionHistoryActionsByAddress(ctx context.Context, addr *factom.FAAddress, options HistoryQueryOptions) ([]HistoryTransaction, int, error) {
+	return p.historySelectHelper(ctx, "address", addr[:], options)
 }
 
 // SelectTransactionHistoryActionsByTxID uses the lookup table to retrieve all transactions that have
 // the specified txid. A TxID is an entryhash + a transaction index
-func (p *Pegnet) SelectTransactionHistoryActionsByTxID(hash *factom.Bytes32, options HistoryQueryOptions) ([]HistoryTransaction, int, error) {
-	return p.historySelectHelper("entry_hash", hash[:], options)
+func (p *Pegnet) SelectTransactionHistoryActionsByTxID(ctx context.Context, hash *factom.Bytes32, options HistoryQueryOptions) ([]HistoryTransaction, int, error) {
+	return p.historySelectHelper(ctx, "entry_hash", hash[:], options)
 }
 
 // SelectTransactionHistoryActionsByHeight returns all transactions that were **entered** at the specified height.
-func (p *Pegnet) SelectTransactionHistoryActionsByHeight(height uint32, options HistoryQueryOptions) ([]HistoryTransaction, int, error) {
-	return p.historySelectHelper("height", height, options)
+func (p *Pegnet) SelectTransactionHistoryActionsByHeight(ctx context.Context, height uint32, options HistoryQueryOptions) ([]HistoryTransaction, int, error) {
+	return p.historySelectHelper(ctx, "height", height, options)
 }
 
 // SelectTransactionHistoryStatus returns the status of a transaction:

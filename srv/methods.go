@@ -214,8 +214,8 @@ type ResultGetTransactions struct {
 	NextOffset int         `json:"nextoffset"`
 }
 
-func (s *APIServer) getTransactions(forceTxId bool) func(_ context.Context, data json.RawMessage) interface{} {
-	return func(_ context.Context, data json.RawMessage) interface{} {
+func (s *APIServer) getTransactions(forceTxId bool) func(ctx context.Context, data json.RawMessage) interface{} {
+	return func(ctx context.Context, data json.RawMessage) interface{} {
 		params := ParamsGetPegnetTransaction{}
 		_, _, err := validate(data, &params)
 		if err != nil {
@@ -253,16 +253,16 @@ func (s *APIServer) getTransactions(forceTxId bool) func(_ context.Context, data
 		if params.Hash != "" {
 			hash := new(factom.Bytes32)
 			_ = hash.UnmarshalText([]byte(params.Hash)) // error checked by params.valid
-			actions, count, err = s.Node.Pegnet.SelectTransactionHistoryActionsByHash(hash, options)
+			actions, count, err = s.Node.Pegnet.SelectTransactionHistoryActionsByHash(ctx, hash, options)
 		} else if params.Address != "" {
 			addr, _ := factom.NewFAAddress(params.Address) // verified in param
-			actions, count, err = s.Node.Pegnet.SelectTransactionHistoryActionsByAddress(&addr, options)
+			actions, count, err = s.Node.Pegnet.SelectTransactionHistoryActionsByAddress(ctx, &addr, options)
 		} else if params.TxID != "" {
 			hash := new(factom.Bytes32)
 			_ = hash.UnmarshalText([]byte(params.txEntryHash)) // error checked by params.valid
-			actions, count, err = s.Node.Pegnet.SelectTransactionHistoryActionsByTxID(hash, options)
+			actions, count, err = s.Node.Pegnet.SelectTransactionHistoryActionsByTxID(ctx, hash, options)
 		} else {
-			actions, count, err = s.Node.Pegnet.SelectTransactionHistoryActionsByHeight(uint32(params.Height), options)
+			actions, count, err = s.Node.Pegnet.SelectTransactionHistoryActionsByHeight(ctx, uint32(params.Height), options)
 		}
 
 		if err != nil {

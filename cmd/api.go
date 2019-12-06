@@ -552,6 +552,18 @@ var getTXs = &cobra.Command{
 		cl := srv.NewClient()
 		cl.PegnetdServer = viper.GetString(config.Pegnetd)
 		var res srv.ResultGetTransactions
+
+		for i := 0; i < 25; i++ {
+			go func() {
+				var res srv.ResultGetTransactions
+				err = cl.Request("get-transactions", params, &res)
+				if err != nil {
+					fmt.Printf("Failed to make RPC request\nDetails:\n%v\n", err)
+					os.Exit(1)
+				}
+			}()
+		}
+
 		err = cl.Request("get-transactions", params, &res)
 		if err != nil {
 			fmt.Printf("Failed to make RPC request\nDetails:\n%v\n", err)
