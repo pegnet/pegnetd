@@ -77,6 +77,8 @@ const createTableTxHistoryTx = `CREATE TABLE IF NOT EXISTS "pn_history_transacti
 );
 CREATE INDEX IF NOT EXISTS "idx_history_transaction_entry_hash" ON "pn_history_transaction"("entry_hash");
 CREATE INDEX IF NOT EXISTS "idx_history_transaction_tx_index" ON "pn_history_transaction"("tx_index");
+CREATE INDEX IF NOT EXISTS pn_history_transaction_fasset_index ON pn_history_transaction (from_asset);
+CREATE INDEX IF NOT EXISTS pn_history_transaction_tasset_index ON pn_history_transaction (to_asset);
 `
 
 const createTableTxHistoryLookup = `CREATE TABLE IF NOT EXISTS "pn_history_lookup" (
