@@ -155,22 +155,10 @@ func (t TransactionBatch) ValidExtIDs() error {
 		uniqueInputs[factom.Bytes32(tx.Input.Address)] = struct{}{}
 	}
 
-	if err := fat103.Validate(t.Entry, uniqueInputs); err != nil {
+	if err := fat103.Validate(t.Entry, uniqueInputs, factom.R_RCD1); err != nil {
 		return err
 	}
-	// TODO: Verify this check is still enforced above
-	//// Create a map of all RCDs that are present in the ExtIDs
-	//includedRCDHashes := make(map[factom.FAAddress]struct{})
-	//extIDs := t.ExtIDs[1:]
-	//for i := 0; i < len(extIDs)/2; i++ {
-	//	includedRCDHashes[t.FAAddress(i)] = struct{}{}
-	//}
-	//// Ensure that for all unique inputs there is a corresponding RCD in the ExtIDs
-	//for address := range uniqueInputs {
-	//	if _, ok := includedRCDHashes[address]; !ok {
-	//		return fmt.Errorf("invalid RCDs")
-	//	}
-	//}
+
 	return nil
 }
 
