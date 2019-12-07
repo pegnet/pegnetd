@@ -24,8 +24,10 @@ package srv
 
 import (
 	"fmt"
+	"math/rand"
 	"net/http"
 	"strings"
+	"time"
 
 	jrpc "github.com/AdamSLevy/jsonrpc2/v13"
 	"github.com/pegnet/pegnetd/config"
@@ -65,7 +67,11 @@ func (s *APIServer) Start(stop <-chan struct{}) (done <-chan struct{}) {
 
 	var handler http.Handler = http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
+			start := time.Now()
+			id := rand.Intn(100000)
+			log.Infof("%d: API request received", id)
 			jrpcHandler(w, r)
+			log.Infof("%d: API request done in %s", id, time.Since(start))
 		})
 	// TODO: Renable tls auth
 	//if flag.HasAuth {
