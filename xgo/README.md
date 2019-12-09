@@ -6,6 +6,6 @@ If you use the Dockerfile in this directory:
 
 ```
 docker build --tag xgo-builder .
-xgo  -image xgo-builder --targets=windows/amd64,darwin/amd64,linux/amd64 .
+xgo -ldflags="-X github.com/pegnet/pegnetd/config.CompiledInBuild=`git rev-parse HEAD` -X github.com/pegnet/pegnetd/config.CompiledInVersion=`git describe --tags`" -image xgo-builder --targets=windows/amd64,darwin/amd64,linux/amd64 .
 ```
 
