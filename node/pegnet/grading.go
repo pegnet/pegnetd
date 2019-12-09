@@ -110,15 +110,8 @@ func (p *Pegnet) InsertRates(tx *sql.Tx, height uint32, rates []opr.AssetUint, p
 			totalCapitalization.Add(totalCapitalization, assetCapitalization)
 		}
 		if issuance[fat2.PTickerPEG] == 0 {
-			// This number is outrageously large since the total cap is the total
-			// assets * rates. Assets and rates are 1e8 notation, so a price
-			// of $1 puts 1 USD at a market cap of 1e8*1e8.
-			// A max int64 is `9223372036854775807` (cannot save top bit in sqlite)
-			// So with pUSD, 922.337203685 pUSD will overflow a int64 and break
-			// our system. If we have 0 PEG, just set the rate to 0. This means
-			// you can only create the first PEG from mining.
-			//
-			// This only affects local nets that burn before mining starts.
+			// If there are no PEGs in the system, PEGs have no value (divide-by-zero)
+			// At least one block will have to be mined in order for PEGs to attain a value
 			ratePEG.SetUint64(0)
 		} else {
 			ratePEG.Div(totalCapitalization, new(big.Int).SetUint64(issuance[fat2.PTickerPEG]))
