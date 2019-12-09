@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -11,6 +12,7 @@ import (
 	"github.com/pegnet/pegnetd/config"
 	"github.com/pegnet/pegnetd/exit"
 	"github.com/pegnet/pegnetd/node"
+	"github.com/pegnet/pegnetd/node/pegnet"
 	"github.com/pegnet/pegnetd/srv"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -35,6 +37,10 @@ func init() {
 	rootCmd.PersistentFlags().Int("act", -1, "Able to manually set the activation heights")
 	rootCmd.PersistentFlags().Int32("testingact", -1, "This is a hidden flag that can be used by QA and developers to set some custom activation heights.")
 	_ = rootCmd.PersistentFlags().MarkHidden("testingact")
+
+	properties.Flags().String("dbmode", "", "Turn on custom sqlite modes")
+	properties.Flags().Bool("wal", false, "Turn on WAL mode for sqlite")
+	rootCmd.AddCommand(properties)
 }
 
 // Execute is cobra's entry point
@@ -68,6 +74,35 @@ var rootCmd = &cobra.Command{
 
 		// Run
 		node.DBlockSync(ctx)
+	},
+}
+
+var properties = &cobra.Command{
+	Use:              "properties",
+	Short:            "Pegnetd properties",
+	PersistentPreRun: always,
+	PreRun:           SoftReadConfig,
+	Run: func(cmd *cobra.Command, args []string) {
+		// Handle ctl+c
+		ctx, cancel := context.WithCancel(context.Background())
+		exit.GlobalExitHandler.AddCancel(cancel)
+		defer ctx.Done()
+
+		// Get the db
+		conf := viper.GetViper()
+		node := pegnet.New(conf)
+		sqliteVersion := ""
+		if err := node.Init(); err != nil {
+			sqliteVersion = err.Error()
+		} else {
+			row := node.DB.QueryRow("select sqlite_version() as version")
+			if err := row.Scan(&sqliteVersion); err != nil {
+				sqliteVersion = err.Error()
+			}
+		}
+
+		format := "%20s: %v\n"
+		fmt.Printf(format, "SQLite Version", sqliteVersion)
 	},
 }
 
