@@ -116,7 +116,7 @@ var properties = &cobra.Command{
 			FactomdVersion    string `json:"factomdversion"`
 			FactomdAPIVersion string `json:"factomdapiversion"`
 		}{
-			FactomdVersion: "Unknown", FactomdAPIVersion: "Uknown",
+			FactomdVersion: "Unknown", FactomdAPIVersion: "Unknown",
 		}
 		_ = cl.FactomdRequest("properties", nil, &factomdProperties)
 		fmt.Printf(format, "Factomd Version", factomdProperties.FactomdVersion)
@@ -126,11 +126,11 @@ var properties = &cobra.Command{
 			WalletdVersion    string `json:"walletversion"`
 			WalletdAPIVersion string `json:"walletapiversion"`
 		}{
-			WalletdVersion: "Unknown", WalletdAPIVersion: "Uknown",
+			WalletdVersion: "Unknown", WalletdAPIVersion: "Unknown",
 		}
 		_ = cl.WalletdRequest("properties", nil, &walletdProperties)
-		fmt.Printf(format, "Walletd Version", factomdProperties.FactomdVersion)
-		fmt.Printf(format, "Walletd API Version", factomdProperties.FactomdAPIVersion)
+		fmt.Printf(format, "Walletd Version", walletdProperties.WalletdVersion)
+		fmt.Printf(format, "Walletd API Version", walletdProperties.WalletdAPIVersion)
 
 	},
 }
