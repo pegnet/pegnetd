@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 
@@ -90,19 +91,47 @@ var properties = &cobra.Command{
 
 		// Get the db
 		conf := viper.GetViper()
-		node := pegnet.New(conf)
+		pNode := pegnet.New(conf)
 		sqliteVersion := ""
-		if err := node.Init(); err != nil {
+		if err := pNode.Init(); err != nil {
 			sqliteVersion = err.Error()
 		} else {
-			row := node.DB.QueryRow("select sqlite_version() as version")
+			row := pNode.DB.QueryRow("select sqlite_version() as version")
 			if err := row.Scan(&sqliteVersion); err != nil {
 				sqliteVersion = err.Error()
 			}
 		}
 
-		format := "%20s: %v\n"
+		format := "\t%30s: %v\n"
+		fmt.Println("Pegnetd version and Properties")
+		fmt.Printf(format, "Build Verison", config.CompiledInVersion)
+		fmt.Printf(format, "Build Commit", config.CompiledInBuild)
 		fmt.Printf(format, "SQLite Version", sqliteVersion)
+		fmt.Printf(format, "GoLang Version", runtime.Version())
+
+		// Factomd and walletd versions
+		fmt.Println()
+		cl := node.FactomClientFromConfig(conf)
+		factomdProperties := struct {
+			FactomdVersion    string `json:"factomdversion"`
+			FactomdAPIVersion string `json:"factomdapiversion"`
+		}{
+			FactomdVersion: "Unknown", FactomdAPIVersion: "Uknown",
+		}
+		_ = cl.FactomdRequest("properties", nil, &factomdProperties)
+		fmt.Printf(format, "Factomd Version", factomdProperties.FactomdVersion)
+		fmt.Printf(format, "Factomd API Version", factomdProperties.FactomdAPIVersion)
+
+		walletdProperties := struct {
+			WalletdVersion    string `json:"walletversion"`
+			WalletdAPIVersion string `json:"walletapiversion"`
+		}{
+			WalletdVersion: "Unknown", WalletdAPIVersion: "Uknown",
+		}
+		_ = cl.WalletdRequest("properties", nil, &walletdProperties)
+		fmt.Printf(format, "Walletd Version", factomdProperties.FactomdVersion)
+		fmt.Printf(format, "Walletd API Version", factomdProperties.FactomdAPIVersion)
+
 	},
 }
 
