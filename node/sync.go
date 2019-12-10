@@ -331,7 +331,7 @@ func (d *Pegnetd) ApplyTransactionBatchesInHolding(ctx context.Context, sqlTx *s
 		// on a proportional basis.
 		for i, txBatch := range txBatches {
 			// Re-validate transaction batch because timestamp might not be valid anymore
-			if err := txBatch.Validate(); err != nil {
+			if err := txBatch.Validate(currentHeight); err != nil {
 				d.Pegnet.SetTransactionHistoryExecuted(sqlTx, txBatch, -2)
 				continue
 			}

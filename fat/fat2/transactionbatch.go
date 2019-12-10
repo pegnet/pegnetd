@@ -21,13 +21,13 @@ type TransactionBatch struct {
 
 // NewTransactionBatch returns a TransactionBatch initialized with the given
 // entry.
-func NewTransactionBatch(entry factom.Entry) (*TransactionBatch, error) {
+func NewTransactionBatch(entry factom.Entry, height uint32) (*TransactionBatch, error) {
 	t := TransactionBatch{Entry: entry}
 	if err := t.UnmarshalJSON(entry.Content); err != nil {
 		return nil, err
 	}
 
-	if err := t.Validate(); err != nil {
+	if err := t.Validate(height); err != nil {
 		return nil, err
 	}
 
@@ -106,12 +106,14 @@ func (t TransactionBatch) Sign(signingSet ...factom.RCDSigner) (factom.Entry, er
 
 // Validate performs all validation checks and returns nil if it is a valid
 // batch. This function assumes the struct's entry field is populated.
-func (t *TransactionBatch) Validate() error {
+// Validate requires a height for rcd signature validation.
+// Not all rcd types are valid for all heights
+func (t *TransactionBatch) Validate(height uint32) error {
 	err := t.ValidData()
 	if err != nil {
 		return err
 	}
-	if err = t.ValidExtIDs(); err != nil {
+	if err = t.ValidExtIDs(height); err != nil {
 		return err
 	}
 	return nil
@@ -147,12 +149,17 @@ func (t *TransactionBatch) ValidData() error {
 // found, it will then validate the content of the RCD/signature pair. This
 // function assumes that the entry content has been unmarshaled and that
 // ValidData returns nil.
-func (t TransactionBatch) ValidExtIDs() error {
+func (t TransactionBatch) ValidExtIDs(height uint32) error {
 	// Count unique inputs to know how many signatures are needed on the entry
 
 	uniqueInputs := make(map[factom.Bytes32]struct{})
 	for _, tx := range t.Transactions {
 		uniqueInputs[factom.Bytes32(tx.Input.Address)] = struct{}{}
+	}
+
+	flag := factom.R_RCD1
+	if height > Fat2RCDEActivation {
+		flag = flag | factom.R_RCDe
 	}
 
 	if err := fat103.Validate(t.Entry, uniqueInputs, factom.R_RCD1); err != nil {
