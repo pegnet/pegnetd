@@ -10,10 +10,10 @@ import (
 	"strings"
 	"time"
 
+	sqlite3 "github.com/mattn/go-sqlite3"
 	"github.com/pegnet/pegnetd/config"
 	"github.com/pegnet/pegnetd/exit"
 	"github.com/pegnet/pegnetd/node"
-	"github.com/pegnet/pegnetd/node/pegnet"
 	"github.com/pegnet/pegnetd/srv"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -39,8 +39,6 @@ func init() {
 	rootCmd.PersistentFlags().Int32("testingact", -1, "This is a hidden flag that can be used by QA and developers to set some custom activation heights.")
 	_ = rootCmd.PersistentFlags().MarkHidden("testingact")
 
-	properties.Flags().String("dbmode", "", "Turn on custom sqlite modes")
-	properties.Flags().Bool("wal", false, "Turn on WAL mode for sqlite")
 	rootCmd.AddCommand(properties)
 }
 
@@ -91,23 +89,14 @@ var properties = &cobra.Command{
 
 		// Get the db
 		conf := viper.GetViper()
-		pNode := pegnet.New(conf)
-		sqliteVersion := ""
-		if err := pNode.Init(); err != nil {
-			sqliteVersion = err.Error()
-		} else {
-			row := pNode.DB.QueryRow("select sqlite_version() as version")
-			if err := row.Scan(&sqliteVersion); err != nil {
-				sqliteVersion = err.Error()
-			}
-		}
 
+		sqliteVersion, _, _ := sqlite3.Version()
 		format := "\t%30s: %v\n"
-		fmt.Println("Pegnetd version and Properties")
-		fmt.Printf(format, "Build Verison", config.CompiledInVersion)
+		fmt.Println("Pegnetd Version and Properties")
+		fmt.Printf(format, "Build Version", config.CompiledInVersion)
 		fmt.Printf(format, "Build Commit", config.CompiledInBuild)
 		fmt.Printf(format, "SQLite Version", sqliteVersion)
-		fmt.Printf(format, "GoLang Version", runtime.Version())
+		fmt.Printf(format, "Golang Version", runtime.Version())
 
 		// Factomd and walletd versions
 		fmt.Println()
