@@ -91,12 +91,20 @@ var properties = &cobra.Command{
 		conf := viper.GetViper()
 
 		sqliteVersion, _, _ := sqlite3.Version()
-		format := "\t%30s: %v\n"
-		fmt.Println("Pegnetd Version and Properties")
+		format := "\t%20s: %v\n"
+		fmt.Println("Pegnetd CLI Version and Properties")
 		fmt.Printf(format, "Build Version", config.CompiledInVersion)
 		fmt.Printf(format, "Build Commit", config.CompiledInBuild)
 		fmt.Printf(format, "SQLite Version", sqliteVersion)
 		fmt.Printf(format, "Golang Version", runtime.Version())
+
+		// Remote pegnetd properties. The cli and pegnetd daemon can differ
+		fmt.Println("\nRemote Pegnetd")
+		props := getProperties()
+		fmt.Printf(format, "Build Version", props.BuildVersion)
+		fmt.Printf(format, "Build Commit", props.BuildCommit)
+		fmt.Printf(format, "SQLite Version", props.SQLiteVersion)
+		fmt.Printf(format, "Golang Version", props.GolangVersion)
 
 		// Factomd and walletd versions
 		fmt.Println()

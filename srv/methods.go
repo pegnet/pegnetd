@@ -28,10 +28,12 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"runtime"
 	"sort"
 
 	jrpc "github.com/AdamSLevy/jsonrpc2/v13"
 	"github.com/Factom-Asset-Tokens/factom"
+	sqlite3 "github.com/mattn/go-sqlite3"
 	"github.com/pegnet/pegnet/modules/conversions"
 	"github.com/pegnet/pegnetd/config"
 	"github.com/pegnet/pegnetd/fat/fat2"
@@ -51,10 +53,28 @@ func (s *APIServer) jrpcMethods() jrpc.MethodMap {
 		"send-transaction":       s.sendTransaction,
 
 		"get-sync-status": s.getSyncStatus,
+		"properties":      s.properties,
 
 		"get-pegnet-rates": s.getPegnetRates,
 	}
 
+}
+
+type PegnetdProperties struct {
+	BuildVersion  string `json:"buildversion"`
+	BuildCommit   string `json:"buildcommit"`
+	SQLiteVersion string `json:"sqliteversion"`
+	GolangVersion string `json:"golang"`
+}
+
+func (APIServer) properties(_ context.Context, data json.RawMessage) interface{} {
+	sqliteVersion, _, _ := sqlite3.Version()
+	return PegnetdProperties{
+		BuildVersion:  config.CompiledInVersion,
+		BuildCommit:   config.CompiledInBuild,
+		SQLiteVersion: sqliteVersion,
+		GolangVersion: runtime.Version(),
+	}
 }
 
 type ResultGlobalRichList struct {

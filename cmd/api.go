@@ -455,6 +455,22 @@ var status = &cobra.Command{
 	},
 }
 
+func getProperties() srv.PegnetdProperties {
+	cl := srv.NewClient()
+	cl.PegnetdServer = viper.GetString(config.Pegnetd)
+	var res srv.PegnetdProperties
+	err := cl.Request("properties", nil, &res)
+	if err != nil {
+		return srv.PegnetdProperties{
+			BuildVersion:  "Unknown/Unable",
+			BuildCommit:   "Unknown/Unable",
+			SQLiteVersion: "Unknown/Unable",
+			GolangVersion: "Unknown/Unable",
+		}
+	}
+	return res
+}
+
 func getStatus() srv.ResultGetSyncStatus {
 	cl := srv.NewClient()
 	cl.PegnetdServer = viper.GetString(config.Pegnetd)

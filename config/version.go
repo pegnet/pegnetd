@@ -2,6 +2,6 @@ package config
 
 // Compiled in
 var (
-	CompiledInBuild   string = "Unknown"
-	CompiledInVersion string = "Unknown"
+	CompiledInBuild   string = "Undefined"
+	CompiledInVersion string = "Undefined"
 )
