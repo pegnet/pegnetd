@@ -110,7 +110,9 @@ func (p *Pegnet) InsertRates(tx *sql.Tx, height uint32, rates []opr.AssetUint, p
 			totalCapitalization.Add(totalCapitalization, assetCapitalization)
 		}
 		if issuance[fat2.PTickerPEG] == 0 {
-			ratePEG.Set(totalCapitalization)
+			// If there are no PEGs in the system, PEGs have no value (divide-by-zero)
+			// At least one block will have to be mined in order for PEGs to attain a value
+			ratePEG.SetUint64(0)
 		} else {
 			ratePEG.Div(totalCapitalization, new(big.Int).SetUint64(issuance[fat2.PTickerPEG]))
 		}
