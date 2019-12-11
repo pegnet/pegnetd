@@ -27,7 +27,7 @@ func New(conf *viper.Viper) *Pegnet {
 
 func (p *Pegnet) Init() error {
 	// The path should contain a $HOME env variable.
-	rawpath := viper.GetString(config.SqliteDBPath)
+	rawpath := p.Config.GetString(config.SqliteDBPath)
 	if runtime.GOOS == "windows" {
 		rawpath = strings.Replace(rawpath, "$HOME", "$USERPROFILE", -1)
 	}

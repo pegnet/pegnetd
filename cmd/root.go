@@ -2,12 +2,15 @@ package cmd
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"os/signal"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 
+	sqlite3 "github.com/mattn/go-sqlite3"
 	"github.com/pegnet/pegnetd/config"
 	"github.com/pegnet/pegnetd/exit"
 	"github.com/pegnet/pegnetd/node"
@@ -35,6 +38,8 @@ func init() {
 	rootCmd.PersistentFlags().Int("act", -1, "Able to manually set the activation heights")
 	rootCmd.PersistentFlags().Int32("testingact", -1, "This is a hidden flag that can be used by QA and developers to set some custom activation heights.")
 	_ = rootCmd.PersistentFlags().MarkHidden("testingact")
+
+	rootCmd.AddCommand(properties)
 }
 
 // Execute is cobra's entry point
@@ -68,6 +73,62 @@ var rootCmd = &cobra.Command{
 
 		// Run
 		node.DBlockSync(ctx)
+	},
+}
+
+var properties = &cobra.Command{
+	Use:              "properties",
+	Short:            "Pegnetd properties",
+	PersistentPreRun: always,
+	PreRun:           SoftReadConfig,
+	Run: func(cmd *cobra.Command, args []string) {
+		// Handle ctl+c
+		ctx, cancel := context.WithCancel(context.Background())
+		exit.GlobalExitHandler.AddCancel(cancel)
+		defer ctx.Done()
+
+		// Get the db
+		conf := viper.GetViper()
+
+		sqliteVersion, _, _ := sqlite3.Version()
+		format := "\t%20s: %v\n"
+		fmt.Println("Pegnetd CLI Version and Properties")
+		fmt.Printf(format, "Build Version", config.CompiledInVersion)
+		fmt.Printf(format, "Build Commit", config.CompiledInBuild)
+		fmt.Printf(format, "SQLite Version", sqliteVersion)
+		fmt.Printf(format, "Golang Version", runtime.Version())
+
+		// Remote pegnetd properties. The cli and pegnetd daemon can differ
+		fmt.Println("\nRemote Pegnetd")
+		props := getProperties()
+		fmt.Printf(format, "Build Version", props.BuildVersion)
+		fmt.Printf(format, "Build Commit", props.BuildCommit)
+		fmt.Printf(format, "SQLite Version", props.SQLiteVersion)
+		fmt.Printf(format, "Golang Version", props.GolangVersion)
+
+		// Factomd and walletd versions
+		fmt.Println()
+		cl := node.FactomClientFromConfig(conf)
+		factomdProperties := struct {
+			FactomdVersion    string `json:"factomdversion"`
+			FactomdAPIVersion string `json:"factomdapiversion"`
+		}{
+			FactomdVersion: "Unknown", FactomdAPIVersion: "Unknown",
+		}
+		_ = cl.FactomdRequest("properties", nil, &factomdProperties)
+		fmt.Printf(format, "Factomd Version", factomdProperties.FactomdVersion)
+		fmt.Printf(format, "Factomd API Version", factomdProperties.FactomdAPIVersion)
+
+		walletdProperties := struct {
+			WalletdVersion    string `json:"walletversion"`
+			WalletdAPIVersion string `json:"walletapiversion"`
+		}{
+			WalletdVersion: "Unknown", WalletdAPIVersion: "Unknown",
+		}
+		_ = cl.WalletdRequest("properties", nil, &walletdProperties)
+		fmt.Printf(format, "Walletd Version", walletdProperties.WalletdVersion)
+		fmt.Printf(format, "Walletd API Version", walletdProperties.WalletdAPIVersion)
+
 	},
 }
 
