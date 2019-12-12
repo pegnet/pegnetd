@@ -148,7 +148,7 @@ func TestTransactionBatch_Validate(t *testing.T) {
 			assert.NoError(err)
 			txBatch.Entry = ent
 
-			err = txBatch.Validate()
+			err = txBatch.Validate(-1)
 			if len(test.Error) != 0 {
 				assert.EqualError(err, test.Error)
 				return
