@@ -331,7 +331,7 @@ func (d *Pegnetd) ApplyTransactionBatchesInHolding(ctx context.Context, sqlTx *s
 		// on a proportional basis.
 		for i, txBatch := range txBatches {
 			// Re-validate transaction batch because timestamp might not be valid anymore
-			if err := txBatch.Validate(currentHeight); err != nil {
+			if err := txBatch.Validate(int32(currentHeight)); err != nil {
 				d.Pegnet.SetTransactionHistoryExecuted(sqlTx, txBatch, -2)
 				continue
 			}
@@ -378,13 +378,11 @@ func (d *Pegnetd) ApplyTransactionBatchesInHolding(ctx context.Context, sqlTx *s
 // immediately. If an error is returned, the sql.Tx should be rolled back by the caller.
 func (d *Pegnetd) ApplyTransactionBlock(sqlTx *sql.Tx, eblock *factom.EBlock) error {
 	for blockorder, entry := range eblock.Entries {
-		txBatch, err := fat2.NewTransactionBatch(entry)
+		txBatch, err := fat2.NewTransactionBatch(entry, int32(eblock.Height))
 		if err != nil {
 			continue // Bad formatted entry
 		}
-		if err := txBatch.Validate(); err != nil {
-			continue
-		}
+
 		log.WithFields(log.Fields{
 			"height":      eblock.Height,
 			"entryhash":   entry.Hash.String(),

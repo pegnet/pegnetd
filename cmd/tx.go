@@ -9,11 +9,55 @@ import (
 	"github.com/pegnet/pegnetd/node"
 )
 
-func signAndSend(tx *fat2.Transaction, cl *factom.Client, payment string) (err error, commit *factom.Bytes32, reveal *factom.Bytes32) {
+func addressRules(input string, output string) error {
+	if len(input) < 2 || len(output) < 2 {
+		return fmt.Errorf("input or output is too short to be an address")
+	}
+
+	switch input[:2] {
+	case "FA":
+		if output[:2] == "FA" || output[:2] == "Fe" {
+			// This is ok
+			return nil
+		}
+		if output[:2] == "FE" {
+			return fmt.Errorf("FA addresses can only send pAssets to FA or Fe addresses. You cannot send pAssets to a gateway address, FE, from an FA address. You must use an address that has a linked ethereum address to do that")
+		}
+		return fmt.Errorf("FA addresses can only send pAssets to FA or Fe addresses. It seems what you are trying to do it not allowed")
+	case "Fe":
+		if output[:2] == "FA" || output[:2] == "Fe" || output[:2] == "FE" {
+			// This is ok
+			return nil
+		}
+
+		return fmt.Errorf("Fe addresses can only send pAssets to FA, Fe, or FE addresses. It seems what you are trying to do it not allowed")
+	}
+	return nil
+}
+
+func signAndSend(source string, tx *fat2.Transaction, cl *factom.Client, payment string) (err error, commit *factom.Bytes32, reveal *factom.Bytes32) {
 	// Get out private key
-	priv, err := tx.Input.Address.GetFsAddress(nil, cl)
-	if err != nil {
-		return fmt.Errorf("unable to get private key: %s\n", err.Error()), nil, nil
+	// If the source is an Fe/FE address, we use the eth secret
+	var priv factom.RCDSigner
+
+	switch source[:2] {
+	case "FA":
+		priv, err = tx.Input.Address.GetFsAddress(nil, cl)
+		if err != nil {
+			return fmt.Errorf("[FA] unable to get private key: %s\n", err.Error()), nil, nil
+		}
+	case "Fe":
+		addr := factom.FeAddress(tx.Input.Address)
+		priv, err = addr.GetEthSecret(nil, cl)
+		if err != nil {
+			return fmt.Errorf("[Fe] unable to get private key: %s\n", err.Error()), nil, nil
+		}
+	case "FE":
+		addr := factom.FEGatewayAddress(tx.Input.Address)
+		priv, err = addr.GetEthSecret(nil, cl)
+		if err != nil {
+			return fmt.Errorf("[FE] unable to get private key: %s\n", err.Error()), nil, nil
+		}
 	}
 
 	var txBatch fat2.TransactionBatch
@@ -28,7 +72,7 @@ func signAndSend(tx *fat2.Transaction, cl *factom.Client, payment string) (err e
 	}
 	txBatch.Entry = entry
 
-	if err := txBatch.Validate(); err != nil {
+	if err := txBatch.Validate(-1); err != nil {
 		return fmt.Errorf("invalid tx: %s", err.Error()), nil, nil
 	}
 
@@ -68,7 +112,7 @@ func setTransferOutput(tx *fat2.Transaction, cl *factom.Client, dest, amt string
 
 	tx.Transfers = make([]fat2.AddressAmountTuple, 1)
 	tx.Transfers[0].Amount = uint64(amount)
-	if tx.Transfers[0].Address, err = factom.NewFAAddress(dest); err != nil {
+	if tx.Transfers[0].Address, err = underlyingFA(dest); err != nil {
 		return fmt.Errorf("failed to parse input: %s\n", err.Error())
 	}
 
@@ -88,7 +132,7 @@ func setTransactionInput(tx *fat2.Transaction, cl *factom.Client, source, asset,
 	tx.Input.Amount = uint64(amount)
 
 	// Set the input
-	if tx.Input.Address, err = factom.NewFAAddress(source); err != nil {
+	if tx.Input.Address, err = underlyingFA(source); err != nil {
 		return fmt.Errorf("failed to parse input: %s\n", err.Error())
 	}
 
@@ -116,4 +160,21 @@ func ticker(asset string) (fat2.PTicker, error) {
 		return fat2.PTickerInvalid, fmt.Errorf("invalid ticker type\n")
 	}
 	return aType, nil
+}
+
+func underlyingFA(addr string) (factom.FAAddress, error) {
+	if len(addr) < 2 {
+		return factom.NewFAAddress(addr)
+	}
+	switch addr[:2] {
+	case "FA":
+		// Resort to the default
+	case "Fe":
+		feAddr, err := factom.NewFeAddress(addr)
+		return factom.FAAddress(feAddr), err
+	case "FE":
+		gatewayAddr, err := factom.NewFEGatewayAddress(addr)
+		return factom.FAAddress(gatewayAddr), err
+	}
+	return factom.NewFAAddress(addr)
 }

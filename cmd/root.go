@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/pegnet/pegnetd/fat/fat2"
 	sqlite3 "github.com/mattn/go-sqlite3"
 	"github.com/pegnet/pegnetd/config"
 	"github.com/pegnet/pegnetd/exit"
@@ -147,8 +148,7 @@ func always(cmd *cobra.Command, args []string) {
 	}
 
 	if testingact, _ := cmd.Flags().GetInt32("testingact"); testingact >= 0 {
-		node.PegnetConversionLimitActivation = uint32(testingact)
-		node.PEGFreeFloatingPriceActivation = uint32(testingact)
+		fat2.Fat2RCDEActivation = uint32(testingact)
 	}
 
 	// Setup config reading

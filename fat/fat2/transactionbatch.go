@@ -21,7 +21,10 @@ type TransactionBatch struct {
 
 // NewTransactionBatch returns a TransactionBatch initialized with the given
 // entry.
-func NewTransactionBatch(entry factom.Entry, height uint32) (*TransactionBatch, error) {
+// The height is for validation purposes. For certain heights, only
+// certain rcd types are valid. If the height -1 is passed in, then
+// all rcd types are valid. This is helpful when making a tx.
+func NewTransactionBatch(entry factom.Entry, height int32) (*TransactionBatch, error) {
 	t := TransactionBatch{Entry: entry}
 	if err := t.UnmarshalJSON(entry.Content); err != nil {
 		return nil, err
@@ -108,7 +111,7 @@ func (t TransactionBatch) Sign(signingSet ...factom.RCDSigner) (factom.Entry, er
 // batch. This function assumes the struct's entry field is populated.
 // Validate requires a height for rcd signature validation.
 // Not all rcd types are valid for all heights
-func (t *TransactionBatch) Validate(height uint32) error {
+func (t *TransactionBatch) Validate(height int32) error {
 	err := t.ValidData()
 	if err != nil {
 		return err
@@ -149,7 +152,7 @@ func (t *TransactionBatch) ValidData() error {
 // found, it will then validate the content of the RCD/signature pair. This
 // function assumes that the entry content has been unmarshaled and that
 // ValidData returns nil.
-func (t TransactionBatch) ValidExtIDs(height uint32) error {
+func (t TransactionBatch) ValidExtIDs(height int32) error {
 	// Count unique inputs to know how many signatures are needed on the entry
 
 	uniqueInputs := make(map[factom.Bytes32]struct{})
@@ -158,11 +161,15 @@ func (t TransactionBatch) ValidExtIDs(height uint32) error {
 	}
 
 	flag := factom.R_RCD1
-	if height > Fat2RCDEActivation {
+	if height > int32(Fat2RCDEActivation) {
 		flag = flag | factom.R_RCDe
 	}
+	// < 0 means accept all rcd types
+	if height < 0 {
+		flag = flag | factom.R_ALL
+	}
 
-	if err := fat103.Validate(t.Entry, uniqueInputs, factom.R_RCD1); err != nil {
+	if err := fat103.Validate(t.Entry, uniqueInputs, flag); err != nil {
 		return err
 	}
 

@@ -4,9 +4,9 @@ import (
 	"database/sql"
 	"time"
 
-	"github.com/pegnet/pegnetd/fat/fat2"
-
 	"github.com/Factom-Asset-Tokens/factom"
+	"github.com/pegnet/pegnetd/fat/fat2"
+	log "github.com/sirupsen/logrus"
 )
 
 const createTableTransactionBatchHolding = `CREATE TABLE IF NOT EXISTS "pn_transaction_batch_holding" (
@@ -76,8 +76,9 @@ func (p *Pegnet) SelectTransactionBatchesInHoldingAtHeight(height uint64) ([]*fa
 			return nil, err
 		}
 		entry.Timestamp = time.Unix(unix, 0)
-		txBatch, err := fat2.NewTransactionBatch(entry)
+		txBatch, err := fat2.NewTransactionBatch(entry, int32(height))
 		if err != nil {
+			log.WithError(err).Error("failed to parse tx from database")
 			continue // TODO: this should never happen?
 		}
 		txBatches = append(txBatches, txBatch)

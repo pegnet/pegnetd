@@ -249,7 +249,7 @@ var conv = &cobra.Command{
 		CustomArgOrderValidationBuilder(
 			true,
 			ArgValidatorECAddress,
-			ArgValidatorFCTAddress,
+			ArgValidatorAddress(ADD_FA|ADD_FE|ADD_Fe),
 			ArgValidatorAssetOrP,
 			ArgValidatorFCTAmount,
 			ArgValidatorAssetOrP),
@@ -257,7 +257,7 @@ var conv = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		var err error
 		cl := node.FactomClientFromConfig(viper.GetViper())
-		payment, source, srcAsset, amt, destAsset := args[0], args[1], args[2], args[3], args[4]
+		payment, originalSource, srcAsset, amt, destAsset := args[0], args[1], args[2], args[3], args[4]
 
 		// Let's check the pXXX -> pFCT first
 		status := getStatus()
@@ -268,7 +268,7 @@ var conv = &cobra.Command{
 
 		// Build the transaction from the args
 		var trans fat2.Transaction
-		if err := setTransactionInput(&trans, cl, source, srcAsset, amt); err != nil {
+		if err := setTransactionInput(&trans, cl, originalSource, srcAsset, amt); err != nil {
 			cmd.PrintErrln(err.Error())
 			os.Exit(1)
 		}
@@ -278,7 +278,7 @@ var conv = &cobra.Command{
 			os.Exit(1)
 		}
 
-		err, commit, reveal := signAndSend(&trans, cl, payment)
+		err, commit, reveal := signAndSend(originalSource, &trans, cl, payment)
 		if err != nil {
 			cmd.PrintErrln(err.Error())
 			os.Exit(1)
@@ -301,10 +301,10 @@ var tx = &cobra.Command{
 		CustomArgOrderValidationBuilder(
 			true,
 			ArgValidatorECAddress,
-			ArgValidatorFCTAddress,
+			ArgValidatorAddress(ADD_FA|ADD_FE|ADD_Fe),
 			ArgValidatorAssetOrP,
 			ArgValidatorFCTAmount,
-			ArgValidatorFCTAddress),
+			ArgValidatorAddress(ADD_FA|ADD_FE|ADD_Fe)),
 	),
 	Run: func(cmd *cobra.Command, args []string) {
 		cl := node.FactomClientFromConfig(viper.GetViper())
@@ -322,7 +322,14 @@ var tx = &cobra.Command{
 			os.Exit(1)
 		}
 
-		err, commit, reveal := signAndSend(&trans, cl, payment)
+		// Before we sign and send, check the in/out rules
+		err := addressRules(source, dest)
+		if err != nil {
+			cmd.PrintErrln(err.Error())
+			os.Exit(1)
+		}
+
+		err, commit, reveal := signAndSend(source, &trans, cl, payment)
 		if err != nil {
 			cmd.PrintErrln(err.Error())
 			os.Exit(1)
@@ -341,7 +348,7 @@ var balance = &cobra.Command{
 	PersistentPreRun: always,
 	PreRun:           SoftReadConfig,
 	Args: CombineCobraArgs(
-		CustomArgOrderValidationBuilder(true, ArgValidatorAssetOrP, ArgValidatorFCTAddress),
+		CustomArgOrderValidationBuilder(true, ArgValidatorAssetOrP, ArgValidatorAddress(ADD_FA|ADD_FE|ADD_Fe)),
 		cobra.MinimumNArgs(1)),
 	Run: func(cmd *cobra.Command, args []string) {
 		res, err := queryBalances(args[1])
@@ -364,7 +371,7 @@ var balances = &cobra.Command{
 	PersistentPreRun: always,
 	PreRun:           SoftReadConfig,
 	Args: CombineCobraArgs(
-		CustomArgOrderValidationBuilder(true, ArgValidatorFCTAddress),
+		CustomArgOrderValidationBuilder(true, ArgValidatorAddress(ADD_FA|ADD_FE|ADD_Fe)),
 		cobra.MinimumNArgs(1)),
 	Run: func(cmd *cobra.Command, args []string) {
 		res, err := queryBalances(args[0])
@@ -390,7 +397,7 @@ var balances = &cobra.Command{
 func queryBalances(humanAddress string) (srv.ResultPegnetTickerMap, error) {
 	cl := srv.NewClient()
 	cl.PegnetdServer = viper.GetString(config.Pegnetd)
-	addr, err := factom.NewFAAddress(humanAddress)
+	addr, err := underlyingFA(humanAddress)
 	if err != nil {
 		// TODO: Better error
 		fmt.Println("1", err)

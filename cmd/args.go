@@ -91,6 +91,41 @@ func ArgValidatorECAddress(cmd *cobra.Command, arg string) error {
 	return nil
 }
 
+const (
+	// Flags
+	ADD_ANY = 1 << iota // Indicates all address types
+	ADD_FA
+	ADD_Fs
+	ADD_EC
+	ADD_Es
+	ADD_Fe
+	ADD_FE
+	ADD_ETHS
+)
+
+func ArgValidatorAddress(flag int) func(cmd *cobra.Command, arg string) error {
+	return func(cmd *cobra.Command, arg string) error {
+		addTypes := map[int]func(arg string) error{
+			ADD_FA:   func(arg string) (err error) { _, err = factom.NewFAAddress(arg); return },
+			ADD_Fs:   func(arg string) (err error) { _, err = factom.NewFsAddress(arg); return },
+			ADD_EC:   func(arg string) (err error) { _, err = factom.NewECAddress(arg); return },
+			ADD_Es:   func(arg string) (err error) { _, err = factom.NewEsAddress(arg); return },
+			ADD_Fe:   func(arg string) (err error) { _, err = factom.NewFeAddress(arg); return },
+			ADD_FE:   func(arg string) (err error) { _, err = factom.NewFEGatewayAddress(arg); return },
+			ADD_ETHS: func(arg string) (err error) { _, err = factom.NewEthSecret(arg); return },
+		}
+
+		for mask, addType := range addTypes {
+			if flag&(mask|ADD_ANY) != 0 {
+				if err := addType(arg); err == nil {
+					return nil
+				}
+			}
+		}
+		return fmt.Errorf("%s is not a valid address input for this command", arg)
+	}
+}
+
 // ArgValidatorFCTAddress checks for FCT address
 func ArgValidatorFCTAddress(cmd *cobra.Command, arg string) error {
 	if len(arg) > 2 && arg[:2] != "FA" {
