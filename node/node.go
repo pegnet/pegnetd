@@ -8,6 +8,7 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/pegnet/pegnet/modules/grader"
 	"github.com/pegnet/pegnetd/config"
+	"github.com/pegnet/pegnetd/fat/fat2"
 	"github.com/pegnet/pegnetd/node/pegnet"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
@@ -54,6 +55,7 @@ func SetAllActivations(act uint32) {
 	OneWaypFCTConversions = act
 	PegnetConversionLimitActivation = act
 	PEGFreeFloatingPriceActivation = act
+	fat2.Fat2RCDEActivation = act
 }
 
 type Pegnetd struct {
