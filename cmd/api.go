@@ -237,6 +237,8 @@ var burn = &cobra.Command{
 	},
 }
 
+var outputFEWarning = "The address you are sending is an ethereum linked address. In transactions, the output address will be displayed as %s."
+
 var conv = &cobra.Command{
 	Use:     "newcvt <ECAddress> <FA-SOURCE> <SRC-ASSET> <AMOUNT> <DEST-ASSET>",
 	Aliases: []string{"newconversion", "newconvert"},
@@ -287,6 +289,8 @@ var conv = &cobra.Command{
 		fmt.Printf("conversion sent:\n")
 		fmt.Printf("\t%10s: %s\n", "EntryHash", reveal)
 		fmt.Printf("\t%10s: %s\n", "Commit", commit)
+		printFeWarning(cmd, originalSource, false,
+			"The address you are converting from is an ethereum linked address. In transactions, the input address will be displayed as %s.")
 	},
 }
 
@@ -338,6 +342,10 @@ var tx = &cobra.Command{
 		fmt.Printf("transaction sent:\n")
 		fmt.Printf("\t%10s: %s\n", "EntryHash", reveal)
 		fmt.Printf("\t%10s: %s\n", "Commit", commit)
+		printFeWarning(cmd, source, false,
+			"The address you are sending from an ethereum linked address. In transactions, the input address will be displayed as %s.")
+		printFeWarning(cmd, dest, false,
+			"The address you are sending is an ethereum linked address. In transactions, the output address will be displayed as %s.")
 	},
 }
 
@@ -361,6 +369,7 @@ var balance = &cobra.Command{
 		balance := res[ticker]
 		humanBal := FactoshiToFactoid(int64(balance))
 		fmt.Printf("%s %s\n", humanBal, ticker.String())
+		printFeWarning(cmd, args[1], false)
 	},
 }
 
@@ -391,6 +400,7 @@ var balances = &cobra.Command{
 			panic(err)
 		}
 		fmt.Println(string(data))
+		defer printFeWarning(cmd, args[0], true)
 	},
 }
 
@@ -543,6 +553,7 @@ var getTXs = &cobra.Command{
 		var height int
 		// determine the params
 		var params srv.ParamsGetPegnetTransaction
+		var add factom.FAAddress
 
 		// An entryhash?
 		bytes, err := hex.DecodeString(args[0])
@@ -552,9 +563,11 @@ var getTXs = &cobra.Command{
 		}
 
 		// A factoid address maybe?
-		_, err = factom.NewFAAddress(args[0])
+		add, err = underlyingFA(args[0])
 		if err == nil {
-			params.Address = args[0]
+			// Place warning at the bottom
+			defer printFeWarning(cmd, args[0], true)
+			params.Address = add.String()
 			goto FoundParams
 		}
 

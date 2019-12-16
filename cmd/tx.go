@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/spf13/cobra"
+
 	"github.com/Factom-Asset-Tokens/factom"
 	"github.com/pegnet/pegnetd/fat/fat2"
 	"github.com/pegnet/pegnetd/node"
@@ -162,19 +164,48 @@ func ticker(asset string) (fat2.PTicker, error) {
 	return aType, nil
 }
 
+// printFeWarning will tell the user of the Fe->Fa thing. Optionally provide a
+// custom message format
+func printFeWarning(cmd *cobra.Command, addr string, json bool, format ...string) {
+	if q, _ := cmd.Flags().GetBool("qe"); q {
+		return
+	}
+
+	add, addType, _ := underlyingFAWithType(addr)
+	if addType == ADD_Fe || addType == ADD_FE {
+		info := fmt.Sprintf("The address you requested is an ethereum linked address. In transactions, your address will be displayed as %s.", add.String())
+		if len(format) > 0 {
+			info = fmt.Sprintf(format[0], add.String())
+		}
+		if json {
+			fmt.Printf(`{"Info":"%s"}`, info)
+		} else {
+			fmt.Printf("%s", info)
+		}
+		fmt.Println()
+	}
+}
+
 func underlyingFA(addr string) (factom.FAAddress, error) {
+	add, _, err := underlyingFAWithType(addr)
+	return add, err
+}
+
+func underlyingFAWithType(addr string) (factom.FAAddress, int, error) {
 	if len(addr) < 2 {
-		return factom.NewFAAddress(addr)
+		add, err := factom.NewFAAddress(addr)
+		return add, -1, err
 	}
 	switch addr[:2] {
 	case "FA":
 		// Resort to the default
 	case "Fe":
 		feAddr, err := factom.NewFeAddress(addr)
-		return factom.FAAddress(feAddr), err
+		return factom.FAAddress(feAddr), ADD_Fe, err
 	case "FE":
 		gatewayAddr, err := factom.NewFEGatewayAddress(addr)
-		return factom.FAAddress(gatewayAddr), err
+		return factom.FAAddress(gatewayAddr), ADD_FE, err
 	}
-	return factom.NewFAAddress(addr)
+	add, err := factom.NewFAAddress(addr)
+	return add, -1, err
 }
