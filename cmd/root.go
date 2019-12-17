@@ -34,8 +34,7 @@ func init() {
 	rootCmd.Flags().String("dbmode", "", "Turn on custom sqlite modes")
 	rootCmd.Flags().Bool("wal", false, "Turn on WAL mode for sqlite")
 
-	rootCmd.PersistentFlags().Bool("qe", false, "Quiet all Fe -> FA warnings")
-	_ = rootCmd.PersistentFlags().MarkHidden("qe")
+	rootCmd.PersistentFlags().BoolP("no-warn", "n", false, "Ignore all warnings/notices")
 
 	// This is for testing purposes
 	rootCmd.PersistentFlags().Bool("testing", false, "If this flag is set, all activations heights are set to 0.")

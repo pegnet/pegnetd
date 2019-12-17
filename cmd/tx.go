@@ -166,18 +166,50 @@ func ticker(asset string) (fat2.PTicker, error) {
 
 // printFeWarning will tell the user of the Fe->Fa thing. Optionally provide a
 // custom message format
-func printFeWarning(cmd *cobra.Command, addr string, json bool, format ...string) {
-	if q, _ := cmd.Flags().GetBool("qe"); q {
+func printFeWarning(cmd *cobra.Command, addrs ...string) bool {
+	if q, _ := cmd.Flags().GetBool("no-warn"); q {
+		return false
+	}
+
+	var warnings []string
+
+	for _, addr := range addrs {
+		add, addType, _ := underlyingFAWithType(addr)
+		if addType == ADD_Fe || addType == ADD_FE {
+			warnings = append(warnings, fmt.Sprintf("%s may be displayed as \n%s in some contexts such as explorers and cli outputs.", addr, add.String()))
+		}
+	}
+
+	if len(warnings) > 0 {
+		fmt.Println("\nNOTICE:\n")
+		fmt.Println("DO NOT USE THE FOLLOWING FA ADDRESSES DIRECTLY, AS LOSS OF FUNDS MAY RESULT!\n")
+		warns := strings.Join(warnings, "\n\n")
+		fmt.Println(warns)
+		fmt.Println("\nDO NOT USE THE FOLLOWING FA ADDRESSES DIRECTLY, AS LOSS OF FUNDS MAY RESULT!\n")
+		fmt.Println("For more information about Ethereum backed addresses see:\n" +
+			"https://example.com/link-to-info.html")
+	}
+
+	return false
+}
+
+// printFeWarning will tell the user of the Fe->Fa thing. Optionally provide a
+// custom message format
+func printFeWarning2(cmd *cobra.Command, addr string, json bool, format ...string) {
+	if q, _ := cmd.Flags().GetBool("ignore"); q {
 		return
 	}
 
 	add, addType, _ := underlyingFAWithType(addr)
 	if addType == ADD_Fe || addType == ADD_FE {
-		info := fmt.Sprintf("The address you requested is an ethereum linked address. In transactions, your address will be displayed as %s.", add.String())
+		info := fmt.Sprintf("The address you requested is an ethereum linked address.\n In transactions, your address will be displayed as %s. "+
+			"Continue to use '%s'! Use of the FA address can result in loss of funds!", add.String(), addr)
 		if len(format) > 0 {
 			info = fmt.Sprintf(format[0], add.String())
 		}
 		if json {
+			// Drop the newlines
+			info = strings.Replace(info, "\n", "\\n", -1)
 			fmt.Printf(`{"Info":"%s"}`, info)
 		} else {
 			fmt.Printf("%s", info)
