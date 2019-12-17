@@ -275,7 +275,7 @@ func (s *APIServer) getTransactions(forceTxId bool) func(_ context.Context, data
 			_ = hash.UnmarshalText([]byte(params.Hash)) // error checked by params.valid
 			actions, count, err = s.Node.Pegnet.SelectTransactionHistoryActionsByHash(hash, options)
 		} else if params.Address != "" {
-			addr, _ := factom.NewFAAddress(params.Address) // verified in param
+			addr, _ := underlyingFA(params.Address) // verified in param
 			actions, count, err = s.Node.Pegnet.SelectTransactionHistoryActionsByAddress(&addr, options)
 		} else if params.TxID != "" {
 			hash := new(factom.Bytes32)
@@ -338,7 +338,9 @@ func (s *APIServer) getPegnetBalances(_ context.Context, data json.RawMessage) i
 	if _, _, err := validate(data, &params); err != nil {
 		return err
 	}
-	bals, err := s.Node.Pegnet.SelectBalances(params.Address)
+	add, _ := underlyingFA(params.Address)
+
+	bals, err := s.Node.Pegnet.SelectBalances(&add)
 	if err == sql.ErrNoRows {
 		return ErrorAddressNotFound
 	}

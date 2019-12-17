@@ -418,7 +418,7 @@ func queryBalances(humanAddress string) (srv.ResultPegnetTickerMap, error) {
 	}
 
 	var res srv.ResultPegnetTickerMap
-	err = cl.Request("get-pegnet-balances", srv.ParamsGetPegnetBalances{&addr}, &res)
+	err = cl.Request("get-pegnet-balances", srv.ParamsGetPegnetBalances{addr.String()}, &res)
 	if err != nil {
 		// TODO: Better error
 		fmt.Println("2", err)
