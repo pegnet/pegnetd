@@ -181,11 +181,11 @@ func printFeWarning(cmd *cobra.Command, addrs ...string) bool {
 	}
 
 	if len(warnings) > 0 {
-		fmt.Println("\nNOTICE:\n")
-		fmt.Println("DO NOT USE THE FOLLOWING FA ADDRESSES DIRECTLY, AS LOSS OF FUNDS MAY RESULT!\n")
+		fmt.Print("\nNOTICE:\n\n")
+		fmt.Print("DO NOT USE THE FOLLOWING FA ADDRESSES DIRECTLY, AS LOSS OF FUNDS MAY RESULT!\n\n")
 		warns := strings.Join(warnings, "\n\n")
 		fmt.Println(warns)
-		fmt.Println("\nDO NOT USE THE FOLLOWING FA ADDRESSES DIRECTLY, AS LOSS OF FUNDS MAY RESULT!\n")
+		fmt.Print("\nDO NOT USE THE FOLLOWING FA ADDRESSES DIRECTLY, AS LOSS OF FUNDS MAY RESULT!\n\n")
 		fmt.Println("For more information about Ethereum backed addresses see:\n" +
 			"https://example.com/link-to-info.html")
 	}
