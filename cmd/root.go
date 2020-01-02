@@ -10,10 +10,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/pegnet/pegnetd/fat/fat2"
 	sqlite3 "github.com/mattn/go-sqlite3"
 	"github.com/pegnet/pegnetd/config"
 	"github.com/pegnet/pegnetd/exit"
+	"github.com/pegnet/pegnetd/fat/fat2"
 	"github.com/pegnet/pegnetd/node"
 	"github.com/pegnet/pegnetd/srv"
 	log "github.com/sirupsen/logrus"
@@ -118,7 +118,7 @@ var properties = &cobra.Command{
 		}{
 			FactomdVersion: "Unknown", FactomdAPIVersion: "Unknown",
 		}
-		_ = cl.FactomdRequest("properties", nil, &factomdProperties)
+		_ = cl.FactomdRequest(nil, "properties", nil, &factomdProperties)
 		fmt.Printf(format, "Factomd Version", factomdProperties.FactomdVersion)
 		fmt.Printf(format, "Factomd API Version", factomdProperties.FactomdAPIVersion)
 
@@ -128,7 +128,7 @@ var properties = &cobra.Command{
 		}{
 			WalletdVersion: "Unknown", WalletdAPIVersion: "Unknown",
 		}
-		_ = cl.WalletdRequest("properties", nil, &walletdProperties)
+		_ = cl.WalletdRequest(nil, "properties", nil, &walletdProperties)
 		fmt.Printf(format, "Walletd Version", walletdProperties.WalletdVersion)
 		fmt.Printf(format, "Walletd API Version", walletdProperties.WalletdAPIVersion)
 
