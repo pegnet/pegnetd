@@ -32,14 +32,13 @@ func TestPegnet_CheckHardForks(t *testing.T) {
 		{ActivationHeight: 3, MinimumVersion: 3},
 		{ActivationHeight: 4, MinimumVersion: 4},
 		{ActivationHeight: 5, MinimumVersion: 5},
-		// Gap
 		{ActivationHeight: 9, MinimumVersion: 9},
-		// Gap
+		{ActivationHeight: 15, MinimumVersion: 15},
 		{ActivationHeight: 20, MinimumVersion: 20},
-		// Gap
 		{ActivationHeight: 1000, MinimumVersion: 1000},
 	}
 
+	// Height 0-10
 	t.Run("test all versions updated", func(t *testing.T) {
 		for i := 0; i < 10; i++ {
 			pegnet.PegnetdSyncVersion = i
@@ -51,6 +50,17 @@ func TestPegnet_CheckHardForks(t *testing.T) {
 		}
 	})
 
+	// Height 15
+	t.Run("test version high above", func(t *testing.T) {
+		pegnet.PegnetdSyncVersion = 500
+		_ = p.MarkHeightSynced(p.DB, uint32(15))
+
+		if err := p.CheckHardForks(p.DB); err != nil {
+			t.Errorf("correct db error: %v", err)
+		}
+	})
+
+	// Height 20
 	t.Run("test version 1 behind", func(t *testing.T) {
 		pegnet.PegnetdSyncVersion = 19
 		_ = p.MarkHeightSynced(p.DB, uint32(20))
