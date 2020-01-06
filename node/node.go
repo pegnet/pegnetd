@@ -3,6 +3,7 @@ package node
 import (
 	"context"
 	"database/sql"
+	"fmt"
 
 	"github.com/Factom-Asset-Tokens/factom"
 	_ "github.com/mattn/go-sqlite3"
@@ -87,6 +88,16 @@ func NewPegnetd(ctx context.Context, conf *viper.Viper) (*Pegnetd, error) {
 		}
 	} else {
 		n.Sync = sync
+	}
+
+	err := n.Pegnet.CheckHardForks(n.Pegnet.DB)
+	if err != nil {
+		err = fmt.Errorf("pegnetd database hardfork check failed: %s", err.Error())
+		if conf.GetBool(config.DisableHardForkCheck) {
+			log.Warnf(err.Error())
+		} else {
+			return nil, err
+		}
 	}
 
 	grader.InitLX()

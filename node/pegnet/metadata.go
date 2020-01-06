@@ -24,6 +24,13 @@ func (p *Pegnet) InsertSynced(tx *sql.Tx, bs *BlockSync) error {
 		return err
 	}
 
+	// Since this is called for every height, we also can mark the height
+	// synced for version checking
+	err = p.MarkHeightSynced(tx, bs.Synced)
+	if err != nil {
+		return err
+	}
+
 	_, err = tx.Exec("REPLACE INTO pn_metadata (name, value) VALUES ($1, $2)", "synced", data)
 	if err != nil {
 		return err
