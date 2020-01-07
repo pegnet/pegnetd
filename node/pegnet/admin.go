@@ -82,10 +82,20 @@ func (Pegnet) HighestSynced(tx QueryAble) (uint32, error) {
 	return topHeight, err
 }
 
-// FetchSyncedVersion returns -1, nil if the height was not found
-func (Pegnet) FetchSyncedVersion(tx QueryAble, height uint32) (int, error) {
+// FetchMinSyncedVersion returns -1, nil if the height was not found
+func (Pegnet) FetchMinSyncedVersion(tx QueryAble, height uint32) (int, error) {
 	var version int
-	err := tx.QueryRow(`SELECT version FROM pn_sync_version WHERE height = ?;`, height).Scan(&version)
+	err := tx.QueryRow(`SELECT COALESCE(MIN(version), -1) FROM pn_sync_version WHERE height >= ?;`, height).Scan(&version)
+	if err == sql.ErrNoRows {
+		return -1, nil
+	}
+	return version, err
+}
+
+// FetchMaxSyncedVersion returns -1, nil if the height was not found
+func (Pegnet) FetchMaxSyncedVersion(tx QueryAble, height uint32) (int, error) {
+	var version int
+	err := tx.QueryRow(`SELECT COALESCE(MAX(version), -1) FROM pn_sync_version WHERE height >= ?;`, height).Scan(&version)
 	if err == sql.ErrNoRows {
 		return -1, nil
 	}
@@ -103,14 +113,25 @@ func (p Pegnet) CheckHardForks(tx QueryAble) error {
 	for _, event := range Hardforks {
 		// If the event is not synced past, then we do not need to check
 		if event.ActivationHeight <= top {
-			version, err := p.FetchSyncedVersion(tx, event.ActivationHeight)
+			version, err := p.FetchMinSyncedVersion(tx, event.ActivationHeight)
 			if err != nil {
 				return err
 			}
 			if version < event.MinimumVersion {
-				return fmt.Errorf("a hardfork occurred at height %d. This node was not updated prior to the hardfork, and synced these blocks with the incorrect version number. The found sync version was %d, and it required %d. The only way to fix this error is to ensure your node is updated, delete your database, and resync", event.ActivationHeight, version, event.MinimumVersion)
+				return fmt.Errorf("a hardfork occurred at height %d. This node was not updated prior to the hardfork (or was downgraded at some point after the fork), and synced these blocks with the incorrect version number. The found sync version was %d, and it required %d. The only way to fix this error is to ensure your node is updated, delete your database, and resync", event.ActivationHeight, version, event.MinimumVersion)
 			}
 		}
+	}
+
+	// Catch downgrade with the hardfork check code in it
+	// If our PegnetdSyncVersion is less than the highest version we have in
+	// our db, then we downgraded
+	max, err := p.FetchMaxSyncedVersion(tx, 0)
+	if err != nil {
+		return err
+	}
+	if PegnetdSyncVersion < max {
+		return fmt.Errorf("pegnetd downgrade was detected. The current pegnetd sync version is %d, but the database shows it was previously at %d. Update pegnetd to prevent a downgrade", PegnetdSyncVersion, max)
 	}
 
 	return nil
