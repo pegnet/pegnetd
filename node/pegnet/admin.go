@@ -28,9 +28,6 @@ var (
 		// This is the most basic check. All versions are valid for 0
 		{0, -1}, // {0, -1}, means at height 0 any version >= -1 is sufficient
 
-		// Pegnet activation. When Pegnet starts on mainnet
-		{206422, 1},
-
 		// Future hardforks go here
 		// If the pegnet node syncs a hardfork height with any height less than
 		// the minimum version, the node will not start.
