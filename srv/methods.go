@@ -94,7 +94,7 @@ func (s *APIServer) getMiningDominance(ctx context.Context, data json.RawMessage
 		}
 		params.Start = int(synced.Synced) + params.Stop
 		params.Stop = int(synced.Synced)
-	} else if params.Start != 0 && params.Stop == 0 {
+	} else if params.Stop == 0 {
 		synced, err := s.Node.Pegnet.SelectSynced(ctx)
 		if err != nil {
 			return err

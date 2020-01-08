@@ -64,21 +64,29 @@ var minerDistro = &cobra.Command{
 		cl.PegnetdServer = viper.GetString(config.Pegnetd)
 
 		var params srv.ParamsGetMiningDominance
+		n, err := strconv.Atoi(args[0])
+		if err != nil {
+			fmt.Println("Arguments must be valid integers")
+			os.Exit(1)
+		}
 		if len(args) == 1 {
-			n, err := strconv.Atoi(args[0])
-			if err != nil {
-				fmt.Println("Arguments must be valid integers")
-				os.Exit(1)
-			}
-			if n < 0 {
+			if n <= 0 {
 				params.Stop = n
 			} else {
 				params.Start = n
 			}
+		} else {
+			n2, err := strconv.Atoi(args[1])
+			if err != nil {
+				fmt.Println("Arguments must be valid integers")
+				os.Exit(1)
+			}
+			params.Start = n
+			params.Stop = n2
 		}
 
 		var res pegnet.MinerDominanceResult
-		err := cl.Request("get-miner-distribution", params, &res)
+		err = cl.Request("get-miner-distribution", params, &res)
 		if err != nil {
 			fmt.Println(err)
 			os.Exit(1)
