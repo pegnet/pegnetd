@@ -86,9 +86,6 @@ func (Pegnet) HighestSynced(tx QueryAble) (uint32, error) {
 func (Pegnet) FetchMinSyncedVersion(tx QueryAble, height uint32) (int, error) {
 	var version int
 	err := tx.QueryRow(`SELECT COALESCE(MIN(version), -1) FROM pn_sync_version WHERE height >= ?;`, height).Scan(&version)
-	if err == sql.ErrNoRows {
-		return -1, nil
-	}
 	return version, err
 }
 
@@ -96,9 +93,6 @@ func (Pegnet) FetchMinSyncedVersion(tx QueryAble, height uint32) (int, error) {
 func (Pegnet) FetchMaxSyncedVersion(tx QueryAble, height uint32) (int, error) {
 	var version int
 	err := tx.QueryRow(`SELECT COALESCE(MAX(version), -1) FROM pn_sync_version WHERE height >= ?;`, height).Scan(&version)
-	if err == sql.ErrNoRows {
-		return -1, nil
-	}
 	return version, err
 }
 
