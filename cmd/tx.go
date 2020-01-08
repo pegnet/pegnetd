@@ -33,6 +33,8 @@ func addressRules(input string, output string) error {
 		}
 
 		return fmt.Errorf("Fe addresses can only send pAssets to FA, Fe, or FE addresses. It seems what you are trying to do it not allowed")
+	case "FE":
+		return fmt.Errorf("you are trying to use a gateway address as in input. If you are a gateway operator, please use the Fe address encoding")
 	}
 	return nil
 }
