@@ -86,14 +86,20 @@ func (Pegnet) HighestSynced(tx QueryAble) (uint32, error) {
 func (Pegnet) FetchMinSyncedVersion(tx QueryAble, height uint32) (int, error) {
 	var version int
 	err := tx.QueryRow(`SELECT COALESCE(MIN(version), -1) FROM pn_sync_version WHERE height >= ?;`, height).Scan(&version)
-	return version, err
+	if err != nil {
+		return -1, err
+	}
+	return version, nil
 }
 
 // FetchMaxSyncedVersion returns -1, nil if the height was not found
 func (Pegnet) FetchMaxSyncedVersion(tx QueryAble, height uint32) (int, error) {
 	var version int
 	err := tx.QueryRow(`SELECT COALESCE(MAX(version), -1) FROM pn_sync_version WHERE height >= ?;`, height).Scan(&version)
-	return version, err
+	if err != nil {
+		return -1, err
+	}
+	return version, nil
 }
 
 // CheckHardForks will iterate over all the hardforks post the version_lock
