@@ -32,6 +32,9 @@ func (p *Pegnet) SelectMinerDominance(ctx context.Context, start, stop int) (Min
 		return result, fmt.Errorf("invalid stop, must be >= start")
 	}
 
+	// Group by unique addresses and count the number of >0 payouts (wins)
+	// and the number of count (graded).
+	// Also select their identities
 	stmtString := `
 	SELECT address, COUNT(NULLIF(0, payout)) AS wins, COUNT(*) AS graded, group_concat(DISTINCT minerid) 
 	FROM pn_winners

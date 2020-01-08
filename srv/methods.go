@@ -88,6 +88,8 @@ func (s *APIServer) getMiningDominance(ctx context.Context, data json.RawMessage
 	}
 
 	if params.Start == 0 && params.Stop < 0 {
+		// If the start is 0, and stop is negative, then the user is requesting
+		// the last STOP blocks
 		synced, err := s.Node.Pegnet.SelectSynced(ctx)
 		if err != nil {
 			return err
@@ -95,6 +97,7 @@ func (s *APIServer) getMiningDominance(ctx context.Context, data json.RawMessage
 		params.Start = int(synced.Synced) + params.Stop
 		params.Stop = int(synced.Synced)
 	} else if params.Stop == 0 {
+		// If the stop is 0, then the stop is the end.
 		synced, err := s.Node.Pegnet.SelectSynced(ctx)
 		if err != nil {
 			return err

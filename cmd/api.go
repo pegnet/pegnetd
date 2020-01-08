@@ -105,8 +105,7 @@ var minerDistro = &cobra.Command{
 		_, _ = fmt.Fprintf(tw, "Address\t1st ID\t# IDs\t Win %%\t Graded %%\n")
 		_, _ = fmt.Fprintf(tw, "-------\t------\t-----\t -----\t --------\n")
 
-		// To slice
-
+		// To slice so we can print in sorted order
 		slice := make([]struct {
 			Address string
 			Miner   pegnet.MinerDominance
