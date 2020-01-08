@@ -207,15 +207,17 @@ func underlyingFAWithType(addr string) (factom.FAAddress, uint8, error) {
 		return add, 0, err
 	}
 	switch addr[:2] {
-	case "FA":
-		// Resort to the default
 	case "Fe":
 		feAddr, err := factom.NewFeAddress(addr)
 		return factom.FAAddress(feAddr), ADD_Fe, err
 	case "FE":
 		gatewayAddr, err := factom.NewFEGatewayAddress(addr)
 		return factom.FAAddress(gatewayAddr), ADD_FE, err
+	case "FA":
+		// Resort to the default
+		fallthrough
+	default:
+		add, err := factom.NewFAAddress(addr)
+		return add, 0, err
 	}
-	add, err := factom.NewFAAddress(addr)
-	return add, 0, err
 }
