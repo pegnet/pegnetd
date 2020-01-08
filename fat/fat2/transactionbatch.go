@@ -85,16 +85,6 @@ func (t TransactionBatch) String() string {
 	return string(data)
 }
 
-//// UnmarshalEntry unmarshals the Entry content as a TransactionBatch
-//func (t *TransactionBatch) UnmarshalEntry() error {
-//	return t.Entry.UnmarshalEntry(t)
-//}
-//
-//// MarshalEntry marshals the TransactionBatch into the entry content
-//func (t *TransactionBatch) MarshalEntry() error {
-//	return t.Entry.MarshalEntry(t)
-//}
-
 func (t TransactionBatch) Sign(signingSet ...factom.RCDSigner) (factom.Entry, error) {
 	e := t.Entry
 	content, err := json.Marshal(t)

@@ -163,6 +163,12 @@ var burn = &cobra.Command{
 			os.Exit(1)
 		}
 
+		rcd1, ok := rcd.(*factom.RCD1)
+		if !ok {
+			cmd.PrintErrln("the address is not compatible with factoid transactions, must be rcd type 1")
+			os.Exit(1)
+		}
+
 		balance, err := addr.GetBalance(nil, cl)
 		if err != nil {
 			cmd.PrintErrln("unable to retrieve balance:" + err.Error())
@@ -188,12 +194,6 @@ var burn = &cobra.Command{
 			Amount:  0,
 			Address: fBurnAddress,
 		})
-
-		rcd1, ok := rcd.(*factom.RCD1)
-		if !ok {
-			cmd.PrintErrln("failed to make rcd type 1")
-			os.Exit(1)
-		}
 
 		// the library requires at least one signature to "be populated"
 		// fill in below with real sig
@@ -237,7 +237,7 @@ var burn = &cobra.Command{
 	},
 }
 
-var outputFEWarning = "The address you are sending is an ethereum linked address. In transactions, the output address will be displayed as %s."
+var outputFEWarning = "The address you are sending to is an Ethereum linked address. In transactions, the output address will be displayed as %s."
 
 var conv = &cobra.Command{
 	Use:     "newcvt <ECAddress> <FA-SOURCE> <SRC-ASSET> <AMOUNT> <DEST-ASSET>",
@@ -403,7 +403,7 @@ var balances = &cobra.Command{
 			panic(err)
 		}
 		fmt.Println(string(data))
-		defer printFeWarning(cmd, args[0])
+		printFeWarning(cmd, args[0])
 	},
 }
 

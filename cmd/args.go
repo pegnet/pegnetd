@@ -93,8 +93,8 @@ func ArgValidatorECAddress(cmd *cobra.Command, arg string) error {
 
 const (
 	// Flags
-	ADD_ANY = 1 << iota // Indicates all address types
-	ADD_FA
+	ADD_ANY       = ^uint8(0) // Indicates all address types
+	ADD_FA  uint8 = 1 << iota
 	ADD_Fs
 	ADD_EC
 	ADD_Es
@@ -103,9 +103,9 @@ const (
 	ADD_ETHS
 )
 
-func ArgValidatorAddress(flag int) func(cmd *cobra.Command, arg string) error {
+func ArgValidatorAddress(flag uint8) func(cmd *cobra.Command, arg string) error {
 	return func(cmd *cobra.Command, arg string) error {
-		addTypes := map[int]func(arg string) error{
+		addTypes := map[uint8]func(arg string) error{
 			ADD_FA:   func(arg string) (err error) { _, err = factom.NewFAAddress(arg); return },
 			ADD_Fs:   func(arg string) (err error) { _, err = factom.NewFsAddress(arg); return },
 			ADD_EC:   func(arg string) (err error) { _, err = factom.NewECAddress(arg); return },
@@ -116,7 +116,7 @@ func ArgValidatorAddress(flag int) func(cmd *cobra.Command, arg string) error {
 		}
 
 		for mask, addType := range addTypes {
-			if flag&(mask|ADD_ANY) != 0 {
+			if flag&(mask) != 0 {
 				if err := addType(arg); err == nil {
 					return nil
 				}

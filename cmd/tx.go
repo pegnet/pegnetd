@@ -166,9 +166,10 @@ func ticker(asset string) (fat2.PTicker, error) {
 
 // printFeWarning will tell the user of the Fe->Fa thing. Optionally provide a
 // custom message format
+// Return indicates if a warning was printed
 func printFeWarning(cmd *cobra.Command, addrs ...string) bool {
 	if q, _ := cmd.Flags().GetBool("no-warn"); q {
-		return false
+		return false // Silenced
 	}
 
 	var warnings []string
@@ -185,11 +186,13 @@ func printFeWarning(cmd *cobra.Command, addrs ...string) bool {
 		fmt.Print("DO NOT USE THE FOLLOWING FA ADDRESSES DIRECTLY, AS LOSS OF FUNDS MAY RESULT!\n\n")
 		warns := strings.Join(warnings, "\n\n")
 		fmt.Println(warns)
-		fmt.Print("\nDO NOT USE THE FOLLOWING FA ADDRESSES DIRECTLY, AS LOSS OF FUNDS MAY RESULT!\n\n")
+		fmt.Println()
 		fmt.Println("For more information about Ethereum backed addresses see:\n" +
 			"https://example.com/link-to-info.html")
+		return true
 	}
 
+	// If the length of the warnings is 0, then there is no printing
 	return false
 }
 
@@ -198,10 +201,10 @@ func underlyingFA(addr string) (factom.FAAddress, error) {
 	return add, err
 }
 
-func underlyingFAWithType(addr string) (factom.FAAddress, int, error) {
+func underlyingFAWithType(addr string) (factom.FAAddress, uint8, error) {
 	if len(addr) < 2 {
 		add, err := factom.NewFAAddress(addr)
-		return add, -1, err
+		return add, 0, err
 	}
 	switch addr[:2] {
 	case "FA":
@@ -214,5 +217,5 @@ func underlyingFAWithType(addr string) (factom.FAAddress, int, error) {
 		return factom.FAAddress(gatewayAddr), ADD_FE, err
 	}
 	add, err := factom.NewFAAddress(addr)
-	return add, -1, err
+	return add, 0, err
 }
