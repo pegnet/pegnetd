@@ -93,7 +93,7 @@ func ArgValidatorECAddress(cmd *cobra.Command, arg string) error {
 
 const (
 	// Flags
-	ADD_ANY       = ^uint8(0) // Indicates all address types
+	ADD_ANY       = ^uint8(0) // Indicates all address types (all bits set)
 	ADD_FA  uint8 = 1 << iota
 	ADD_Fs
 	ADD_EC
@@ -113,6 +113,10 @@ func ArgValidatorAddress(flag uint8) func(cmd *cobra.Command, arg string) error 
 			ADD_Fe:   func(arg string) (err error) { _, err = factom.NewFeAddress(arg); return },
 			ADD_FE:   func(arg string) (err error) { _, err = factom.NewFEGatewayAddress(arg); return },
 			ADD_ETHS: func(arg string) (err error) { _, err = factom.NewEthSecret(arg); return },
+		}
+
+		if flag == 0 {
+			panic(fmt.Sprintf("cmd %s uses the 'ArgValidatorAddress' argument parsing with a flag of 0. This means there is no valid inputs, please specify a flag to indicate which addresses are valid", cmd.Name()))
 		}
 
 		for mask, addType := range addTypes {
