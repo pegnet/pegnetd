@@ -23,6 +23,7 @@
 package srv
 
 import (
+	"fmt"
 	"time"
 
 	jrpc "github.com/AdamSLevy/jsonrpc2/v13"
@@ -35,6 +36,24 @@ type Params interface {
 	IsValid() error
 	ValidChainID() *factom.Bytes32
 	HasIncludePending() bool
+}
+
+type ParamsGetMiningDominance struct {
+	Start int `json:"start,omitempty"`
+	Stop  int `json:"stop,omitempty"`
+}
+
+func (p ParamsGetMiningDominance) HasIncludePending() bool { return false }
+func (p ParamsGetMiningDominance) IsValid() error {
+	if p.Stop < p.Start {
+		if !(p.Stop < 0 && p.Start == 0 || p.Start > 0 && p.Stop == 0) {
+			return fmt.Errorf("stop must be >= start")
+		}
+	}
+	return nil
+}
+func (p ParamsGetMiningDominance) ValidChainID() *factom.Bytes32 {
+	return nil
 }
 
 type ParamsGetGlobalRichList struct {

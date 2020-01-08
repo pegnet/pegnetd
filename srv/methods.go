@@ -45,6 +45,7 @@ func (s *APIServer) jrpcMethods() jrpc.MethodMap {
 	return jrpc.MethodMap{
 		"get-rich-list":          s.getRichList,
 		"get-global-rich-list":   s.getGlobalRichList,
+		"get-miner-distribution": s.getMiningDominance,
 		"get-transactions":       s.getTransactions(false),
 		"get-transaction-status": s.getTransactionStatus,
 		"get-transaction":        s.getTransactions(true),
@@ -75,6 +76,37 @@ func (APIServer) properties(_ context.Context, data json.RawMessage) interface{}
 		SQLiteVersion: sqliteVersion,
 		GolangVersion: runtime.Version(),
 	}
+}
+
+// getMiningDominance returns the representation of rewarded miners for a given
+// block range
+func (s *APIServer) getMiningDominance(ctx context.Context, data json.RawMessage) interface{} {
+	params := ParamsGetMiningDominance{}
+	_, _, err := validate(data, &params)
+	if err != nil {
+		return err
+	}
+
+	if params.Start == 0 && params.Stop < 0 {
+		synced, err := s.Node.Pegnet.SelectSynced(ctx)
+		if err != nil {
+			return err
+		}
+		params.Start = int(synced.Synced) + params.Stop
+		params.Stop = int(synced.Synced)
+	} else if params.Start != 0 && params.Stop == 0 {
+		synced, err := s.Node.Pegnet.SelectSynced(ctx)
+		if err != nil {
+			return err
+		}
+		params.Stop = int(synced.Synced)
+	}
+
+	result, err := s.Node.Pegnet.SelectMinerDominance(ctx, params.Start, params.Stop)
+	if err != nil {
+		return err
+	}
+	return result
 }
 
 type ResultGlobalRichList struct {

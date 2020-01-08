@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 	"text/tabwriter"
@@ -42,10 +43,84 @@ func init() {
 	get.AddCommand(getTXs)
 	rootCmd.AddCommand(get)
 
+	minerDistro.Flags().Bool("long", false, "Print the full json data")
+	rootCmd.AddCommand(minerDistro)
+
 	//tx.Flags()
 	rootCmd.AddCommand(tx)
 	rootCmd.AddCommand(conv)
 
+}
+
+var minerDistro = &cobra.Command{
+	Use:              "minerdist <start> <stop>",
+	Short:            "Get the distribution of miners and their winnings/graded",
+	Example:          "pegnetd minedist 225500 225600\npegnetd minedist -- -1000\n pegnetd minedist 225500",
+	PersistentPreRun: always,
+	PreRun:           SoftReadConfig,
+	Args:             cobra.RangeArgs(1, 2),
+	Run: func(cmd *cobra.Command, args []string) {
+		cl := srv.NewClient()
+		cl.PegnetdServer = viper.GetString(config.Pegnetd)
+
+		var params srv.ParamsGetMiningDominance
+		if len(args) == 1 {
+			n, err := strconv.Atoi(args[0])
+			if err != nil {
+				fmt.Println("Arguments must be valid integers")
+				os.Exit(1)
+			}
+			if n < 0 {
+				params.Stop = n
+			} else {
+				params.Start = n
+			}
+		}
+
+		var res pegnet.MinerDominanceResult
+		err := cl.Request("get-miner-distribution", params, &res)
+		if err != nil {
+			fmt.Println(err)
+			os.Exit(1)
+		}
+
+		// Dump all the data
+		if long, _ := cmd.Flags().GetBool("long"); long {
+			d, _ := json.Marshal(res)
+			fmt.Println(string(d))
+			os.Exit(0)
+		}
+
+		// Print the shortened data
+		fmt.Printf("Miner distribution for block range %d -> %d (%d blocks)\n", res.Start, res.Stop, res.Stop-res.Start)
+		tw := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
+		_, _ = fmt.Fprintf(tw, "Address\t1st ID\t# IDs\t Win %%\t Graded %%\n")
+		_, _ = fmt.Fprintf(tw, "-------\t------\t-----\t -----\t --------\n")
+
+		// To slice
+
+		slice := make([]struct {
+			Address string
+			Miner   pegnet.MinerDominance
+		}, len(res.Miners))
+		var i int
+		for add, miner := range res.Miners {
+			slice[i].Address = add
+			slice[i].Miner = miner
+			i++
+		}
+
+		sort.Slice(slice, func(i, j int) bool {
+			return slice[i].Miner.WinPercentage > slice[j].Miner.WinPercentage
+		})
+
+		for i := range slice {
+			add := slice[i].Address
+			miner := slice[i].Miner
+			_, _ = fmt.Fprintf(tw, "%s\t%s\t%d\t%6.3f%%\t%6.3f%%\n", add, miner.Identities[0], len(miner.Identities), miner.WinPercentage*100, miner.GradedPercentage*100)
+		}
+		tw.Flush()
+	},
 }
 
 var rich = &cobra.Command{
