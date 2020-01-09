@@ -32,16 +32,31 @@ func (p *Pegnet) SelectMinerDominance(ctx context.Context, start, stop int) (Min
 		return result, fmt.Errorf("invalid stop, must be >= start")
 	}
 
+	// First check the start/stop bounds and tighten them if we need to
+	stmtString := `SELECT COALESCE(MIN(height), 0) AS min, COALESCE(MAX(height), 0) AS max FROM pn_winners`
+	row := p.DB.QueryRow(stmtString)
+	var min, max int
+	err := row.Scan(&min, &max)
+	if err != nil {
+		return result, err
+	}
+	if result.Start < min {
+		result.Start = min
+	}
+	if result.Stop > max {
+		result.Stop = max
+	}
+
 	// Group by unique addresses and count the number of >0 payouts (wins)
 	// and the number of count (graded).
 	// Also select their identities
-	stmtString := `
+	stmtString = `
 	SELECT address, COUNT(NULLIF(0, payout)) AS wins, COUNT(*) AS graded, group_concat(DISTINCT minerid) 
 	FROM pn_winners
 	WHERE pn_winners.height >= ? AND pn_winners.height <= ? GROUP BY pn_winners.address;
 	`
 
-	rows, err := p.DB.QueryContext(ctx, stmtString, start, stop)
+	rows, err := p.DB.QueryContext(ctx, stmtString, result.Start, result.Stop)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return result, nil
