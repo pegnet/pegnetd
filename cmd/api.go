@@ -295,11 +295,11 @@ var conv = &cobra.Command{
 var limitConv = &cobra.Command{
 	Use:     "limitcvt <ECAddress> <FA-SOURCE> <SRC-ASSET> <AMOUNT> <DEST-ASSET> <LIMIT>",
 	Aliases: []string{"lcvt", "limitconversion", "limitconvert"},
-	Short:   "Builds and submits a pegnet conversion when the source asset reaches the specified limit",
+	Short:   "Builds and submits a pegnet conversion when the specified limit is reached",
 	Long: 	"Only converts an asset when the limit condition is met. By default this condition is " +
-	"when the source asset is below the provided limit.\nTo convert when the destination asset reaches the limit instead of the source use the '--dest' flag.\n" +
+	"when the source asset is below the provided limit.\nTo convert when the destination asset reaches the limit instead use the '--dest' flag.\n" +
 	"To convert when the selected asset is above the limit threshold rather than below, use the '--above' flag.\n" + 
-	"to test the logic without actually going through with the conversion use the '--dryrun' flag" +
+	"to test without actually going through with the conversion use the '--dryrun' flag, it will print out when the condition is met" +
 	"", 
 	Example: "pegnetd limitcvt EC3eX8VxGH64Xv3NFd9g4Y7PxSMnH3EGz5jQQrrQS8VZGnv4JY2K FA32xV6SoPBSbAZAVyuiHWwyoMYhnSyMmAHZfK29H8dx7bJXFLja" +
 		" pXBT 1 pUSD 9000.00 --above",
