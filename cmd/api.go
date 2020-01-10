@@ -353,8 +353,9 @@ var limitConv = &cobra.Command{
 				} else {
 					waiting = limit.LessThan(newRate)
 				}
+			} else {
+				time.Sleep(300 * time.Second)
 			}
-			time.Sleep(300 * time.Second)
 		}
 
 		if dryrun {
