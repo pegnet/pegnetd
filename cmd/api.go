@@ -55,7 +55,7 @@ func init() {
 var minerDistro = &cobra.Command{
 	Use:              "minerdist <start> <stop>",
 	Short:            "Get the distribution of miners and their winnings/graded",
-	Example:          "pegnetd minedist 225500 225600\npegnetd minedist -- -1000\n pegnetd minedist 225500",
+	Example:          "pegnetd minerdist 225500 225600\npegnetd minerdist -- -1000\n pegnetd minerdist 225500",
 	PersistentPreRun: always,
 	PreRun:           SoftReadConfig,
 	Args:             cobra.RangeArgs(1, 2),
