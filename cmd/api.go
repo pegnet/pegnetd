@@ -17,9 +17,9 @@ import (
 	"github.com/pegnet/pegnetd/node"
 	"github.com/pegnet/pegnetd/node/pegnet"
 	"github.com/pegnet/pegnetd/srv"
+	"github.com/shopspring/decimal"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"github.com/shopspring/decimal"
 )
 
 func init() {
@@ -296,11 +296,11 @@ var limitConv = &cobra.Command{
 	Use:     "limitcvt <ECAddress> <FA-SOURCE> <SRC-ASSET> <AMOUNT> <DEST-ASSET> <LIMIT>",
 	Aliases: []string{"lcvt", "limitconversion", "limitconvert"},
 	Short:   "Builds and submits a pegnet conversion when the specified limit is reached",
-	Long: 	"Only converts an asset when the limit condition is met. By default this condition is " +
-	"when the source asset is below the provided limit.\nTo convert when the destination asset reaches the limit instead use the '--dest' flag.\n" +
-	"To convert when the selected asset is above the limit threshold rather than below, use the '--above' flag.\n" + 
-	"to test without actually going through with the conversion use the '--dryrun' flag, it will print out when the condition is met" +
-	"", 
+	Long: "Only converts an asset when the limit condition is met. By default this condition is " +
+		"when the source asset is below the provided limit.\nTo convert when the destination asset reaches the limit instead use the '--dest' flag.\n" +
+		"To convert when the selected asset is above the limit threshold rather than below, use the '--above' flag.\n" +
+		"to test without actually going through with the conversion use the '--dryrun' flag, it will print out when the condition is met" +
+		"",
 	Example: "pegnetd limitcvt EC3eX8VxGH64Xv3NFd9g4Y7PxSMnH3EGz5jQQrrQS8VZGnv4JY2K FA32xV6SoPBSbAZAVyuiHWwyoMYhnSyMmAHZfK29H8dx7bJXFLja" +
 		" pXBT 1 pUSD 9000.00 --above",
 	PersistentPreRun: always,
