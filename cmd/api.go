@@ -19,6 +19,7 @@ import (
 	"github.com/pegnet/pegnetd/srv"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"github.com/shopspring/decimal"
 )
 
 func init() {
@@ -46,6 +47,11 @@ func init() {
 	rootCmd.AddCommand(tx)
 	rootCmd.AddCommand(conv)
 
+	// limit conversion
+	limitConv.Flags().Bool("dest", false, "Use the destination asset to trigger the limit conversion")
+	limitConv.Flags().Bool("above", false, "Trigger the conversion above the limit amount")
+	limitConv.Flags().Bool("dryrun", false, "Use if you want to test the command but not actually convert the asset when triggered")
+	rootCmd.AddCommand(limitConv)
 }
 
 var rich = &cobra.Command{
@@ -284,6 +290,122 @@ var conv = &cobra.Command{
 		fmt.Printf("\t%10s: %s\n", "EntryHash", reveal)
 		fmt.Printf("\t%10s: %s\n", "Commit", commit)
 	},
+}
+
+var limitConv = &cobra.Command{
+	Use:     "limitcvt <ECAddress> <FA-SOURCE> <SRC-ASSET> <AMOUNT> <DEST-ASSET> <LIMIT>",
+	Aliases: []string{"lcvt", "limitconversion", "limitconvert"},
+	Short:   "Builds and submits a pegnet conversion when the source asset reaches the specified limit",
+	Long: 	"Only converts an asset when the limit condition is met. By default this condition is " +
+	"when the source asset is below the provided limit.\nTo convert when the destination asset reaches the limit instead of the source use the '--dest' flag.\n" +
+	"To convert when the selected asset is above the limit threshold rather than below, use the '--above' flag.\n" + 
+	"to test the logic without actually going through with the conversion use the '--dryrun' flag" +
+	"", 
+	Example: "pegnetd limitcvt EC3eX8VxGH64Xv3NFd9g4Y7PxSMnH3EGz5jQQrrQS8VZGnv4JY2K FA32xV6SoPBSbAZAVyuiHWwyoMYhnSyMmAHZfK29H8dx7bJXFLja" +
+		" pXBT 1 pUSD 9000.00 --above",
+	PersistentPreRun: always,
+	PreRun:           SoftReadConfig,
+	Args: CombineCobraArgs(
+		CustomArgOrderValidationBuilder(
+			true,
+			ArgValidatorECAddress,
+			ArgValidatorFCTAddress,
+			ArgValidatorAssetOrP,
+			ArgValidatorFCTAmount,
+			ArgValidatorAssetOrP,
+			ArgValidatorFCTAmount), // Limit is converted into a decimal object, using ArgValidatorFCTAmount for validation
+	),
+	Run: func(cmd *cobra.Command, args []string) {
+		var err error
+		cl := node.FactomClientFromConfig(viper.GetViper())
+		payment, source, srcAsset, amt, destAsset, limitStr := args[0], args[1], args[2], args[3], args[4], args[5]
+
+		// Let's check the pXXX -> pFCT first
+		status := getStatus()
+		if (destAsset == "pFCT" || destAsset == "FCT") && uint32(status.Current) >= node.OneWaypFCTConversions {
+			cmd.PrintErrln(fmt.Sprintf("pXXX -> pFCT conversions are not allowed since block height %d. If you need to acquire pFCT, you have to burn FCT -> pFCT", node.OneWaypFCTConversions))
+			os.Exit(1)
+		}
+
+		dest, _ := cmd.Flags().GetBool("dest")
+		above, _ := cmd.Flags().GetBool("above")
+		dryrun, _ := cmd.Flags().GetBool("dryrun")
+		waiting := true
+		limit, err := decimal.NewFromString(limitStr)
+		if err != nil {
+			cmd.PrintErrln("Error parsing limit amount, must be a valid number or decimal")
+			os.Exit(1)
+		}
+		var limitTicker string
+		if dest {
+			limitTicker = destAsset
+		} else {
+			limitTicker = srcAsset
+		}
+		oldRate := decimal.NewFromInt(0)
+		for waiting {
+			rates := CurrentRates()
+			newRate, _ := decimal.NewFromString(rates[limitTicker])
+			if newRate != oldRate {
+				fmt.Printf("Current Rate: %s\n", newRate)
+				if above {
+					waiting = limit.GreaterThan(newRate)
+				} else {
+					waiting = limit.LessThan(newRate)
+				}
+			}
+			time.Sleep(300 * time.Second)
+		}
+
+		if dryrun {
+			fmt.Println("Limit condition met, dryrun active, not converting assets")
+			return
+		}
+
+		fmt.Println("Limit condition met, converting")
+
+		// Build the transaction from the args
+		var trans fat2.Transaction
+		if err := setTransactionInput(&trans, cl, source, srcAsset, amt); err != nil {
+			cmd.PrintErrln(err.Error())
+			os.Exit(1)
+		}
+
+		if trans.Conversion, err = ticker(destAsset); err != nil {
+			cmd.PrintErrln("invalid ticker type")
+			os.Exit(1)
+		}
+
+		err, commit, reveal := signAndSend(&trans, cl, payment)
+		if err != nil {
+			cmd.PrintErrln(err.Error())
+			os.Exit(1)
+		}
+
+		fmt.Printf("conversion sent:\n")
+		fmt.Printf("\t%10s: %s\n", "EntryHash", reveal)
+		fmt.Printf("\t%10s: %s\n", "Commit", commit)
+	},
+}
+
+// CurrentRates returns the rates as of the current nodes syncheight
+func CurrentRates() map[string]string {
+	client := srv.NewClient()
+	client.PegnetdServer = viper.GetString(config.Pegnetd)
+	var res srv.ResultPegnetTickerMap
+	status := getStatus()
+	uH := uint32(status.Sync)
+	err := client.Request("get-pegnet-rates", srv.ParamsGetPegnetRates{Height: &uH}, &res)
+	if err != nil {
+		fmt.Printf("Failed to make RPC request\nDetails:\n%v\n", err)
+		os.Exit(1)
+	}
+	// Change the units to be human readable
+	humanBals := make(map[string]string)
+	for k, bal := range res {
+		humanBals[k.String()] = FactoshiToFactoid(int64(bal))
+	}
+	return humanBals
 }
 
 var tx = &cobra.Command{
