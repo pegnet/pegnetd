@@ -59,7 +59,7 @@ func SetAllActivations(act uint32) {
 	PegnetConversionLimitActivation = act
 	PEGFreeFloatingPriceActivation = act
 	fat2.Fat2RCDEActivation = act
-	//V4OPRUpdate = act
+	V4OPRUpdate = act
 }
 
 type Pegnetd struct {
