@@ -14,7 +14,7 @@ require (
 	github.com/stretchr/testify v1.4.0
 )
 
-replace github.com/Factom-Asset-Tokens/factom => github.com/Emyrk/factom v0.0.0-20191212151433-bd8a5cb70c70
+replace github.com/Factom-Asset-Tokens/factom => github.com/Emyrk/factom v0.0.0-20200113153851-17d98c31e1bd
 
 replace crawshaw.io/sqlite => github.com/AdamSLevy/sqlite v0.1.3-0.20191014215059-b98bb18889de
 
