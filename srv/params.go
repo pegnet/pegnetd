@@ -220,7 +220,7 @@ func (p ParamsGetPegnetTransaction) IsValid() error {
 
 	// error check input
 	if p.Address != "" {
-		if _, err := factom.NewFAAddress(p.Address); err != nil {
+		if _, err := underlyingFA(p.Address); err != nil {
 			return jrpc.ErrorInvalidParams("address: " + err.Error())
 		}
 	}
@@ -244,14 +244,17 @@ func (p ParamsGetPegnetTransaction) ValidChainID() *factom.Bytes32 {
 }
 
 type ParamsGetPegnetBalances struct {
-	Address *factom.FAAddress `json:"address,omitempty"`
+	Address string `json:"address,omitempty"`
 }
 
 func (p ParamsGetPegnetBalances) HasIncludePending() bool { return false }
 
 func (p ParamsGetPegnetBalances) IsValid() error {
-	if p.Address == nil {
+	if p.Address == "" {
 		return jrpc.ErrorInvalidParams(`required: "address"`)
+	}
+	if _, err := underlyingFA(p.Address); err != nil {
+		return jrpc.ErrorInvalidParams("address: " + err.Error())
 	}
 	return nil
 }
@@ -293,7 +296,7 @@ func (p *ParamsSendTransaction) IsValid() error {
 		Timestamp: time.Now(),
 		ChainID:   p.ChainID,
 	}
-	if _, err := p.entry.Cost(false); err != nil {
+	if _, err := p.entry.Cost(); err != nil {
 		return jrpc.ErrorInvalidParams(err)
 	}
 

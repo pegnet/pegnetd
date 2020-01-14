@@ -5,8 +5,7 @@ import (
 	"fmt"
 
 	"github.com/Factom-Asset-Tokens/factom"
-	"github.com/Factom-Asset-Tokens/fatd/fat"
-	"github.com/Factom-Asset-Tokens/fatd/fat/jsonlen"
+	"github.com/Factom-Asset-Tokens/factom/jsonlen"
 )
 
 // TypedAddressAmountTuple represents a tuple of a Factoid address sending
@@ -135,10 +134,16 @@ func (t *Transaction) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+// This constant was imported from /fatd
+// If we grab the constant from the package, it causes us to import
+// fatd, which complicates the dep management. Just copy over the coinbase
+// line vs importing the lib.
+var coinbase = factom.FsAddress{}.FAAddress()
+
 // Validate performs all validation checks and returns nil if t is a valid
 // Transaction
 func (t *Transaction) Validate() error {
-	if t.Input.Address == fat.Coinbase() {
+	if t.Input.Address == coinbase {
 		return fmt.Errorf("invalid input: %v reserved as burn address", t.Input.Address)
 	} else if t.Input == (TypedAddressAmountTuple{}) { // TODO: is there a better way to check for zero value struct?
 		return fmt.Errorf("invalid input: empty")

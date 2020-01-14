@@ -13,6 +13,7 @@ import (
 	sqlite3 "github.com/mattn/go-sqlite3"
 	"github.com/pegnet/pegnetd/config"
 	"github.com/pegnet/pegnetd/exit"
+	"github.com/pegnet/pegnetd/fat/fat2"
 	"github.com/pegnet/pegnetd/node"
 	"github.com/pegnet/pegnetd/srv"
 	log "github.com/sirupsen/logrus"
@@ -32,6 +33,9 @@ func init() {
 
 	rootCmd.Flags().String("dbmode", "", "Turn on custom sqlite modes")
 	rootCmd.Flags().Bool("wal", false, "Turn on WAL mode for sqlite")
+
+	rootCmd.PersistentFlags().BoolP("no-warn", "n", false, "Ignore all warnings/notices")
+	rootCmd.PersistentFlags().Bool("no-hf", false, "Disable the check that your node was updated before each hard fork. It will still print a warning")
 
 	// This is for testing purposes
 	rootCmd.PersistentFlags().Bool("testing", false, "If this flag is set, all activations heights are set to 0.")
@@ -115,7 +119,7 @@ var properties = &cobra.Command{
 		}{
 			FactomdVersion: "Unknown", FactomdAPIVersion: "Unknown",
 		}
-		_ = cl.FactomdRequest("properties", nil, &factomdProperties)
+		_ = cl.FactomdRequest(nil, "properties", nil, &factomdProperties)
 		fmt.Printf(format, "Factomd Version", factomdProperties.FactomdVersion)
 		fmt.Printf(format, "Factomd API Version", factomdProperties.FactomdAPIVersion)
 
@@ -125,7 +129,7 @@ var properties = &cobra.Command{
 		}{
 			WalletdVersion: "Unknown", WalletdAPIVersion: "Unknown",
 		}
-		_ = cl.WalletdRequest("properties", nil, &walletdProperties)
+		_ = cl.WalletdRequest(nil, "properties", nil, &walletdProperties)
 		fmt.Printf(format, "Walletd Version", walletdProperties.WalletdVersion)
 		fmt.Printf(format, "Walletd API Version", walletdProperties.WalletdAPIVersion)
 
@@ -147,8 +151,7 @@ func always(cmd *cobra.Command, args []string) {
 	}
 
 	if testingact, _ := cmd.Flags().GetInt32("testingact"); testingact >= 0 {
-		node.PegnetConversionLimitActivation = uint32(testingact)
-		node.PEGFreeFloatingPriceActivation = uint32(testingact)
+		fat2.Fat2RCDEActivation = uint32(testingact)
 	}
 
 	// Setup config reading
@@ -175,6 +178,7 @@ func always(cmd *cobra.Command, args []string) {
 	_ = viper.BindPFlag(config.APIListen, cmd.Flags().Lookup("api"))
 	_ = viper.BindPFlag(config.SQLDBWalMode, cmd.Flags().Lookup("wal"))
 	_ = viper.BindPFlag(config.CustomSQLDBMode, cmd.Flags().Lookup("dbmode"))
+	_ = viper.BindPFlag(config.DisableHardForkCheck, cmd.Flags().Lookup("no-hf"))
 
 	// Also init some defaults
 	viper.SetDefault(config.DBlockSyncRetryPeriod, time.Second*5)

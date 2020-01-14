@@ -233,7 +233,7 @@ var burn = &cobra.Command{
 		}
 		faddr := factom.Bytes32(addr)
 
-		priv, err := addr.GetFsAddress(cl)
+		priv, err := addr.GetFsAddress(nil, cl)
 		if err != nil {
 			cmd.PrintErrf("unable to get private key: %s\n", err.Error())
 			os.Exit(1)
@@ -245,7 +245,13 @@ var burn = &cobra.Command{
 			os.Exit(1)
 		}
 
-		balance, err := addr.GetBalance(cl)
+		rcd1, ok := rcd.(*factom.RCD1)
+		if !ok {
+			cmd.PrintErrln("the address is not compatible with factoid transactions, must be rcd type 1")
+			os.Exit(1)
+		}
+
+		balance, err := addr.GetBalance(nil, cl)
 		if err != nil {
 			cmd.PrintErrln("unable to retrieve balance:" + err.Error())
 			os.Exit(1)
@@ -261,22 +267,20 @@ var burn = &cobra.Command{
 
 		var trans factom.FactoidTransaction
 		trans.Version = 2
-		trans.Timestamp = time.Now()
-		trans.InputCount = 1
-		trans.ECOutputCount = 1
+		trans.TimestampSalt = time.Now()
 		trans.FCTInputs = append(trans.FCTInputs, factom.FactoidTransactionIO{
 			Amount:  uint64(amount),
-			Address: &faddr,
+			Address: faddr,
 		})
 		trans.ECOutputs = append(trans.ECOutputs, factom.FactoidTransactionIO{
 			Amount:  0,
-			Address: &fBurnAddress,
+			Address: fBurnAddress,
 		})
 
 		// the library requires at least one signature to "be populated"
 		// fill in below with real sig
 		trans.Signatures = append(trans.Signatures, factom.FactoidTransactionSignature{
-			ReedeemCondition: rcd,
+			ReedeemCondition: *rcd1,
 			SignatureBlock:   nil,
 		})
 
@@ -304,7 +308,7 @@ var burn = &cobra.Command{
 			TXID    string `json:"txid"`
 		}
 
-		err = cl.FactomdRequest("factoid-submit", params, &result)
+		err = cl.FactomdRequest(nil, "factoid-submit", params, &result)
 		if err != nil {
 			cmd.PrintErrf("unable to submit transaction: %s\n", err.Error())
 			os.Exit(1)
@@ -314,6 +318,8 @@ var burn = &cobra.Command{
 		fmt.Printf("Transaction ID: %s\n", result.TXID)
 	},
 }
+
+var outputFEWarning = "The address you are sending to is an Ethereum linked address. In transactions, the output address will be displayed as %s."
 
 var conv = &cobra.Command{
 	Use:     "newcvt <ECAddress> <FA-SOURCE> <SRC-ASSET> <AMOUNT> <DEST-ASSET>",
@@ -327,7 +333,7 @@ var conv = &cobra.Command{
 		CustomArgOrderValidationBuilder(
 			true,
 			ArgValidatorECAddress,
-			ArgValidatorFCTAddress,
+			ArgValidatorAddress(ADD_FA|ADD_FE|ADD_Fe),
 			ArgValidatorAssetOrP,
 			ArgValidatorFCTAmount,
 			ArgValidatorAssetOrP),
@@ -335,7 +341,7 @@ var conv = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		var err error
 		cl := node.FactomClientFromConfig(viper.GetViper())
-		payment, source, srcAsset, amt, destAsset := args[0], args[1], args[2], args[3], args[4]
+		payment, originalSource, srcAsset, amt, destAsset := args[0], args[1], args[2], args[3], args[4]
 
 		// Let's check the pXXX -> pFCT first
 		status := getStatus()
@@ -346,7 +352,7 @@ var conv = &cobra.Command{
 
 		// Build the transaction from the args
 		var trans fat2.Transaction
-		if err := setTransactionInput(&trans, cl, source, srcAsset, amt); err != nil {
+		if err := setTransactionInput(&trans, cl, originalSource, srcAsset, amt); err != nil {
 			cmd.PrintErrln(err.Error())
 			os.Exit(1)
 		}
@@ -356,7 +362,7 @@ var conv = &cobra.Command{
 			os.Exit(1)
 		}
 
-		err, commit, reveal := signAndSend(&trans, cl, payment)
+		err, commit, reveal := signAndSend(originalSource, &trans, cl, payment)
 		if err != nil {
 			cmd.PrintErrln(err.Error())
 			os.Exit(1)
@@ -365,6 +371,7 @@ var conv = &cobra.Command{
 		fmt.Printf("conversion sent:\n")
 		fmt.Printf("\t%10s: %s\n", "EntryHash", reveal)
 		fmt.Printf("\t%10s: %s\n", "Commit", commit)
+		printFeWarning(cmd, originalSource)
 	},
 }
 
@@ -379,10 +386,10 @@ var tx = &cobra.Command{
 		CustomArgOrderValidationBuilder(
 			true,
 			ArgValidatorECAddress,
-			ArgValidatorFCTAddress,
+			ArgValidatorAddress(ADD_FA|ADD_FE|ADD_Fe),
 			ArgValidatorAssetOrP,
 			ArgValidatorFCTAmount,
-			ArgValidatorFCTAddress),
+			ArgValidatorAddress(ADD_FA|ADD_FE|ADD_Fe)),
 	),
 	Run: func(cmd *cobra.Command, args []string) {
 		cl := node.FactomClientFromConfig(viper.GetViper())
@@ -400,7 +407,14 @@ var tx = &cobra.Command{
 			os.Exit(1)
 		}
 
-		err, commit, reveal := signAndSend(&trans, cl, payment)
+		// Before we sign and send, check the in/out rules
+		err := addressRules(source, dest)
+		if err != nil {
+			cmd.PrintErrln(err.Error())
+			os.Exit(1)
+		}
+
+		err, commit, reveal := signAndSend(source, &trans, cl, payment)
 		if err != nil {
 			cmd.PrintErrln(err.Error())
 			os.Exit(1)
@@ -409,6 +423,14 @@ var tx = &cobra.Command{
 		fmt.Printf("transaction sent:\n")
 		fmt.Printf("\t%10s: %s\n", "EntryHash", reveal)
 		fmt.Printf("\t%10s: %s\n", "Commit", commit)
+
+		printFeWarning(cmd, source, dest)
+
+		//printFeWarning(cmd, source, false,
+		//	fmt.Sprintf("The address you are sending from is an Ethereum linked address. In transactions, the input address will be displayed as %%s. "+
+		//		"Continue to use '%s'! DO NOT USE THIS FA ADDRESS DIRECTLY. LOSS OF FUNDS MAY RESULT!", source))
+		//printFeWarning(cmd, dest, false,
+		//	"The address you are sending to is an Ethereum linked address. In transactions, the output address will be displayed as %s.")
 	},
 }
 
@@ -419,7 +441,7 @@ var balance = &cobra.Command{
 	PersistentPreRun: always,
 	PreRun:           SoftReadConfig,
 	Args: CombineCobraArgs(
-		CustomArgOrderValidationBuilder(true, ArgValidatorAssetOrP, ArgValidatorFCTAddress),
+		CustomArgOrderValidationBuilder(true, ArgValidatorAssetOrP, ArgValidatorAddress(ADD_FA|ADD_FE|ADD_Fe)),
 		cobra.MinimumNArgs(1)),
 	Run: func(cmd *cobra.Command, args []string) {
 		res, err := queryBalances(args[1])
@@ -432,6 +454,7 @@ var balance = &cobra.Command{
 		balance := res[ticker]
 		humanBal := FactoshiToFactoid(int64(balance))
 		fmt.Printf("%s %s\n", humanBal, ticker.String())
+		printFeWarning(cmd, args[1])
 	},
 }
 
@@ -442,7 +465,7 @@ var balances = &cobra.Command{
 	PersistentPreRun: always,
 	PreRun:           SoftReadConfig,
 	Args: CombineCobraArgs(
-		CustomArgOrderValidationBuilder(true, ArgValidatorFCTAddress),
+		CustomArgOrderValidationBuilder(true, ArgValidatorAddress(ADD_FA|ADD_FE|ADD_Fe)),
 		cobra.MinimumNArgs(1)),
 	Run: func(cmd *cobra.Command, args []string) {
 		res, err := queryBalances(args[0])
@@ -462,13 +485,14 @@ var balances = &cobra.Command{
 			panic(err)
 		}
 		fmt.Println(string(data))
+		printFeWarning(cmd, args[0])
 	},
 }
 
 func queryBalances(humanAddress string) (srv.ResultPegnetTickerMap, error) {
 	cl := srv.NewClient()
 	cl.PegnetdServer = viper.GetString(config.Pegnetd)
-	addr, err := factom.NewFAAddress(humanAddress)
+	addr, err := underlyingFA(humanAddress)
 	if err != nil {
 		// TODO: Better error
 		fmt.Println("1", err)
@@ -476,7 +500,7 @@ func queryBalances(humanAddress string) (srv.ResultPegnetTickerMap, error) {
 	}
 
 	var res srv.ResultPegnetTickerMap
-	err = cl.Request("get-pegnet-balances", srv.ParamsGetPegnetBalances{&addr}, &res)
+	err = cl.Request("get-pegnet-balances", srv.ParamsGetPegnetBalances{addr.String()}, &res)
 	if err != nil {
 		// TODO: Better error
 		fmt.Println("2", err)
@@ -614,6 +638,7 @@ var getTXs = &cobra.Command{
 		var height int
 		// determine the params
 		var params srv.ParamsGetPegnetTransaction
+		var add factom.FAAddress
 
 		// An entryhash?
 		bytes, err := hex.DecodeString(args[0])
@@ -623,9 +648,11 @@ var getTXs = &cobra.Command{
 		}
 
 		// A factoid address maybe?
-		_, err = factom.NewFAAddress(args[0])
+		add, err = underlyingFA(args[0])
 		if err == nil {
-			params.Address = args[0]
+			// Place warning at the bottom
+			defer printFeWarning(cmd, args[0])
+			params.Address = add.String()
 			goto FoundParams
 		}
 

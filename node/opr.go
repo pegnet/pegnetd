@@ -53,7 +53,7 @@ func (d *Pegnetd) Grade(ctx context.Context, block *factom.EBlock) (grader.Grade
 		err = g.AddOPR(entry.Hash[:], extids, entry.Content)
 		if err != nil {
 			// This is a noisy debug print
-			// log.WithError(err).WithFields(log.Fields{"hash": entry.Hash.String()}).Debug("failed to add opr")
+			//logrus.WithError(err).WithFields(logrus.Fields{"hash": entry.Hash.String()}).Debug("failed to add opr")
 		}
 	}
 

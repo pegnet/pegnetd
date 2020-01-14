@@ -33,7 +33,7 @@ OuterSyncLoop:
 
 		// Fetch the current highest height
 		heights := new(factom.Heights)
-		err := heights.Get(d.FactomClient)
+		err := heights.Get(nil, d.FactomClient)
 		if err != nil {
 			log.WithError(err).WithFields(log.Fields{}).Errorf("failed to fetch heights")
 			time.Sleep(retryPeriod)
@@ -166,7 +166,7 @@ func (d *Pegnetd) SyncBlock(ctx context.Context, tx *sql.Tx, height uint32) erro
 
 	dblock := new(factom.DBlock)
 	dblock.Height = height
-	if err := dblock.Get(d.FactomClient); err != nil {
+	if err := dblock.Get(nil, d.FactomClient); err != nil {
 		return err
 	}
 
@@ -259,7 +259,7 @@ func (d *Pegnetd) SyncBlock(ctx context.Context, tx *sql.Tx, height uint32) erro
 }
 
 func multiFetch(eblock *factom.EBlock, c *factom.Client) error {
-	err := eblock.Get(c)
+	err := eblock.Get(nil, c)
 	if err != nil {
 		return err
 	}
@@ -278,7 +278,7 @@ func multiFetch(eblock *factom.EBlock, c *factom.Client) error {
 			}()
 
 			for j := range work {
-				errs <- eblock.Entries[j].Get(c)
+				errs <- eblock.Entries[j].Get(nil, c)
 			}
 		}()
 	}
@@ -331,11 +331,11 @@ func (d *Pegnetd) ApplyTransactionBatchesInHolding(ctx context.Context, sqlTx *s
 		// on a proportional basis.
 		for i, txBatch := range txBatches {
 			// Re-validate transaction batch because timestamp might not be valid anymore
-			if err := txBatch.Validate(); err != nil {
+			if err := txBatch.Validate(int32(currentHeight)); err != nil {
 				d.Pegnet.SetTransactionHistoryExecuted(sqlTx, txBatch, -2)
 				continue
 			}
-			isReplay, err := d.Pegnet.IsReplayTransaction(sqlTx, txBatch.Hash)
+			isReplay, err := d.Pegnet.IsReplayTransaction(sqlTx, txBatch.Entry.Hash)
 			if err != nil {
 				return err
 			} else if isReplay {
@@ -378,21 +378,18 @@ func (d *Pegnetd) ApplyTransactionBatchesInHolding(ctx context.Context, sqlTx *s
 // immediately. If an error is returned, the sql.Tx should be rolled back by the caller.
 func (d *Pegnetd) ApplyTransactionBlock(sqlTx *sql.Tx, eblock *factom.EBlock) error {
 	for blockorder, entry := range eblock.Entries {
-		txBatch := fat2.NewTransactionBatch(entry)
-		err := txBatch.UnmarshalEntry()
+		txBatch, err := fat2.NewTransactionBatch(entry, int32(eblock.Height))
 		if err != nil {
 			continue // Bad formatted entry
 		}
-		if err := txBatch.Validate(); err != nil {
-			continue
-		}
+
 		log.WithFields(log.Fields{
 			"height":      eblock.Height,
 			"entryhash":   entry.Hash.String(),
 			"conversions": txBatch.HasConversions(),
 			"txs":         len(txBatch.Transactions)}).Tracef("tx found")
 
-		isReplay, err := d.Pegnet.IsReplayTransaction(sqlTx, txBatch.Hash)
+		isReplay, err := d.Pegnet.IsReplayTransaction(sqlTx, txBatch.Entry.Hash)
 		if err != nil {
 			return err
 		} else if isReplay {
@@ -505,7 +502,7 @@ func (d *Pegnetd) applyTransactionBatch(sqlTx *sql.Tx, txBatch *fat2.Transaction
 
 	log.WithFields(log.Fields{
 		"height":     currentHeight, // Just for log traces
-		"entryhash":  txBatch.Hash.String(),
+		"entryhash":  txBatch.Entry.Hash.String(),
 		"conversion": txBatch.HasConversions(),
 		"txs":        len(txBatch.Transactions)}).Tracef("tx applied")
 
@@ -523,8 +520,7 @@ func (d *Pegnetd) recordBatch(sqlTx *sql.Tx, txBatch *fat2.TransactionBatch, rat
 			// This should fail the block
 			return fmt.Errorf("uncaught: %s", txErr.Error())
 		}
-
-		_, err = d.Pegnet.InsertTransactionRelation(sqlTx, tx.Input.Address, txBatch.Hash, uint64(txIndex), false, tx.IsConversion())
+		_, err = d.Pegnet.InsertTransactionRelation(sqlTx, tx.Input.Address, txBatch.Entry.Hash, uint64(txIndex), false, tx.IsConversion())
 		if err != nil {
 			return err
 		}
@@ -564,7 +560,7 @@ func (d *Pegnetd) recordBatch(sqlTx *sql.Tx, txBatch *fat2.TransactionBatch, rat
 				if err != nil {
 					return err
 				}
-				_, err = d.Pegnet.InsertTransactionRelation(sqlTx, transfer.Address, txBatch.Hash, uint64(txIndex), true, false)
+				_, err = d.Pegnet.InsertTransactionRelation(sqlTx, transfer.Address, txBatch.Entry.Hash, uint64(txIndex), true, false)
 				if err != nil {
 					return err
 				}
@@ -593,7 +589,7 @@ func (d *Pegnetd) recordPegnetRequests(sqlTx *sql.Tx, txBatchs []*fat2.Transacti
 			tx := txBatchs[i].Transactions[j]
 			// The txid helps determine the order when deciding who
 			// gets the dust
-			txid := transactionid.FormatTxID(j, txBatchs[i].Hash.String())
+			txid := transactionid.FormatTxID(j, txBatchs[i].Entry.Hash.String())
 
 			// We caught the error earlier, so we can ignore it here.
 			pegAmt, _ := conversions.Convert(int64(tx.Input.Amount), rates[tx.Input.Type], rates[tx.Conversion])
@@ -651,13 +647,13 @@ func (d *Pegnetd) recordPegnetRequests(sqlTx *sql.Tx, txBatchs []*fat2.Transacti
 // DBlock. If an error is returned, the sql.Tx should be rolled back by the caller.
 func (d *Pegnetd) ApplyFactoidBlock(ctx context.Context, tx *sql.Tx, dblock *factom.DBlock) error {
 	fblock := new(factom.FBlock)
-	fblock.Header.Height = dblock.Height
-	if err := fblock.Get(d.FactomClient); err != nil {
+	fblock.Height = dblock.Height
+	if err := fblock.Get(nil, d.FactomClient); err != nil {
 		return err
 	}
 
 	var totalBurned uint64
-	var burns []*factom.FactoidTransaction
+	var burns []factom.FactoidTransaction
 
 	// Register all burns. Burns have a few requirements
 	// - Only 1 output, and that output must be the EC burn address
@@ -668,7 +664,7 @@ func (d *Pegnetd) ApplyFactoidBlock(ctx context.Context, tx *sql.Tx, dblock *fac
 			return context.Canceled
 		}
 
-		if err := fblock.Transactions[i].Get(d.FactomClient); err != nil {
+		if err := fblock.Transactions[i].Get(nil, d.FactomClient); err != nil {
 			return err
 		}
 
@@ -680,7 +676,7 @@ func (d *Pegnetd) ApplyFactoidBlock(ctx context.Context, tx *sql.Tx, dblock *fac
 
 		// Check correct output
 		out := tx.ECOutputs[0]
-		if BurnRCD != *out.Address {
+		if BurnRCD != out.Address {
 			continue // Wrong EC output for a burn
 		}
 

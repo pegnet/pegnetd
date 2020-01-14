@@ -5,8 +5,8 @@ import (
 	"fmt"
 
 	"github.com/Factom-Asset-Tokens/factom"
-	"github.com/Factom-Asset-Tokens/fatd/fat"
-	"github.com/Factom-Asset-Tokens/fatd/fat/jsonlen"
+	"github.com/Factom-Asset-Tokens/factom/fat103"
+	"github.com/Factom-Asset-Tokens/factom/jsonlen"
 )
 
 // TransactionBatch represents a fat2 entry, which can be a list of one or more
@@ -14,13 +14,27 @@ import (
 type TransactionBatch struct {
 	Version      uint          `json:"version"`
 	Transactions []Transaction `json:"transactions"`
-	fat.Entry
+
+	Metadata json.RawMessage `json:"metadata,omitempty"`
+	Entry    factom.Entry    `json:"-"`
 }
 
 // NewTransactionBatch returns a TransactionBatch initialized with the given
 // entry.
-func NewTransactionBatch(entry factom.Entry) *TransactionBatch {
-	return &TransactionBatch{Entry: fat.Entry{Entry: entry}}
+// The height is for validation purposes. For certain heights, only
+// certain rcd types are valid. If the height -1 is passed in, then
+// all rcd types are valid. This is helpful when making a tx.
+func NewTransactionBatch(entry factom.Entry, height int32) (*TransactionBatch, error) {
+	t := TransactionBatch{Entry: entry}
+	if err := t.UnmarshalJSON(entry.Content); err != nil {
+		return nil, err
+	}
+
+	if err := t.Validate(height); err != nil {
+		return nil, err
+	}
+
+	return &t, nil
 }
 
 type transactionBatch TransactionBatch
@@ -32,10 +46,11 @@ func (t *TransactionBatch) UnmarshalJSON(data []byte) error {
 	tRaw := struct {
 		Version      json.RawMessage `json:"version"`
 		Transactions json.RawMessage `json:"transactions"`
-		fat.Entry
+		Metadata     json.RawMessage `json:"metadata,omitempty"`
 	}{}
 	if err := json.Unmarshal(data, &tRaw); err != nil {
-		return fmt.Errorf("%T: %v", t, err)
+		return fmt.Errorf(
+			"%T: %v", t, err)
 	}
 	if err := json.Unmarshal(tRaw.Version, &t.Version); err != nil {
 		return fmt.Errorf("%T.Version: %v", t, err)
@@ -43,6 +58,7 @@ func (t *TransactionBatch) UnmarshalJSON(data []byte) error {
 	if err := json.Unmarshal(tRaw.Transactions, &t.Transactions); err != nil {
 		return fmt.Errorf("%T.Transactions: %v", t, err)
 	}
+	t.Metadata = tRaw.Metadata
 
 	expectedJSONLen := len(`{"version":,"transactions":}`) +
 		len(tRaw.Version) + len(tRaw.Transactions)
@@ -69,24 +85,28 @@ func (t TransactionBatch) String() string {
 	return string(data)
 }
 
-// UnmarshalEntry unmarshals the Entry content as a TransactionBatch
-func (t *TransactionBatch) UnmarshalEntry() error {
-	return t.Entry.UnmarshalEntry(t)
-}
-
-// MarshalEntry marshals the TransactionBatch into the entry content
-func (t *TransactionBatch) MarshalEntry() error {
-	return t.Entry.MarshalEntry(t)
+func (t TransactionBatch) Sign(signingSet ...factom.RCDSigner) (factom.Entry, error) {
+	e := t.Entry
+	content, err := json.Marshal(t)
+	if err != nil {
+		return e, err
+	}
+	e.Content = content
+	signed := fat103.Sign(e, signingSet...)
+	t.Entry = signed
+	return t.Entry, nil
 }
 
 // Validate performs all validation checks and returns nil if it is a valid
 // batch. This function assumes the struct's entry field is populated.
-func (t *TransactionBatch) Validate() error {
+// Validate requires a height for rcd signature validation.
+// Not all rcd types are valid for all heights
+func (t *TransactionBatch) Validate(height int32) error {
 	err := t.ValidData()
 	if err != nil {
 		return err
 	}
-	if err = t.ValidExtIDs(); err != nil {
+	if err = t.ValidExtIDs(height); err != nil {
 		return err
 	}
 	return nil
@@ -122,27 +142,27 @@ func (t *TransactionBatch) ValidData() error {
 // found, it will then validate the content of the RCD/signature pair. This
 // function assumes that the entry content has been unmarshaled and that
 // ValidData returns nil.
-func (t TransactionBatch) ValidExtIDs() error {
+func (t TransactionBatch) ValidExtIDs(height int32) error {
 	// Count unique inputs to know how many signatures are needed on the entry
-	uniqueInputs := make(map[factom.FAAddress]struct{})
+
+	uniqueInputs := make(map[factom.Bytes32]struct{})
 	for _, tx := range t.Transactions {
-		uniqueInputs[tx.Input.Address] = struct{}{}
+		uniqueInputs[factom.Bytes32(tx.Input.Address)] = struct{}{}
 	}
-	if err := t.Entry.ValidExtIDs(len(uniqueInputs)); err != nil {
+
+	flag := factom.R_RCD1
+	if height > int32(Fat2RCDEActivation) {
+		flag = flag | factom.R_RCDe
+	}
+	// < 0 means accept all rcd types
+	if height < 0 {
+		flag = flag | factom.R_ALL
+	}
+
+	if err := fat103.Validate(t.Entry, uniqueInputs, flag); err != nil {
 		return err
 	}
-	// Create a map of all RCDs that are present in the ExtIDs
-	includedRCDHashes := make(map[factom.FAAddress]struct{})
-	extIDs := t.ExtIDs[1:]
-	for i := 0; i < len(extIDs)/2; i++ {
-		includedRCDHashes[t.FAAddress(i)] = struct{}{}
-	}
-	// Ensure that for all unique inputs there is a corresponding RCD in the ExtIDs
-	for address := range uniqueInputs {
-		if _, ok := includedRCDHashes[address]; !ok {
-			return fmt.Errorf("invalid RCDs")
-		}
-	}
+
 	return nil
 }
 

@@ -310,7 +310,7 @@ func (s *APIServer) getTransactions(forceTxId bool) func(_ context.Context, data
 			_ = hash.UnmarshalText([]byte(params.Hash)) // error checked by params.valid
 			actions, count, err = s.Node.Pegnet.SelectTransactionHistoryActionsByHash(hash, options)
 		} else if params.Address != "" {
-			addr, _ := factom.NewFAAddress(params.Address) // verified in param
+			addr, _ := underlyingFA(params.Address) // verified in param
 			actions, count, err = s.Node.Pegnet.SelectTransactionHistoryActionsByAddress(&addr, options)
 		} else if params.TxID != "" {
 			hash := new(factom.Bytes32)
@@ -373,7 +373,9 @@ func (s *APIServer) getPegnetBalances(_ context.Context, data json.RawMessage) i
 	if _, _, err := validate(data, &params); err != nil {
 		return err
 	}
-	bals, err := s.Node.Pegnet.SelectBalances(params.Address)
+	add, _ := underlyingFA(params.Address)
+
+	bals, err := s.Node.Pegnet.SelectBalances(&add)
 	if err == sql.ErrNoRows {
 		return ErrorAddressNotFound
 	}
@@ -448,13 +450,13 @@ func (s *APIServer) sendTransaction(_ context.Context, data json.RawMessage) int
 	//	return err
 	//}
 
-	var txID *factom.Bytes32
+	var txID factom.Bytes32
 	if !params.DryRun {
-		balance, err := ecPrivateKey.ECAddress().GetBalance(s.Node.FactomClient)
+		balance, err := ecPrivateKey.ECAddress().GetBalance(nil, s.Node.FactomClient)
 		if err != nil {
 			panic(err)
 		}
-		cost, err := entry.Cost(false)
+		cost, err := entry.Cost()
 		if err != nil {
 			rerr := ErrorInvalidTransaction
 			rerr.Data = err.Error()
@@ -463,7 +465,7 @@ func (s *APIServer) sendTransaction(_ context.Context, data json.RawMessage) int
 		if balance < uint64(cost) {
 			return ErrorNoEC
 		}
-		txID, err = entry.ComposeCreate(s.Node.FactomClient, ecPrivateKey, false)
+		txID, err = entry.ComposeCreate(nil, s.Node.FactomClient, ecPrivateKey)
 		if err != nil {
 			panic(err)
 		}
@@ -473,7 +475,7 @@ func (s *APIServer) sendTransaction(_ context.Context, data json.RawMessage) int
 		ChainID *factom.Bytes32 `json:"chainid"`
 		TxID    *factom.Bytes32 `json:"txid,omitempty"`
 		Hash    *factom.Bytes32 `json:"entryhash"`
-	}{ChainID: entry.ChainID, TxID: txID, Hash: entry.Hash}
+	}{ChainID: entry.ChainID, TxID: &txID, Hash: entry.Hash}
 	return nil
 }
 
@@ -504,7 +506,7 @@ type ResultGetSyncStatus struct {
 
 func (s *APIServer) getSyncStatus(_ context.Context, data json.RawMessage) interface{} {
 	heights := new(factom.Heights)
-	err := heights.Get(s.Node.FactomClient)
+	err := heights.Get(nil, s.Node.FactomClient)
 	if err != nil {
 		return ResultGetSyncStatus{Sync: s.Node.GetCurrentSync(), Current: -1}
 	}
