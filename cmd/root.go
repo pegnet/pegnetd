@@ -12,7 +12,7 @@ import (
 
 	"github.com/pegnet/pegnetd/node/pegnet"
 
-	sqlite3 "github.com/mattn/go-sqlite3"
+	"github.com/mattn/go-sqlite3"
 	"github.com/pegnet/pegnetd/config"
 	"github.com/pegnet/pegnetd/exit"
 	"github.com/pegnet/pegnetd/node"
@@ -154,7 +154,7 @@ func always(cmd *cobra.Command, args []string) {
 	if testingact, _ := cmd.Flags().GetInt32("testingact"); testingact >= 0 {
 		node.V4OPRUpdate = uint32(testingact)
 		// Also updaet hardfork
-		pegnet.Hardforks[0].ActivationHeight = uint32(testingact)
+		pegnet.Hardforks[1].ActivationHeight = uint32(testingact)
 	}
 
 	// Setup config reading

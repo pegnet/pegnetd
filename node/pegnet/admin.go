@@ -1,6 +1,7 @@
 package pegnet
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"time"
@@ -59,7 +60,11 @@ func (p *Pegnet) CreateTableSyncVersion() error {
 	return nil
 }
 
-func (Pegnet) MarkHeightSynced(tx QueryAble, height uint32) error {
+func (p Pegnet) MarkHeightSynced(tx QueryAble, height uint32) error {
+	return p.markHeightSyncedVersion(tx, height, PegnetdSyncVersion)
+}
+
+func (Pegnet) markHeightSyncedVersion(tx QueryAble, height uint32, version int) error {
 	stmtStringFmt := `INSERT INTO "pn_sync_version" 
 			("height", "version", "unix_timestamp")
 			VALUES (?, ?, ?);`
@@ -69,20 +74,28 @@ func (Pegnet) MarkHeightSynced(tx QueryAble, height uint32) error {
 		return err
 	}
 
-	_, err = stmt.Exec(height, PegnetdSyncVersion, time.Now().Unix())
+	_, err = stmt.Exec(height, version, time.Now().Unix())
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func (Pegnet) HighestSynced(tx QueryAble) (uint32, error) {
-	var topHeight uint32
-	err := tx.QueryRow(`SELECT COALESCE(max(height), 0) FROM pn_sync_version;`).Scan(&topHeight)
+func (p Pegnet) HighestSynced(tx QueryAble) (uint32, error) {
+	return p.synced("max", tx)
+}
+
+func (p Pegnet) LowestSynced(tx QueryAble) (uint32, error) {
+	return p.synced("min", tx)
+}
+
+func (Pegnet) synced(adj string, tx QueryAble) (uint32, error) {
+	var height uint32
+	err := tx.QueryRow(fmt.Sprintf(`SELECT COALESCE(%s(height), 0) FROM pn_sync_version;`, adj)).Scan(&height)
 	if err == sql.ErrNoRows {
 		return 0, nil
 	}
-	return topHeight, err
+	return height, err
 }
 
 // FetchMinSyncedVersion returns -1, nil if the height was not found
@@ -108,12 +121,36 @@ func (Pegnet) FetchMaxSyncedVersion(tx QueryAble, height uint32) (int, error) {
 // CheckHardForks will iterate over all the hardforks post the version_lock
 // update, and verify the version that was used to sync was appropriate.
 func (p Pegnet) CheckHardForks(tx QueryAble) error {
+	// The lowest synced height is the lowest synced height after
+	// version_lock feature is included.
+	minSynced, err := p.LowestSynced(tx)
+	if err != nil {
+		return err
+	}
+
+	// bs is the node's synced height.
+	bs, _ := p.SelectSynced(context.Background(), tx)
+	// If bs > minSynced, then this node was just upgraded to verison_lock
+	// We will check if they are past any hardforks.
+	if bs != nil && bs.Synced > minSynced {
+		// This means we already have some heights synced. So we need to insert
+		// -1s for all hardfork heights we synced prior to the version tracking.
+		for _, event := range Hardforks {
+			// If we are past the hardfork, put in a -1
+			if bs.Synced > event.ActivationHeight {
+				_ = p.markHeightSyncedVersion(tx, event.ActivationHeight, -1)
+			}
+		}
+	}
+
 	top, err := p.HighestSynced(tx)
 	if err != nil {
 		return err
 	}
 
 	for _, event := range Hardforks {
+		// If we are
+
 		// If the event is not synced past, then we do not need to check
 		if event.ActivationHeight <= top {
 			version, err := p.FetchMinSyncedVersion(tx, event.ActivationHeight)

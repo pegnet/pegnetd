@@ -1,6 +1,7 @@
 package pegnet
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"os"
@@ -124,4 +125,5 @@ type QueryAble interface {
 	Prepare(query string) (*sql.Stmt, error)
 	Query(query string, args ...interface{}) (*sql.Rows, error)
 	QueryRow(query string, args ...interface{}) *sql.Row
+	QueryRowContext(ctx context.Context, query string, args ...interface{}) *sql.Row
 }

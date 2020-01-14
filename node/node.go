@@ -81,7 +81,7 @@ func NewPegnetd(ctx context.Context, conf *viper.Viper) (*Pegnetd, error) {
 		return nil, err
 	}
 
-	if sync, err := n.Pegnet.SelectSynced(ctx); err != nil {
+	if sync, err := n.Pegnet.SelectSynced(ctx, n.Pegnet.DB); err != nil {
 		if err == sql.ErrNoRows {
 			n.Sync = new(pegnet.BlockSync)
 			n.Sync.Synced = PegnetActivation
