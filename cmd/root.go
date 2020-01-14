@@ -35,6 +35,7 @@ func init() {
 	rootCmd.Flags().Bool("wal", false, "Turn on WAL mode for sqlite")
 
 	rootCmd.PersistentFlags().BoolP("no-warn", "n", false, "Ignore all warnings/notices")
+	rootCmd.PersistentFlags().Bool("no-hf", false, "Disable the check that your node was updated before each hard fork. It will still print a warning")
 
 	// This is for testing purposes
 	rootCmd.PersistentFlags().Bool("testing", false, "If this flag is set, all activations heights are set to 0.")
@@ -177,6 +178,7 @@ func always(cmd *cobra.Command, args []string) {
 	_ = viper.BindPFlag(config.APIListen, cmd.Flags().Lookup("api"))
 	_ = viper.BindPFlag(config.SQLDBWalMode, cmd.Flags().Lookup("wal"))
 	_ = viper.BindPFlag(config.CustomSQLDBMode, cmd.Flags().Lookup("dbmode"))
+	_ = viper.BindPFlag(config.DisableHardForkCheck, cmd.Flags().Lookup("no-hf"))
 
 	// Also init some defaults
 	viper.SetDefault(config.DBlockSyncRetryPeriod, time.Second*5)
