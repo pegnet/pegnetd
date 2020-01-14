@@ -345,13 +345,16 @@ func (d *Pegnetd) ApplyTransactionBatchesInHolding(ctx context.Context, sqlTx *s
 			// This will apply all batche inputs, and all batch outputs except
 			// conversions to PEG if we are above the PegnetConversionLimit Act
 			err = d.applyTransactionBatch(sqlTx, txBatch, rates, currentHeight)
-			if err != nil && err != pegnet.InsufficientBalanceErr && err != pegnet.PFCTOneWayError {
+			// The err needs to be converted to a code. If the err is still
+			// not nil, then the code is 0 and the error is probably db related.
+			// If the code is < 0, the tx is rejected.
+			// If the code is > 0 and the err is nil, the tx is accepted.
+			rejectCode, err := pegnet.IsRejectedTx(err)
+			if err != nil { // Likely a db error
 				return err
-			} else if err == pegnet.InsufficientBalanceErr {
-				d.Pegnet.SetTransactionHistoryExecuted(sqlTx, txBatch, -1)
-			} else if err == pegnet.PFCTOneWayError {
-				d.Pegnet.SetTransactionHistoryExecuted(sqlTx, txBatch, -3)
-			} else if err == nil {
+			} else if rejectCode < 0 { // Tx rejected
+				d.Pegnet.SetTransactionHistoryExecuted(sqlTx, txBatch, rejectCode)
+			} else if err == nil { // Tx accepted
 				// If PegnetConversion limits are on, we process conversions to
 				// peg in a second pass.
 				if currentHeight >= PegnetConversionLimitActivation && txBatch.HasPEGRequest() {
@@ -451,7 +454,7 @@ func (d *Pegnetd) applyTransactionBatch(sqlTx *sql.Tx, txBatch *fat2.Transaction
 			}
 			if rates[tx.Input.Type] == 0 || rates[tx.Conversion] == 0 {
 				// This error will not fail the block, skip the tx
-				return nil // 0 rates result in an invalid tx. So we drop it
+				return pegnet.ZeroRatesError // 0 rates result in an invalid tx. So we drop it
 			}
 
 			// pXXX -> pFCT conversions are disabled at the activation height

@@ -41,6 +41,19 @@ const (
 	PTickerDASH
 	PTickerZEC
 	PTickerDCR
+	// V4 Additions
+	PTickerAUD
+	PTickerNZD
+	PTickerSEK
+	PTickerNOK
+	PTickerRUB
+	PTickerZAR
+	PTickerTRY
+	PTickerEOS
+	PTickerLINK
+	PTickerATOM
+	PTickerBAT
+	PTickerXTZ
 	PTickerMax
 )
 
@@ -75,6 +88,19 @@ var validPTickerStrings = []string{
 	"pDASH",
 	"pZEC",
 	"pDCR",
+	// V4 Additions
+	"pAUD",
+	"pNZD",
+	"pSEK",
+	"pNOK",
+	"pRUB",
+	"pZAR",
+	"pTRY",
+	"pEOS",
+	"pLINK",
+	"pATOM",
+	"pBAT",
+	"pXTZ",
 }
 
 var validPTickers = func() map[string]PTicker {

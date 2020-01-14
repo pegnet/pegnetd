@@ -80,8 +80,13 @@ func (p *Pegnet) InsertRates(tx *sql.Tx, height uint32, rates []opr.AssetUint, p
 			ratePEG.SetUint64(rates[i].Value)
 			continue
 		}
-		// Correct rates to use `pAsset`
-		rates[i].Name = "p" + rates[i].Name
+		if rates[i].Name == "pUSD" {
+			rates[i].Name = "exch_" + rates[i].Name
+		} else {
+			// Correct rates to use `pAsset`
+			rates[i].Name = "p" + rates[i].Name
+		}
+
 		err := p.insertRate(tx, height, rates[i].Name, rates[i].Value)
 		if err != nil {
 			return err

@@ -13,7 +13,6 @@ import (
 	sqlite3 "github.com/mattn/go-sqlite3"
 	"github.com/pegnet/pegnetd/config"
 	"github.com/pegnet/pegnetd/exit"
-	"github.com/pegnet/pegnetd/fat/fat2"
 	"github.com/pegnet/pegnetd/node"
 	"github.com/pegnet/pegnetd/srv"
 	log "github.com/sirupsen/logrus"
@@ -151,7 +150,7 @@ func always(cmd *cobra.Command, args []string) {
 	}
 
 	if testingact, _ := cmd.Flags().GetInt32("testingact"); testingact >= 0 {
-		fat2.Fat2RCDEActivation = uint32(testingact)
+		node.V4OPRUpdate = uint32(testingact)
 	}
 
 	// Setup config reading
