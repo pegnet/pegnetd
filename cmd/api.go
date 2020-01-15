@@ -12,6 +12,8 @@ import (
 	"text/tabwriter"
 	"time"
 
+	"github.com/pegnet/pegnet/modules/conversions"
+
 	"github.com/Factom-Asset-Tokens/factom"
 	"github.com/pegnet/pegnetd/config"
 	"github.com/pegnet/pegnetd/fat/fat2"
@@ -32,6 +34,7 @@ func init() {
 	rootCmd.AddCommand(rich)
 
 	get.AddCommand(getTX)
+	getRates.Flags().Bool("ref", false, "Query for the reference asset rates instead")
 	get.AddCommand(getRates)
 	getBank.Flags().Bool("raw", false, "Print the full json data")
 	get.AddCommand(getBank)
@@ -698,19 +701,23 @@ var getRates = &cobra.Command{
 	Short:            "Fetch the pegnet quotes for the assets at a given height (if their are quotes)",
 	PersistentPreRun: always,
 	PreRun:           SoftReadConfig,
-	Args:             cobra.ExactArgs(1),
+	Args:             cobra.MaximumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		height, err := strconv.Atoi(args[0])
-		if height <= 0 || err != nil {
-			cmd.PrintErrf("height must be a number greater than 0")
-			os.Exit(1)
+		var height int
+		var err error
+		if len(args) > 0 {
+			height, err = strconv.Atoi(args[0])
+			if height <= 0 || err != nil {
+				cmd.PrintErrf("height must be a number greater than 0")
+				os.Exit(1)
+			}
 		}
+
+		ref, _ := cmd.Flags().GetBool("ref")
 
 		cl := srv.NewClient()
 		cl.PegnetdServer = viper.GetString(config.Pegnetd)
-		var res srv.ResultPegnetTickerMap
-		uH := uint32(height)
-		err = cl.Request("get-pegnet-rates", srv.ParamsGetPegnetRates{Height: &uH}, &res)
+		res, err := getPegnetRates(uint32(height), cl, ref)
 		if err != nil {
 			fmt.Printf("Failed to make RPC request\nDetails:\n%v\n", err)
 			os.Exit(1)
@@ -728,6 +735,12 @@ var getRates = &cobra.Command{
 		}
 		fmt.Println(string(data))
 	},
+}
+
+func getPegnetRates(height uint32, cl *srv.Client, reference bool) (srv.ResultPegnetTickerMap, error) {
+	var res srv.ResultPegnetTickerMap
+	err := cl.Request("get-pegnet-rates", srv.ParamsGetPegnetRates{Height: height, Reference: reference}, &res)
+	return res, err
 }
 
 var getBank = &cobra.Command{
@@ -770,6 +783,19 @@ var getBank = &cobra.Command{
 		fmt.Printf("PEG in Bank   : %s PEG\n", FactoshiToFactoid(res.BankAmount))
 		fmt.Printf("PEG Consumed  : %s PEG\n", FactoshiToFactoid(res.BankUsed))
 		fmt.Printf("PEG Requested : %s PEG\n", FactoshiToFactoid(res.PEGRequested))
+
+		rates, err := getPegnetRates(uint32(res.Height), cl, false)
+		if err == nil {
+			fmt.Println("")
+			fmt.Println("Value in USD")
+			dAmt, _ := conversions.Convert(res.BankAmount, rates[fat2.PTickerPEG], rates[fat2.PTickerUSD])
+			dUsed, _ := conversions.Convert(res.BankUsed, rates[fat2.PTickerPEG], rates[fat2.PTickerUSD])
+			dReq, _ := conversions.Convert(res.PEGRequested, rates[fat2.PTickerPEG], rates[fat2.PTickerUSD])
+			fmt.Printf("PEG in Bank   : $%s\n", FactoshiToFactoid(dAmt))
+			fmt.Printf("PEG Consumed  : $%s\n", FactoshiToFactoid(dUsed))
+			fmt.Printf("PEG Requested : $%s\n", FactoshiToFactoid(dReq))
+
+		}
 
 	},
 }

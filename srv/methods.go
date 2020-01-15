@@ -429,12 +429,27 @@ func (s *APIServer) getPegnetIssuance(_ context.Context, data json.RawMessage) i
 	}
 }
 
-func (s *APIServer) getPegnetRates(_ context.Context, data json.RawMessage) interface{} {
+func (s *APIServer) getPegnetRates(ctx context.Context, data json.RawMessage) interface{} {
 	params := ParamsGetPegnetRates{}
 	if _, _, err := validate(data, &params); err != nil {
 		return err
 	}
-	rates, err := s.Node.Pegnet.SelectRates(context.Background(), *params.Height)
+
+	if params.Height == 0 {
+		synced, err := s.Node.Pegnet.SelectSynced(ctx, s.Node.Pegnet.DB)
+		if err != nil {
+			return err
+		}
+		params.Height = uint32(synced.Synced)
+	}
+
+	var rates map[fat2.PTicker]uint64
+	var err error
+	if params.Reference {
+		rates, err = s.Node.Pegnet.SelectReferenceRates(ctx, nil, params.Height)
+	} else {
+		rates, err = s.Node.Pegnet.SelectRates(ctx, params.Height)
+	}
 	if err == sql.ErrNoRows || rates == nil || len(rates) == 0 {
 		return ErrorNotFound
 	}

@@ -186,6 +186,9 @@ func (p *Pegnet) SelectPreviousWinners(ctx context.Context, height uint32) ([]st
 // So pUSD == $1, but the Reference token (pUSD) can be trading at $0.90
 // This rate call will return $0.90
 func (p *Pegnet) SelectReferenceRates(ctx context.Context, tx QueryAble, height uint32) (map[fat2.PTicker]uint64, error) {
+	if tx == nil {
+		tx = p.DB
+	}
 	rows, err := tx.Query("SELECT token, value FROM pn_rate WHERE height = $1", height)
 	if err != nil {
 		return nil, err

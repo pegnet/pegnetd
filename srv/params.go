@@ -144,16 +144,16 @@ func (p ParamsGetTransaction) IsValid() error {
 }
 
 type ParamsGetPegnetRates struct {
-	Height    *uint32 `json:"height,omitempty"`
-	Reference bool    `json:"reference,omitempty"`
+	Height    uint32 `json:"height,omitempty"`
+	Reference bool   `json:"reference,omitempty"`
 }
 
 func (ParamsGetPegnetRates) HasIncludePending() bool { return false }
 
 func (p ParamsGetPegnetRates) IsValid() error {
-	if p.Height == nil {
-		return jrpc.ErrorInvalidParams(`required: "height"`)
-	}
+	//if p.Height == nil {
+	//	return jrpc.ErrorInvalidParams(`required: "height"`)
+	//}
 	return nil
 }
 func (ParamsGetPegnetRates) ValidChainID() *factom.Bytes32 {
