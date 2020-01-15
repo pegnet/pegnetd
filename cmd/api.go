@@ -33,6 +33,8 @@ func init() {
 
 	get.AddCommand(getTX)
 	get.AddCommand(getRates)
+	getBank.Flags().Bool("raw", false, "Print the full json data")
+	get.AddCommand(getBank)
 	getTXs.Flags().Bool("burn", false, "Show burns")
 	getTXs.Flags().Bool("cvt", false, "Show converions")
 	getTXs.Flags().Bool("tran", false, "Show transfers")
@@ -43,7 +45,7 @@ func init() {
 	get.AddCommand(getTXs)
 	rootCmd.AddCommand(get)
 
-	minerDistro.Flags().Bool("long", false, "Print the full json data")
+	minerDistro.Flags().Bool("raw", false, "Print the full json data")
 	rootCmd.AddCommand(minerDistro)
 
 	//tx.Flags()
@@ -725,6 +727,50 @@ var getRates = &cobra.Command{
 			panic(err)
 		}
 		fmt.Println(string(data))
+	},
+}
+
+var getBank = &cobra.Command{
+	Use:              "bank <height>",
+	Short:            "Fetch the pegnet bank properties for a given height. Put no height for the latest",
+	PersistentPreRun: always,
+	PreRun:           SoftReadConfig,
+	Args:             cobra.MaximumNArgs(1),
+	Run: func(cmd *cobra.Command, args []string) {
+		var height int
+		var err error
+		if len(args) > 0 {
+			height, err = strconv.Atoi(args[0])
+			if height <= 0 || err != nil {
+				cmd.PrintErrf("height must be a number greater than 0")
+				os.Exit(1)
+			}
+		}
+
+		cl := srv.NewClient()
+		cl.PegnetdServer = viper.GetString(config.Pegnetd)
+		var res pegnet.BankEntry
+		err = cl.Request("get-bank", srv.ParamsGetBank{Height: int32(height)}, &res)
+		if err != nil {
+			fmt.Printf("Failed to make RPC request\nDetails:\n%v\n", err)
+			os.Exit(1)
+		}
+
+		if raw, _ := cmd.Flags().GetBool("raw"); raw {
+			data, err := json.Marshal(res)
+			if err != nil {
+				panic(err)
+			}
+			fmt.Println(string(data))
+			return
+		}
+
+		// Pretty print
+		fmt.Printf("Bank details for height %d\n", res.Height)
+		fmt.Printf("PEG in Bank   : %s PEG\n", FactoshiToFactoid(res.BankAmount))
+		fmt.Printf("PEG Consumed  : %s PEG\n", FactoshiToFactoid(res.BankUsed))
+		fmt.Printf("PEG Requested : %s PEG\n", FactoshiToFactoid(res.PEGRequested))
+
 	},
 }
 

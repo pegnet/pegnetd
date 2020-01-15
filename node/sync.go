@@ -368,7 +368,35 @@ func (d *Pegnetd) ApplyTransactionBatchesInHolding(ctx context.Context, sqlTx *s
 		// The `conversions.PerBlock` is the allowed amount of PEG to be
 		// converted. So when the bank is implemented, it should be passed in
 		// here.
-		err = d.recordPegnetRequests(sqlTx, pegConversions, rates, currentHeight, conversions.PerBlock)
+		bank := pegnet.BankBaseAmount
+		if currentHeight >= V4OPRUpdate {
+			// From this fork forward, the bank can grow above 5K
+			refRates, err := d.Pegnet.SelectReferenceRates(ctx, sqlTx, currentHeight)
+			if err != nil {
+				return err
+			}
+			// We will only affect the bank based on the pUSD rates
+			refRate := refRates[fat2.PTickerUSD]
+
+			// Select the previous Bank properties
+			priorBank := pegnet.BankEntry{Height: int32(currentHeight) - 1}
+			// If we are on the update boundary, it is possible the database
+			// does not have the prior amount. We know it will be 5K, so
+			// we can assume that here.
+			if priorBank.Height == int32(V4OPRUpdate)-1 {
+				priorBank.BankAmount = int64(pegnet.BankBaseAmount)
+			} else {
+				// The prior bank has the previous block's bank amount
+				priorBank, err = d.Pegnet.SelectBankEntry(sqlTx, priorBank.Height)
+				if err != nil {
+					return err
+				}
+			}
+			var _ = refRate
+			bank = uint64(priorBank.BankAmount) + (100 * 1e8)
+		}
+
+		err = d.recordPegnetRequests(sqlTx, pegConversions, rates, currentHeight, bank)
 		if err != nil {
 			return err
 		}
@@ -613,7 +641,9 @@ func (d *Pegnetd) recordPegnetRequests(sqlTx *sql.Tx, txBatchs []*fat2.Transacti
 
 	// Now we have all the PEG amounts and requests in, time to do the payouts.
 	pegPayouts := limit.Payouts()
+	var totalPaid int64
 	for txid, pegYield := range pegPayouts {
+		totalPaid += int64(pegYield)
 		tx := txData[txid].Batch.Transactions[txData[txid].TxIndex]
 
 		refundAmt := conversions.Refund(int64(tx.Input.Amount), int64(pegYield), rates[tx.Input.Type], rates[tx.Conversion])
@@ -641,6 +671,11 @@ func (d *Pegnetd) recordPegnetRequests(sqlTx *sql.Tx, txBatchs []*fat2.Transacti
 		if _, err := d.Pegnet.AddToBalance(sqlTx, &tx.Input.Address, tx.Input.Type, uint64(refundAmt)); err != nil {
 			return err
 		}
+	}
+
+	err := d.Pegnet.InsertBankEntry(sqlTx, int32(currentHeight), int64(bank), totalPaid, int64(limit.TotalRequested()))
+	if err != nil {
+		return err
 	}
 
 	return nil

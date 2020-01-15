@@ -38,6 +38,18 @@ type Params interface {
 	HasIncludePending() bool
 }
 
+type ParamsGetBank struct {
+	Height int32 `json:"height,omitempty"`
+}
+
+func (p ParamsGetBank) HasIncludePending() bool { return false }
+func (p ParamsGetBank) IsValid() error {
+	return nil
+}
+func (p ParamsGetBank) ValidChainID() *factom.Bytes32 {
+	return nil
+}
+
 type ParamsGetMiningDominance struct {
 	Start int `json:"start,omitempty"`
 	Stop  int `json:"stop,omitempty"`

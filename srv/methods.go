@@ -46,6 +46,7 @@ func (s *APIServer) jrpcMethods() jrpc.MethodMap {
 		"get-rich-list":          s.getRichList,
 		"get-global-rich-list":   s.getGlobalRichList,
 		"get-miner-distribution": s.getMiningDominance,
+		"get-bank":               s.getBank,
 		"get-transactions":       s.getTransactions(false),
 		"get-transaction-status": s.getTransactionStatus,
 		"get-transaction":        s.getTransactions(true),
@@ -76,6 +77,28 @@ func (APIServer) properties(_ context.Context, data json.RawMessage) interface{}
 		SQLiteVersion: sqliteVersion,
 		GolangVersion: runtime.Version(),
 	}
+}
+
+func (s *APIServer) getBank(ctx context.Context, data json.RawMessage) interface{} {
+	params := ParamsGetBank{}
+	_, _, err := validate(data, &params)
+	if err != nil {
+		return err
+	}
+
+	if params.Height == 0 {
+		synced, err := s.Node.Pegnet.SelectSynced(ctx, s.Node.Pegnet.DB)
+		if err != nil {
+			return err
+		}
+		params.Height = int32(synced.Synced)
+	}
+
+	result, err := s.Node.Pegnet.SelectBankEntry(nil, params.Height)
+	if err != nil {
+		return err
+	}
+	return result
 }
 
 // getMiningDominance returns the representation of rewarded miners for a given
