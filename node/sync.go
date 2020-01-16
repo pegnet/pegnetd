@@ -495,13 +495,15 @@ func (d *Pegnetd) ApplyTransactionBatchesInHolding(ctx context.Context, sqlTx *s
 		// processed together for peg conversions
 		bank := pegnet.BankBaseAmount
 		if currentHeight >= PegnetConversionLimitActivation && currentHeight < V4OPRUpdate {
-			bentry, err := d.Pegnet.SelectBankEntry(sqlTx, int32(i))
+			// All conversions go into their height +1 for the bank
+			bankHeight := int32(i) + 1
+			bentry, err := d.Pegnet.SelectBankEntry(sqlTx, bankHeight)
 			if err != nil {
 				return err
 			}
 			bank = uint64(bentry.BankAmount)
 
-			err = d.recordPegnetRequests(sqlTx, pegConversions, rates, currentHeight, bank, int32(i))
+			err = d.recordPegnetRequests(sqlTx, pegConversions, rates, currentHeight, bank, bankHeight)
 			if err != nil {
 				return err
 			}
