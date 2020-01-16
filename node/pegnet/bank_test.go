@@ -30,14 +30,31 @@ func TestPegnet_BankTable(t *testing.T) {
 	})
 
 	t.Run("duplicate entry", func(t *testing.T) {
-		err := p.InsertBankEntry(nil, 10, 5000, 0, 0)
+		err := p.InsertBankAmount(nil, 10, 5000)
 		if err != nil {
 			t.Errorf("expected no error, got %v", err)
 		}
 
-		err = p.InsertBankEntry(nil, 10, 5000, 0, 0)
+		err = p.InsertBankAmount(nil, 10, 5000)
 		if err == nil {
 			t.Errorf("expected error, got none")
+		}
+	})
+
+	t.Run("update not exists entry", func(t *testing.T) {
+		err := p.UpdateBankEntry(nil, 9, 0, 0)
+		if err == nil {
+			t.Errorf("expected error, got none")
+		}
+
+		err = p.InsertBankAmount(nil, 9, 5000)
+		if err != nil {
+			t.Errorf("expected no error, got %v", err)
+		}
+
+		err = p.UpdateBankEntry(nil, 9, 0, 0)
+		if err != nil {
+			t.Errorf("expected no error, got %v", err)
 		}
 	})
 }
