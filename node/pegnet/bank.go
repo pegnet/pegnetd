@@ -54,12 +54,11 @@ const (
 
 	// BankGrowth
 	BankGrowthAmount = 500 * 1e8
-	BankDecayAmount  = 500 * 1e8
+	BankDecayAmount  = BankGrowthAmount
 
 	// BankMaxLimit is the maximum size of the Bank for any given block
-	// 5 * 1 million = 5 million PEG
-	million      = 1e6
-	BankMaxLimit = 5 * million * 1e8
+	// 288 blocks of growth
+	BankMaxLimit = BankBaseAmount + (288 * BankGrowthAmount)
 )
 
 // CreateTableBank is used to expose this table for unit tests
@@ -69,6 +68,26 @@ func (p *Pegnet) CreateTableBank() error {
 		return err
 	}
 	return nil
+}
+
+// SelectMostRecentBankEntry returns the last bank entry before a given height.
+func (p Pegnet) SelectMostRecentBankEntry(q QueryAble, height int32) (entry BankEntry, err error) {
+	if q == nil {
+		q = p.DB // nil defaults to db
+	}
+
+	query := fmt.Sprintf(`SELECT 
+			COALESCE(max("height"), -1), 
+			COALESCE("bank_amount", -1),
+			COALESCE("bank_used", -1),
+			COALESCE("total_requested", -1)
+		FROM pn_bank WHERE height < ?;`)
+	err = q.QueryRow(query, height).Scan(&entry.Height, &entry.BankAmount, &entry.BankUsed, &entry.PEGRequested)
+	if err == sql.ErrNoRows {
+		entry = BankEntry{Height: -1, BankAmount: -1}
+		err = nil
+	}
+	return
 }
 
 func (p Pegnet) SelectBankEntry(q QueryAble, height int32) (entry BankEntry, err error) {
@@ -85,14 +104,15 @@ func (p Pegnet) SelectBankEntry(q QueryAble, height int32) (entry BankEntry, err
 	return
 }
 
-// InsertBankEntry
-func (p Pegnet) InsertBankEntry(q QueryAble, height int32, bankAmount, bankUsed, pegRequested int64) error {
+// InsertBankAmount does not fill in the bank_used and total_requested with
+// legit values. It leaves a -1 to indicate that needs to be filled.
+func (p Pegnet) InsertBankAmount(q QueryAble, height int32, bankAmount int64) error {
 	if q == nil {
 		q = p.DB // nil defaults to db
 	}
 
-	query := fmt.Sprintf(`INSERT INTO pn_bank("height", "bank_amount", "bank_used", "total_requested") VALUES(?, ?, ?, ?);`)
-	res, err := q.Exec(query, height, bankAmount, bankUsed, pegRequested)
+	query := fmt.Sprintf(`INSERT INTO pn_bank("height", "bank_amount", "bank_used", "total_requested") VALUES(?, ?, -1, -1);`)
+	res, err := q.Exec(query, height, bankAmount)
 	if err != nil {
 		return err
 	}
@@ -100,6 +120,31 @@ func (p Pegnet) InsertBankEntry(q QueryAble, height int32, bankAmount, bankUsed,
 		return err
 	} else if aff != 1 {
 		return fmt.Errorf("bank entry not added")
+	}
+	return nil
+}
+
+// UpdateBankEntry updates the bank_used and total_requested values
+func (p Pegnet) UpdateBankEntry(q QueryAble, height int32, bankUsed, pegRequested int64) error {
+	if q == nil {
+		q = p.DB // nil defaults to db
+	}
+
+	query := fmt.Sprintf(`
+	UPDATE pn_bank
+		SET bank_used = ?,
+			total_requested = ?
+		WHERE height = ?;
+`)
+
+	res, err := q.Exec(query, bankUsed, pegRequested, height)
+	if err != nil {
+		return err
+	}
+	if aff, err := res.RowsAffected(); err != nil {
+		return err
+	} else if aff != 1 {
+		return fmt.Errorf("bank entry not updated")
 	}
 	return nil
 }
