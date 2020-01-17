@@ -229,15 +229,16 @@ func (d *Pegnetd) SyncBlock(ctx context.Context, tx *sql.Tx, height uint32) erro
 			return err
 		}
 
-		// Before conversions can be run, we have to adjust and discover the bank's value.
-		if err := d.SyncBank(ctx, tx, height, rates); err != nil {
-			return err
-		}
-
 		// At this point, we start making updates to the database in a specific order:
 		// TODO: ensure we rollback the tx when needed
 		// 1) Apply transaction batches that are in holding (conversions are always applied here)
 		if gradedBlock != nil && 0 < len(gradedBlock.Winners()) {
+			// Before conversions can be run, we have to adjust and discover the bank's value.
+			// We also only sync the bank if the block is a pegnet block
+			if err := d.SyncBank(ctx, tx, height, rates); err != nil {
+				return err
+			}
+
 			if err = d.ApplyTransactionBatchesInHolding(ctx, tx, height, rates); err != nil {
 				return err
 			}
