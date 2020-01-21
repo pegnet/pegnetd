@@ -778,6 +778,10 @@ var getBank = &cobra.Command{
 			return
 		}
 
+		if res.Height == -1 {
+			fmt.Println("No bank details found for this height. This is not a valid pegnet block. It could be skipped by miners, the block is in the future, or the block was before the bank was implemented.")
+			os.Exit(1)
+		}
 		// Pretty print
 		fmt.Printf("Bank details for height %d\n", res.Height)
 		fmt.Printf("PEG in Bank   : %s PEG\n", FactoshiToFactoid(res.BankAmount))
