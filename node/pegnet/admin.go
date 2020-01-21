@@ -130,7 +130,7 @@ func (p Pegnet) CheckHardForks(tx QueryAble) error {
 
 	// bs is the node's synced height.
 	bs, _ := p.SelectSynced(context.Background(), tx)
-	// If bs > minSynced, then this node was just upgraded to verison_lock
+	// If bs > minSynced, then this node was just upgraded to version_lock
 	// We will check if they are past any hardforks.
 	if bs != nil && bs.Synced > minSynced {
 		// This means we already have some heights synced. So we need to insert
@@ -149,8 +149,6 @@ func (p Pegnet) CheckHardForks(tx QueryAble) error {
 	}
 
 	for _, event := range Hardforks {
-		// If we are
-
 		// If the event is not synced past, then we do not need to check
 		if event.ActivationHeight <= top {
 			version, err := p.FetchMinSyncedVersion(tx, event.ActivationHeight)
