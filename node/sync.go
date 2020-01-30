@@ -235,7 +235,7 @@ func (d *Pegnetd) SyncBlock(ctx context.Context, tx *sql.Tx, height uint32) erro
 		if gradedBlock != nil && 0 < len(gradedBlock.Winners()) {
 			// Before conversions can be run, we have to adjust and discover the bank's value.
 			// We also only sync the bank if the block is a pegnet block
-			if err := d.SyncBank(ctx, tx, height, rates); err != nil {
+			if err := d.SyncBank(ctx, tx, height); err != nil {
 				return err
 			}
 
@@ -314,117 +314,16 @@ func multiFetch(eblock *factom.EBlock, c *factom.Client) error {
 	return nil
 }
 
-// SyncBank will input all bank values for the heights to the current height
-// that are needed. The pegnet conversion code will need this.
+// SyncBank will input the bank value for all heights >= V4OPRUpdate
+// The bank table helps track the demand for peg at a given height.
 // The bank is the total amount of PEG allowed to be issued for any given height.
-func (d *Pegnetd) SyncBank(ctx context.Context, sqlTx *sql.Tx, currentHeight uint32, rates map[fat2.PTicker]uint64) error {
-	// The bank starts at the base. Any modifications won't come in until
-	// a forking event.
-	bank := pegnet.BankBaseAmount
-	if currentHeight >= V4OPRUpdate {
-		// From this fork forward, the bank can grow above 5K
-		// The refRates are the pAsset rates on external exchanges
-		refRates, err := d.Pegnet.SelectReferenceRates(ctx, sqlTx, currentHeight)
-		if err != nil {
-			return err
-		}
-		// We will only affect the bank based on the pUSD rates
-		refRate := refRates[fat2.PTickerUSD]
-
-		// This should always work. If there is no prior bank, there is an
-		// issue with the node. All nodes that update prior to the fork
-		// will input a 5K bank row at some height.
-		priorBank, err := d.Pegnet.SelectMostRecentBankEntry(sqlTx, int32(currentHeight))
-		if err != nil {
-			return err
-		}
-
-		// If the refRate exists and the arbitrage needed is -1,
-		// meaning the price is below the peg, then we add to the PEG bank
-		//
-		// We add 500 PEG to the bank for each block that is below $0.99.
-		// We remove 500 PEG from the bank if we are at or above $0.99
-		// The limits are
-		//		5,000 < Bank < 5,000 + (288 * Growth)
-		arb := conversions.ArbitrageNeeded(rates[fat2.PTickerUSD], refRate)
-		if refRate != 0 && arb == -1 {
-			bank = uint64(priorBank.BankAmount) + pegnet.BankGrowthAmount
-			if bank > pegnet.BankMaxLimit {
-				bank = pegnet.BankMaxLimit
-			}
-		} else {
-			bank = uint64(priorBank.BankAmount) - pegnet.BankDecayAmount
-			if bank < pegnet.BankBaseAmount {
-				bank = pegnet.BankBaseAmount
-			}
-		}
-
-		log.WithFields(log.Fields{
-			"height":  currentHeight,
-			"arb":     arb,
-			"refRate": refRate,
-			"rate":    rates[fat2.PTickerUSD],
-			"pBankA":  priorBank.BankAmount,
-			"pBankH":  priorBank.Height,
-			"bankA":   bank,
-		}).Trace("bank synced")
-
-		err = d.Pegnet.InsertBankAmount(sqlTx, int32(currentHeight), int64(bank))
-		if err != nil {
-			return err
-		}
-
-	} else if currentHeight > PegnetConversionLimitActivation {
-		// Just mark the bank as 5K for all these heights
-		// Prior to the OPRV4 Update all heights (even skipped ones) above the
-		// PEG limit height have a 5K PEG bank.
-		err := d.insertSkippedBankHeights(sqlTx, int32(currentHeight))
-		if err != nil {
-			return err
-		}
-
-		err = d.Pegnet.InsertBankAmount(sqlTx, int32(currentHeight), int64(pegnet.BankBaseAmount))
-		if err != nil {
-			return err
-		}
-
-	}
-	return nil
-}
-
-func (d *Pegnetd) insertSkippedBankHeights(sqlTx *sql.Tx, currentHeight int32) error {
-	var start int32
-
-	// If the priorBank is before currentHeight-1, that means we have a gap.
-	// Gaps are unique, as we do not know the rates for those heights, but
-	// we are still allowed to issue 5K PEG. This is a rare case, and
-	// so we will just input 5K bank values. This means if we have pending
-	// conversions from more than 1 height, only the last height conversions
-	// get the modified bank value. The rest will share a 5K PEG per block.
-	// The benefit of this implementation is that conversions are still
-	// executed as a set per block. Their executed height will be equal,
-	// but their affects will work in the order they were inputted.
-	//
-	// If we want to change this implementation, it would require a hardfork.
-	priorBank, err := d.Pegnet.SelectMostRecentBankEntry(sqlTx, int32(currentHeight))
-	if err != nil {
-		return err
-	}
-
-	if priorBank.Height == -1 {
-		// No records yet, just start from the beginning
-		start = int32(PegnetConversionLimitActivation)
-	} else {
-		start = priorBank.Height + 1
-	}
-
-	for i := start; i < currentHeight; i++ {
-		err := d.Pegnet.InsertBankAmount(sqlTx, i, int64(pegnet.BankBaseAmount))
+func (d *Pegnetd) SyncBank(ctx context.Context, sqlTx *sql.Tx, currentHeight uint32) error {
+	if currentHeight >= V4OPRUpdate { // V4 forward tracks this
+		err := d.Pegnet.InsertBankAmount(sqlTx, int32(currentHeight), int64(pegnet.BankBaseAmount))
 		if err != nil {
 			return err
 		}
 	}
-
 	return nil
 }
 
@@ -494,17 +393,10 @@ func (d *Pegnetd) ApplyTransactionBatchesInHolding(ctx context.Context, sqlTx *s
 		// This is processing each height of conversions as its own block
 		// of conversions. After the v4 update, all pending conversions get
 		// processed together for peg conversions
-		bank := pegnet.BankBaseAmount
 		if currentHeight >= PegnetConversionLimitActivation && currentHeight < V4OPRUpdate {
-			// All conversions go into their height +1 for the bank
-			bankHeight := int32(i) + 1
-			bentry, err := d.Pegnet.SelectBankEntry(sqlTx, bankHeight)
-			if err != nil {
-				return err
-			}
-			bank = uint64(bentry.BankAmount)
-
-			err = d.recordPegnetRequests(sqlTx, pegConversions, rates, currentHeight, bank, bankHeight)
+			// All heights before v4 use the currentHeight-1 with a 5K PEG bank
+			bank := pegnet.BankBaseAmount
+			err = d.recordPegnetRequests(sqlTx, pegConversions, rates, currentHeight, bank, int32(currentHeight-1))
 			if err != nil {
 				return err
 			}
@@ -514,6 +406,7 @@ func (d *Pegnetd) ApplyTransactionBatchesInHolding(ctx context.Context, sqlTx *s
 
 	// Process all pending using the same bank
 	if currentHeight >= V4OPRUpdate {
+		// The bank entry should be here from the sync banks called before this function.
 		bentry, err := d.Pegnet.SelectBankEntry(sqlTx, int32(currentHeight))
 		if err != nil {
 			return err
@@ -795,9 +688,12 @@ func (d *Pegnetd) recordPegnetRequests(sqlTx *sql.Tx, txBatchs []*fat2.Transacti
 		}
 	}
 
-	err := d.Pegnet.UpdateBankEntry(sqlTx, bankHeight, totalPaid, int64(limit.TotalRequested()))
-	if err != nil {
-		return err
+	// The bankheight == currentheight after V4Update fork
+	if bankHeight >= int32(V4OPRUpdate) {
+		err := d.Pegnet.UpdateBankEntry(sqlTx, bankHeight, totalPaid, int64(limit.TotalRequested()))
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil

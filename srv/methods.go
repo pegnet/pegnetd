@@ -94,6 +94,9 @@ func (s *APIServer) getBank(ctx context.Context, data json.RawMessage) interface
 		params.Height = int32(synced.Synced)
 	}
 
+	if params.Height < int32(node.V4OPRUpdate) {
+		return jrpc.ErrorInvalidParams(fmt.Sprintf("the height %d is below the activation height (%d) of this feature", params.Height, node.V4OPRUpdate))
+	}
 	result, err := s.Node.Pegnet.SelectBankEntry(nil, params.Height)
 	if err != nil {
 		return err

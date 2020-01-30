@@ -11,13 +11,9 @@ import (
 // The bank is the amount of PEG allowed to be converted into every block.
 // This table should be used for bank management purposes.
 //
-// Originally the bank was thought of in order to allow conversions out of PEG
-// to positively impact the bank, allowing more conversions in.
-// This would require the supply to be under the supply curve, which we are
-// no where close too.
-//
-// So now the bank has a different control. The bank will be controlled
-// by other mechanisms. Each height will have the following struct data stored
+// The bank has the following data structure at each height. It can be
+// used to control the amount of PEG allowed to be converted into at each
+// pegnet block.
 //
 // There is extra information provided for informational purposes. The only
 // true value needed here is likely the BankAmount and possible the BankUsed.
