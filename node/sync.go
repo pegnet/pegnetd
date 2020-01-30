@@ -491,7 +491,7 @@ func (d *Pegnetd) ApplyTransactionBatchesInHolding(ctx context.Context, sqlTx *s
 		// converted. So when the bank is implemented, it should be passed in
 		// here.
 		//
-		// This is processing each height of conversions as it's own block
+		// This is processing each height of conversions as its own block
 		// of conversions. After the v4 update, all pending conversions get
 		// processed together for peg conversions
 		bank := pegnet.BankBaseAmount

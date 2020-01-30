@@ -27,12 +27,12 @@ type BankEntry struct {
 	Height int32
 	// BankAmount is the total amount of PEG allowed to be converted into
 	// for the given height.
-	BankAmount int64 // units are PEG
+	BankAmount int64 // units are PEGtoshi
 	// BankUsed is some additional information to detail how much of the bank
 	// was consumed.
-	BankUsed int64 // units are PEG
+	BankUsed int64 // units are PEGtoshi
 	// PEGRequested is the total amount of PEG requested
-	PEGRequested int64 // units are PEG
+	PEGRequested int64 // units are PEGtoshi
 }
 
 const createTableBank = `CREATE TABLE IF NOT EXISTS "pn_bank" (
@@ -76,17 +76,23 @@ func (p Pegnet) SelectMostRecentBankEntry(q QueryAble, height int32) (entry Bank
 		q = p.DB // nil defaults to db
 	}
 
-	query := fmt.Sprintf(`SELECT 
-			COALESCE(max("height"), -1), 
-			COALESCE("bank_amount", -1),
-			COALESCE("bank_used", -1),
-			COALESCE("total_requested", -1)
-		FROM pn_bank WHERE height < ?;`)
-	err = q.QueryRow(query, height).Scan(&entry.Height, &entry.BankAmount, &entry.BankUsed, &entry.PEGRequested)
+	query := fmt.Sprintf(
+		`SELECT 
+					height, bank_amount, bank_used, total_requested
+				FROM pn_bank WHERE height < ? 
+				ORDER BY height DESC LIMIT 1`)
+	rows, err := q.Query(query, height)
 	if err == sql.ErrNoRows {
 		entry = BankEntry{Height: -1, BankAmount: -1}
 		err = nil
+		return
 	}
+	if err != nil {
+		return
+	}
+	defer rows.Close()
+	rows.Next()
+	err = rows.Scan(&entry.Height, &entry.BankAmount, &entry.BankUsed, &entry.PEGRequested)
 	return
 }
 
