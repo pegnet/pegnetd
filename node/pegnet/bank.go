@@ -66,32 +66,6 @@ func (p *Pegnet) CreateTableBank() error {
 	return nil
 }
 
-// SelectMostRecentBankEntry returns the last bank entry before a given height.
-func (p Pegnet) SelectMostRecentBankEntry(q QueryAble, height int32) (entry BankEntry, err error) {
-	if q == nil {
-		q = p.DB // nil defaults to db
-	}
-
-	query := fmt.Sprintf(
-		`SELECT 
-					height, bank_amount, bank_used, total_requested
-				FROM pn_bank WHERE height < ? 
-				ORDER BY height DESC LIMIT 1`)
-	rows, err := q.Query(query, height)
-	if err == sql.ErrNoRows {
-		entry = BankEntry{Height: -1, BankAmount: -1}
-		err = nil
-		return
-	}
-	if err != nil {
-		return
-	}
-	defer rows.Close()
-	rows.Next()
-	err = rows.Scan(&entry.Height, &entry.BankAmount, &entry.BankUsed, &entry.PEGRequested)
-	return
-}
-
 func (p Pegnet) SelectBankEntry(q QueryAble, height int32) (entry BankEntry, err error) {
 	if q == nil {
 		q = p.DB // nil defaults to db
