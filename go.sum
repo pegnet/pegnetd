@@ -250,6 +250,8 @@ github.com/pegnet/OracleRecord v0.0.2/go.mod h1:VrY7Shn4oSCli47CsUYBFjH68IenGYtn
 github.com/pegnet/pegnet v0.0.2/go.mod h1:FUyEs8fyLOzPXZgyqXcqiOhQi58loNtujykIbxxoKbQ=
 github.com/pegnet/pegnet v0.1.0-rc4.0.20200114012609-8125549a5bcf h1:VT+f+AU+ppsWdjBefrVZz1DBIc413soVTNlHq8zHDbM=
 github.com/pegnet/pegnet v0.1.0-rc4.0.20200114012609-8125549a5bcf/go.mod h1:Fy8Qohe9zIuqO9Q/ZOLUNpP2kuiFqxjevzaS3IL62+E=
+github.com/pegnet/pegnet v0.1.0-rc4.0.20200203142810-12481581ee60 h1:aF9HPCsk39XhqKb/tFyzkn/J8S6Lk7kkWQXwF6iT/Sg=
+github.com/pegnet/pegnet v0.1.0-rc4.0.20200203142810-12481581ee60/go.mod h1:Fy8Qohe9zIuqO9Q/ZOLUNpP2kuiFqxjevzaS3IL62+E=
 github.com/pegnet/pegnet v0.3.0 h1:Oob388Zho3nzEHj4N9ZKbdSKR8t1nCJYTxsJJkeoHvM=
 github.com/pegnet/pegnet v0.3.0/go.mod h1:Fy8Qohe9zIuqO9Q/ZOLUNpP2kuiFqxjevzaS3IL62+E=
 github.com/pelletier/go-toml v1.2.0 h1:T5zMGML61Wp+FlcbWjRDT7yAxhJNAiPPLOFECq181zc=
