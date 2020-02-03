@@ -6,7 +6,7 @@ require (
 	github.com/AdamSLevy/jsonrpc2/v13 v13.0.1
 	github.com/Factom-Asset-Tokens/factom v0.0.0-20191114224337-71de98ff5b3e
 	github.com/mattn/go-sqlite3 v1.11.0
-	github.com/pegnet/pegnet v0.1.0-rc4.0.20200203142810-12481581ee60
+	github.com/pegnet/pegnet v0.4.1-0.20200203165724-3fc45a9a417a
 	github.com/rs/cors v1.7.0
 	github.com/sirupsen/logrus v1.4.2
 	github.com/spf13/cobra v0.0.5
