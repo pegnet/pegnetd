@@ -95,7 +95,8 @@ const createTableAddresses = `CREATE TABLE IF NOT EXISTS "pn_addresses" (
                         CONSTRAINT "insufficient balance" CHECK ("patom_balance" >= 0),
         "pbat_balance"  INTEGER NOT NULL DEFAULT 0
                         CONSTRAINT "insufficient balance" CHECK ("pbat_balance" >= 0),
-        "pxtz_balance"  INTEGER NOT NULL DEFAULT 0 CHECK ("pxtz_balance" >= 0)
+        "pxtz_balance"  INTEGER NOT NULL DEFAULT 0 
+                        CONSTRAINT "insufficient balance" CHECK ("pxtz_balance" >= 0)
 );
 CREATE INDEX IF NOT EXISTS "idx_address_balances_address_id" ON "pn_addresses"("address");
 `
@@ -414,8 +415,8 @@ func (Pegnet) selectBalances(q QueryAble, adr *factom.FAAddress) (map[fat2.PTick
 // balances for the given address. If the address is not in the database,
 // the map will contain 0 for all valid PTickers. This works on the pending tx
 func (p *Pegnet) SelectAllBalances() ([]BalancesPair, error) {
-	stmt := fmt.Sprintf(`SELECT %s FROM pn_addresses;`, addressSelectCols)
-	rows, err := p.DB.Query(stmt)
+	query := fmt.Sprintf(`SELECT %s FROM pn_addresses;`, addressSelectCols)
+	rows, err := p.DB.Query(query)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, nil
