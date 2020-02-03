@@ -446,13 +446,7 @@ func (s *APIServer) getPegnetRates(ctx context.Context, data json.RawMessage) in
 		params.Height = uint32(synced.Synced)
 	}
 
-	var rates map[fat2.PTicker]uint64
-	var err error
-	if params.Reference {
-		rates, err = s.Node.Pegnet.SelectReferenceRates(ctx, nil, params.Height)
-	} else {
-		rates, err = s.Node.Pegnet.SelectRates(ctx, params.Height)
-	}
+	rates, err := s.Node.Pegnet.SelectRates(ctx, params.Height)
 	if err == sql.ErrNoRows || rates == nil || len(rates) == 0 {
 		return ErrorNotFound
 	}

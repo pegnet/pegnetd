@@ -34,7 +34,6 @@ func init() {
 	rootCmd.AddCommand(rich)
 
 	get.AddCommand(getTX)
-	getRates.Flags().Bool("ref", false, "Query for the reference asset rates instead")
 	get.AddCommand(getRates)
 	getBank.Flags().Bool("raw", false, "Print the full json data")
 	get.AddCommand(getBank)
@@ -713,11 +712,9 @@ var getRates = &cobra.Command{
 			}
 		}
 
-		ref, _ := cmd.Flags().GetBool("ref")
-
 		cl := srv.NewClient()
 		cl.PegnetdServer = viper.GetString(config.Pegnetd)
-		res, err := getPegnetRates(uint32(height), cl, ref)
+		res, err := getPegnetRates(uint32(height), cl)
 		if err != nil {
 			fmt.Printf("Failed to make RPC request\nDetails:\n%v\n", err)
 			os.Exit(1)
@@ -737,9 +734,9 @@ var getRates = &cobra.Command{
 	},
 }
 
-func getPegnetRates(height uint32, cl *srv.Client, reference bool) (srv.ResultPegnetTickerMap, error) {
+func getPegnetRates(height uint32, cl *srv.Client) (srv.ResultPegnetTickerMap, error) {
 	var res srv.ResultPegnetTickerMap
-	err := cl.Request("get-pegnet-rates", srv.ParamsGetPegnetRates{Height: height, Reference: reference}, &res)
+	err := cl.Request("get-pegnet-rates", srv.ParamsGetPegnetRates{Height: height}, &res)
 	return res, err
 }
 
@@ -788,7 +785,7 @@ var getBank = &cobra.Command{
 		fmt.Printf("PEG Consumed  : %s PEG\n", FactoshiToFactoid(res.BankUsed))
 		fmt.Printf("PEG Requested : %s PEG\n", FactoshiToFactoid(res.PEGRequested))
 
-		rates, err := getPegnetRates(uint32(res.Height), cl, false)
+		rates, err := getPegnetRates(uint32(res.Height), cl)
 		if err == nil {
 			fmt.Println("")
 			fmt.Println("Value in USD")

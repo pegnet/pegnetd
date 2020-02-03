@@ -144,8 +144,7 @@ func (p ParamsGetTransaction) IsValid() error {
 }
 
 type ParamsGetPegnetRates struct {
-	Height    uint32 `json:"height,omitempty"`
-	Reference bool   `json:"reference,omitempty"`
+	Height uint32 `json:"height,omitempty"`
 }
 
 func (ParamsGetPegnetRates) HasIncludePending() bool { return false }
