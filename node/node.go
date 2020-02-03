@@ -47,7 +47,9 @@ var (
 	// Estimated to be  Dec 9, 2019, 17:00 UTC
 	PEGFreeFloatingPriceActivation uint32 = 222270
 
-	V4OPRUpdate uint32 = 999999
+	// V4OPRUpdate indicates the activation of additional currencies and ecdsa keys.
+	// Estimated to be  Feb 12, 2020, 18:00 UTC
+	V4OPRUpdate uint32 = 231620
 )
 
 func SetAllActivations(act uint32) {
