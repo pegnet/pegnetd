@@ -38,6 +38,18 @@ type Params interface {
 	HasIncludePending() bool
 }
 
+type ParamsGetBank struct {
+	Height int32 `json:"height,omitempty"`
+}
+
+func (p ParamsGetBank) HasIncludePending() bool { return false }
+func (p ParamsGetBank) IsValid() error {
+	return nil
+}
+func (p ParamsGetBank) ValidChainID() *factom.Bytes32 {
+	return nil
+}
+
 type ParamsGetMiningDominance struct {
 	Start int `json:"start,omitempty"`
 	Stop  int `json:"stop,omitempty"`
@@ -132,15 +144,15 @@ func (p ParamsGetTransaction) IsValid() error {
 }
 
 type ParamsGetPegnetRates struct {
-	Height *uint32 `json:"height,omitempty"`
+	Height uint32 `json:"height,omitempty"`
 }
 
 func (ParamsGetPegnetRates) HasIncludePending() bool { return false }
 
 func (p ParamsGetPegnetRates) IsValid() error {
-	if p.Height == nil {
-		return jrpc.ErrorInvalidParams(`required: "height"`)
-	}
+	//if p.Height == nil {
+	//	return jrpc.ErrorInvalidParams(`required: "height"`)
+	//}
 	return nil
 }
 func (ParamsGetPegnetRates) ValidChainID() *factom.Bytes32 {

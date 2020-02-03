@@ -46,6 +46,8 @@ var (
 	// This is when PEG price is determined by the exchange price
 	// Estimated to be  Dec 9, 2019, 17:00 UTC
 	PEGFreeFloatingPriceActivation uint32 = 222270
+
+	V4OPRUpdate uint32 = 999999
 )
 
 func SetAllActivations(act uint32) {
@@ -57,6 +59,7 @@ func SetAllActivations(act uint32) {
 	PegnetConversionLimitActivation = act
 	PEGFreeFloatingPriceActivation = act
 	fat2.Fat2RCDEActivation = act
+	V4OPRUpdate = act
 }
 
 type Pegnetd struct {
@@ -78,7 +81,7 @@ func NewPegnetd(ctx context.Context, conf *viper.Viper) (*Pegnetd, error) {
 		return nil, err
 	}
 
-	if sync, err := n.Pegnet.SelectSynced(ctx); err != nil {
+	if sync, err := n.Pegnet.SelectSynced(ctx, n.Pegnet.DB); err != nil {
 		if err == sql.ErrNoRows {
 			n.Sync = new(pegnet.BlockSync)
 			n.Sync.Synced = PegnetActivation

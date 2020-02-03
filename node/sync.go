@@ -224,11 +224,22 @@ func (d *Pegnetd) SyncBlock(ctx context.Context, tx *sql.Tx, height uint32) erro
 
 	// Only apply transactions if we crossed the activation
 	if height >= TransactionConversionActivation {
+		rates, err := d.Pegnet.SelectPendingRates(ctx, tx, height)
+		if err != nil {
+			return err
+		}
+
 		// At this point, we start making updates to the database in a specific order:
 		// TODO: ensure we rollback the tx when needed
 		// 1) Apply transaction batches that are in holding (conversions are always applied here)
 		if gradedBlock != nil && 0 < len(gradedBlock.Winners()) {
-			if err = d.ApplyTransactionBatchesInHolding(ctx, tx, height); err != nil {
+			// Before conversions can be run, we have to adjust and discover the bank's value.
+			// We also only sync the bank if the block is a pegnet block
+			if err := d.SyncBank(ctx, tx, height); err != nil {
+				return err
+			}
+
+			if err = d.ApplyTransactionBatchesInHolding(ctx, tx, height, rates); err != nil {
 				return err
 			}
 		}
@@ -303,28 +314,38 @@ func multiFetch(eblock *factom.EBlock, c *factom.Client) error {
 	return nil
 }
 
+// SyncBank will input the bank value for all heights >= V4OPRUpdate
+// The bank table helps track the demand for peg at a given height.
+// The bank is the total amount of PEG allowed to be issued for any given height.
+func (d *Pegnetd) SyncBank(ctx context.Context, sqlTx *sql.Tx, currentHeight uint32) error {
+	if currentHeight >= V4OPRUpdate { // V4 forward tracks this
+		err := d.Pegnet.InsertBankAmount(sqlTx, int32(currentHeight), int64(pegnet.BankBaseAmount))
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // ApplyTransactionBatchesInHolding attempts to apply the transaction batches from previous
 // blocks that were put into holding because they contained conversions.
 // If an error is returned, the sql.Tx should be rolled back by the caller.
-func (d *Pegnetd) ApplyTransactionBatchesInHolding(ctx context.Context, sqlTx *sql.Tx, currentHeight uint32) error {
+func (d *Pegnetd) ApplyTransactionBatchesInHolding(ctx context.Context, sqlTx *sql.Tx, currentHeight uint32, rates map[fat2.PTicker]uint64) error {
 	_, height, err := d.Pegnet.SelectMostRecentRatesBeforeHeight(ctx, sqlTx, currentHeight)
 	if err != nil {
 		return err
 	}
 
-	rates, err := d.Pegnet.SelectPendingRates(ctx, sqlTx, currentHeight)
-	if err != nil {
-		return err
-	}
+	// All batches with a PEG conversion
+	var pegConversions []*fat2.TransactionBatch
 
+	// Usually height is just currentHeight-1, but it can be farther back
+	// if the miners have skipped a block
 	for i := height; i < currentHeight; i++ {
 		txBatches, err := d.Pegnet.SelectTransactionBatchesInHoldingAtHeight(uint64(i))
 		if err != nil {
 			return err
 		}
-
-		// All batches with a PEG conversion
-		var pegConversions []*fat2.TransactionBatch
 
 		// For all conversions, we need to apply the PEG conversion limit.
 		// This means, we need to find all valid conversions and pay them out
@@ -345,13 +366,16 @@ func (d *Pegnetd) ApplyTransactionBatchesInHolding(ctx context.Context, sqlTx *s
 			// This will apply all batche inputs, and all batch outputs except
 			// conversions to PEG if we are above the PegnetConversionLimit Act
 			err = d.applyTransactionBatch(sqlTx, txBatch, rates, currentHeight)
-			if err != nil && err != pegnet.InsufficientBalanceErr && err != pegnet.PFCTOneWayError {
+			// The err needs to be converted to a code. If the err is still
+			// not nil, then the code is 0 and the error is probably db related.
+			// If the code is < 0, the tx is rejected.
+			// If the code is > 0 and the err is nil, the tx is accepted.
+			rejectCode, err := pegnet.IsRejectedTx(err)
+			if err != nil { // Likely a db error
 				return err
-			} else if err == pegnet.InsufficientBalanceErr {
-				d.Pegnet.SetTransactionHistoryExecuted(sqlTx, txBatch, -1)
-			} else if err == pegnet.PFCTOneWayError {
-				d.Pegnet.SetTransactionHistoryExecuted(sqlTx, txBatch, -3)
-			} else if err == nil {
+			} else if rejectCode < 0 { // Tx rejected
+				d.Pegnet.SetTransactionHistoryExecuted(sqlTx, txBatch, rejectCode)
+			} else if err == nil { // Tx accepted
 				// If PegnetConversion limits are on, we process conversions to
 				// peg in a second pass.
 				if currentHeight >= PegnetConversionLimitActivation && txBatch.HasPEGRequest() {
@@ -365,7 +389,29 @@ func (d *Pegnetd) ApplyTransactionBatchesInHolding(ctx context.Context, sqlTx *s
 		// The `conversions.PerBlock` is the allowed amount of PEG to be
 		// converted. So when the bank is implemented, it should be passed in
 		// here.
-		err = d.recordPegnetRequests(sqlTx, pegConversions, rates, currentHeight, conversions.PerBlock)
+		//
+		// This is processing each height of conversions as its own block
+		// of conversions. After the v4 update, all pending conversions get
+		// processed together for peg conversions
+		if currentHeight >= PegnetConversionLimitActivation && currentHeight < V4OPRUpdate {
+			// All heights before v4 use the currentHeight-1 with a 5K PEG bank
+			bank := pegnet.BankBaseAmount
+			err = d.recordPegnetRequests(sqlTx, pegConversions, rates, currentHeight, bank, int32(currentHeight-1))
+			if err != nil {
+				return err
+			}
+			pegConversions = []*fat2.TransactionBatch{}
+		}
+	}
+
+	// Process all pending using the same bank
+	if currentHeight >= V4OPRUpdate {
+		// The bank entry should be here from the sync banks called before this function.
+		bentry, err := d.Pegnet.SelectBankEntry(sqlTx, int32(currentHeight))
+		if err != nil {
+			return err
+		}
+		err = d.recordPegnetRequests(sqlTx, pegConversions, rates, currentHeight, uint64(bentry.BankAmount), int32(currentHeight))
 		if err != nil {
 			return err
 		}
@@ -451,7 +497,7 @@ func (d *Pegnetd) applyTransactionBatch(sqlTx *sql.Tx, txBatch *fat2.Transaction
 			}
 			if rates[tx.Input.Type] == 0 || rates[tx.Conversion] == 0 {
 				// This error will not fail the block, skip the tx
-				return nil // 0 rates result in an invalid tx. So we drop it
+				return pegnet.ZeroRatesError // 0 rates result in an invalid tx. So we drop it
 			}
 
 			// pXXX -> pFCT conversions are disabled at the activation height
@@ -577,7 +623,7 @@ type pegRequest struct {
 	TxIndex            int
 }
 
-func (d *Pegnetd) recordPegnetRequests(sqlTx *sql.Tx, txBatchs []*fat2.TransactionBatch, rates map[fat2.PTicker]uint64, currentHeight uint32, bank uint64) error {
+func (d *Pegnetd) recordPegnetRequests(sqlTx *sql.Tx, txBatchs []*fat2.TransactionBatch, rates map[fat2.PTicker]uint64, currentHeight uint32, bank uint64, bankHeight int32) error {
 	limit := conversions.NewConversionSupply(bank)
 	txData := make(map[string]pegRequest)
 
@@ -610,7 +656,9 @@ func (d *Pegnetd) recordPegnetRequests(sqlTx *sql.Tx, txBatchs []*fat2.Transacti
 
 	// Now we have all the PEG amounts and requests in, time to do the payouts.
 	pegPayouts := limit.Payouts()
+	var totalPaid int64
 	for txid, pegYield := range pegPayouts {
+		totalPaid += int64(pegYield)
 		tx := txData[txid].Batch.Transactions[txData[txid].TxIndex]
 
 		refundAmt := conversions.Refund(int64(tx.Input.Amount), int64(pegYield), rates[tx.Input.Type], rates[tx.Conversion])
@@ -636,6 +684,14 @@ func (d *Pegnetd) recordPegnetRequests(sqlTx *sql.Tx, txBatchs []*fat2.Transacti
 
 		// Refund
 		if _, err := d.Pegnet.AddToBalance(sqlTx, &tx.Input.Address, tx.Input.Type, uint64(refundAmt)); err != nil {
+			return err
+		}
+	}
+
+	// The bankheight == currentheight after V4Update fork
+	if bankHeight >= int32(V4OPRUpdate) {
+		err := d.Pegnet.UpdateBankEntry(sqlTx, bankHeight, totalPaid, int64(limit.TotalRequested()))
+		if err != nil {
 			return err
 		}
 	}

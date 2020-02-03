@@ -51,7 +51,7 @@ func CustomArgOrderValidationBuilder(strict bool, valids ...func(cmd *cobra.Comm
 
 // ArgValidatorAssetAndAll checks for valid asset or 'all'
 func ArgValidatorAssetOrP(cmd *cobra.Command, arg string) error {
-	list := opr.V2Assets
+	list := opr.V4Assets
 	for _, an := range list {
 		if strings.ToLower(arg) == strings.ToLower(an) {
 			return nil

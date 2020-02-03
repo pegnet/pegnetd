@@ -71,10 +71,105 @@ const createTableAddresses = `CREATE TABLE IF NOT EXISTS "pn_addresses" (
         "pzec_balance"  INTEGER NOT NULL DEFAULT 0
                         CONSTRAINT "insufficient balance" CHECK ("pzec_balance" >= 0),
         "pdcr_balance"  INTEGER NOT NULL DEFAULT 0
-                        CONSTRAINT "insufficient balance" CHECK ("pdcr_balance" >= 0)
+                        CONSTRAINT "insufficient balance" CHECK ("pdcr_balance" >= 0),
+        -- v4 additions
+        "paud_balance"  INTEGER NOT NULL DEFAULT 0
+                        CONSTRAINT "insufficient balance" CHECK ("paud_balance" >= 0),
+        "pnzd_balance"  INTEGER NOT NULL DEFAULT 0
+                        CONSTRAINT "insufficient balance" CHECK ("pnzd_balance" >= 0),
+        "psek_balance"  INTEGER NOT NULL DEFAULT 0
+                        CONSTRAINT "insufficient balance" CHECK ("psek_balance" >= 0),
+        "pnok_balance"  INTEGER NOT NULL DEFAULT 0
+                        CONSTRAINT "insufficient balance" CHECK ("pnok_balance" >= 0),
+        "prub_balance"  INTEGER NOT NULL DEFAULT 0
+                        CONSTRAINT "insufficient balance" CHECK ("prub_balance" >= 0),
+        "pzar_balance"  INTEGER NOT NULL DEFAULT 0
+                        CONSTRAINT "insufficient balance" CHECK ("pzar_balance" >= 0),
+        "ptry_balance"  INTEGER NOT NULL DEFAULT 0
+                        CONSTRAINT "insufficient balance" CHECK ("ptry_balance" >= 0),
+        "peos_balance"  INTEGER NOT NULL DEFAULT 0
+                        CONSTRAINT "insufficient balance" CHECK ("peos_balance" >= 0),
+        "plink_balance"  INTEGER NOT NULL DEFAULT 0
+                        CONSTRAINT "insufficient balance" CHECK ("plink_balance" >= 0),
+        "patom_balance"  INTEGER NOT NULL DEFAULT 0
+                        CONSTRAINT "insufficient balance" CHECK ("patom_balance" >= 0),
+        "pbat_balance"  INTEGER NOT NULL DEFAULT 0
+                        CONSTRAINT "insufficient balance" CHECK ("pbat_balance" >= 0),
+        "pxtz_balance"  INTEGER NOT NULL DEFAULT 0 
+                        CONSTRAINT "insufficient balance" CHECK ("pxtz_balance" >= 0)
 );
 CREATE INDEX IF NOT EXISTS "idx_address_balances_address_id" ON "pn_addresses"("address");
 `
+
+// Add additional columns if they do not exist
+const v4migrationNeeded = `
+SELECT CASE
+   -- If the new currencies do not already exist, run the query to add the columns.
+    WHEN (SELECT COUNT(*) FROM pragma_table_info('pn_addresses') WHERE name = 'pxtz_balance') > 0 THEN
+        false -- No migration needed
+    ELSE
+        true
+END AS migrate;
+`
+
+const addressTableV4Migration = `
+ALTER TABLE pn_addresses
+        ADD "paud_balance"  INTEGER NOT NULL DEFAULT 0
+            CONSTRAINT "insufficient balance" CHECK ("paud_balance" >= 0);
+ALTER TABLE pn_addresses
+        ADD "pnzd_balance"  INTEGER NOT NULL DEFAULT 0
+			CONSTRAINT "insufficient balance" CHECK ("pnzd_balance" >= 0);
+ALTER TABLE pn_addresses
+        ADD "psek_balance"  INTEGER NOT NULL DEFAULT 0
+			CONSTRAINT "insufficient balance" CHECK ("psek_balance" >= 0);
+ALTER TABLE pn_addresses
+        ADD "pnok_balance"  INTEGER NOT NULL DEFAULT 0
+			CONSTRAINT "insufficient balance" CHECK ("pnok_balance" >= 0);
+ALTER TABLE pn_addresses
+        ADD "prub_balance"  INTEGER NOT NULL DEFAULT 0
+			CONSTRAINT "insufficient balance" CHECK ("prub_balance" >= 0);
+ALTER TABLE pn_addresses
+        ADD "pzar_balance"  INTEGER NOT NULL DEFAULT 0
+			CONSTRAINT "insufficient balance" CHECK ("pzar_balance" >= 0);
+ALTER TABLE pn_addresses
+        ADD "ptry_balance"  INTEGER NOT NULL DEFAULT 0
+			CONSTRAINT "insufficient balance" CHECK ("ptry_balance" >= 0);
+ALTER TABLE pn_addresses
+        ADD "peos_balance"  INTEGER NOT NULL DEFAULT 0
+			CONSTRAINT "insufficient balance" CHECK ("peos_balance" >= 0);
+ALTER TABLE pn_addresses
+        ADD "plink_balance"  INTEGER NOT NULL DEFAULT 0
+			CONSTRAINT "insufficient balance" CHECK ("plink_balance" >= 0);
+ALTER TABLE pn_addresses
+        ADD "patom_balance"  INTEGER NOT NULL DEFAULT 0
+			CONSTRAINT "insufficient balance" CHECK ("patom_balance" >= 0);
+ALTER TABLE pn_addresses
+        ADD "pbat_balance"  INTEGER NOT NULL DEFAULT 0
+			CONSTRAINT "insufficient balance" CHECK ("pbat_balance" >= 0);
+ALTER TABLE pn_addresses
+        ADD "pxtz_balance"  INTEGER NOT NULL DEFAULT 0
+			CONSTRAINT "insufficient balance" CHECK ("pxtz_balance" >= 0);
+`
+
+// Use addressSelectCols instead of '*' to ensure the order is always the same
+var addressSelectCols = ``
+
+func init() {
+	// +2 for 2 extra cols, -1 since the max is +1
+	cols := make([]string, fat2.PTickerMax+2-1)
+	cols[0] = "id"
+	cols[1] = "address"
+	for i := 1; i < int(fat2.PTickerMax); i++ {
+		cols[i+1] = strings.ToLower(fat2.PTicker(i).String()) + "_balance"
+	}
+	addressSelectCols = strings.Join(cols, ",") + " "
+}
+
+func (p *Pegnet) v4MigrationNeeded() (migrate bool, err error) {
+	row := p.DB.QueryRow(v4migrationNeeded)
+	err = row.Scan(&migrate)
+	return
+}
 
 func (p *Pegnet) CreateTableAddresses() error {
 	_, err := p.DB.Exec(createTableAddresses)
@@ -256,7 +351,8 @@ func (Pegnet) selectBalances(q QueryAble, adr *factom.FAAddress) (map[fat2.PTick
 	balances := make([]uint64, int(fat2.PTickerMax))
 	var id int
 	var address []byte
-	err := q.QueryRow(`SELECT * FROM pn_addresses WHERE address = ?;`, adr[:]).Scan(
+	query := fmt.Sprintf(`SELECT %s FROM pn_addresses WHERE address = ?;`, addressSelectCols)
+	err := q.QueryRow(query, adr[:]).Scan(
 		&id,
 		&address,
 		&balances[fat2.PTickerPEG],
@@ -289,6 +385,19 @@ func (Pegnet) selectBalances(q QueryAble, adr *factom.FAAddress) (map[fat2.PTick
 		&balances[fat2.PTickerDASH],
 		&balances[fat2.PTickerZEC],
 		&balances[fat2.PTickerDCR],
+		// V4 Additions
+		&balances[fat2.PTickerAUD],
+		&balances[fat2.PTickerNZD],
+		&balances[fat2.PTickerSEK],
+		&balances[fat2.PTickerNOK],
+		&balances[fat2.PTickerRUB],
+		&balances[fat2.PTickerZAR],
+		&balances[fat2.PTickerTRY],
+		&balances[fat2.PTickerEOS],
+		&balances[fat2.PTickerLINK],
+		&balances[fat2.PTickerATOM],
+		&balances[fat2.PTickerBAT],
+		&balances[fat2.PTickerXTZ],
 	)
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -306,7 +415,8 @@ func (Pegnet) selectBalances(q QueryAble, adr *factom.FAAddress) (map[fat2.PTick
 // balances for the given address. If the address is not in the database,
 // the map will contain 0 for all valid PTickers. This works on the pending tx
 func (p *Pegnet) SelectAllBalances() ([]BalancesPair, error) {
-	rows, err := p.DB.Query(`SELECT * FROM pn_addresses;`)
+	query := fmt.Sprintf(`SELECT %s FROM pn_addresses;`, addressSelectCols)
+	rows, err := p.DB.Query(query)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, nil
@@ -322,7 +432,7 @@ func (p *Pegnet) SelectAllBalances() ([]BalancesPair, error) {
 
 		var id int
 		var address []byte
-		rows.Scan(
+		err = rows.Scan(
 			&id,
 			&address,
 			&bp.Balances[fat2.PTickerPEG],
@@ -355,7 +465,23 @@ func (p *Pegnet) SelectAllBalances() ([]BalancesPair, error) {
 			&bp.Balances[fat2.PTickerDASH],
 			&bp.Balances[fat2.PTickerZEC],
 			&bp.Balances[fat2.PTickerDCR],
+			// V4 Additions
+			&bp.Balances[fat2.PTickerAUD],
+			&bp.Balances[fat2.PTickerNZD],
+			&bp.Balances[fat2.PTickerSEK],
+			&bp.Balances[fat2.PTickerNOK],
+			&bp.Balances[fat2.PTickerRUB],
+			&bp.Balances[fat2.PTickerZAR],
+			&bp.Balances[fat2.PTickerTRY],
+			&bp.Balances[fat2.PTickerEOS],
+			&bp.Balances[fat2.PTickerLINK],
+			&bp.Balances[fat2.PTickerATOM],
+			&bp.Balances[fat2.PTickerBAT],
+			&bp.Balances[fat2.PTickerXTZ],
 		)
+		if err != nil {
+			return nil, err
+		}
 
 		var fa factom.FAAddress
 		copy(fa[:], address)
@@ -412,6 +538,19 @@ func (p *Pegnet) SelectIssuances() (map[fat2.PTicker]uint64, error) {
 		&issuances[fat2.PTickerDASH],
 		&issuances[fat2.PTickerZEC],
 		&issuances[fat2.PTickerDCR],
+		// V4 Additions
+		&issuances[fat2.PTickerAUD],
+		&issuances[fat2.PTickerNZD],
+		&issuances[fat2.PTickerSEK],
+		&issuances[fat2.PTickerNOK],
+		&issuances[fat2.PTickerRUB],
+		&issuances[fat2.PTickerZAR],
+		&issuances[fat2.PTickerTRY],
+		&issuances[fat2.PTickerEOS],
+		&issuances[fat2.PTickerLINK],
+		&issuances[fat2.PTickerATOM],
+		&issuances[fat2.PTickerBAT],
+		&issuances[fat2.PTickerXTZ],
 	)
 	if err != nil {
 		if err == sql.ErrNoRows {

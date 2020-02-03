@@ -1,7 +1,9 @@
 package pegnet
 
 import (
+	"context"
 	"database/sql"
+	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -80,14 +82,40 @@ func (p *Pegnet) createTables() error {
 		createTableTxHistoryTx,
 		createTableTxHistoryLookup,
 		createTableSyncVersion,
+		createTableBank,
 	} {
 		if _, err := p.DB.Exec(sql); err != nil {
-			return err
+			return fmt.Errorf("createTables: %v", err)
 		}
 	}
 
+	err := p.migrations()
+	if err != nil {
+		return fmt.Errorf("migrations: %v", err)
+	}
+	return nil
+}
+
+// migrations runs after create tables. It is not versioned like standard
+// migrations.
+func (p *Pegnet) migrations() error {
 	// migrate pn_history_lookup alter column
 	txhistoryMigrateLookup1(p)
+
+	v4Migrate, err := p.v4MigrationNeeded()
+	if err != nil {
+		return err
+	}
+	if v4Migrate {
+		log.Infof("Running v4 migrations")
+		for _, sql := range []string{
+			addressTableV4Migration,
+		} {
+			if _, err := p.DB.Exec(sql); err != nil {
+				return err
+			}
+		}
+	}
 
 	return nil
 }
@@ -98,4 +126,5 @@ type QueryAble interface {
 	Prepare(query string) (*sql.Stmt, error)
 	Query(query string, args ...interface{}) (*sql.Rows, error)
 	QueryRow(query string, args ...interface{}) *sql.Row
+	QueryRowContext(ctx context.Context, query string, args ...interface{}) *sql.Row
 }
