@@ -47,14 +47,6 @@ const (
 	// BankBaseAmount is the minimum the bank size will ever be.
 	// Any bank growth will be ontop of this value.
 	BankBaseAmount = conversions.PerBlock
-
-	// BankGrowth
-	BankGrowthAmount = 500 * 1e8
-	BankDecayAmount  = BankGrowthAmount
-
-	// BankMaxLimit is the maximum size of the Bank for any given block
-	// 288 blocks of growth
-	BankMaxLimit = BankBaseAmount + (288 * BankGrowthAmount)
 )
 
 // CreateTableBank is used to expose this table for unit tests
