@@ -33,8 +33,9 @@ var (
 		// If the pegnet node syncs a hardfork height with any height less than
 		// the minimum version, the node will not start.
 		//
-		// TODO: Correct the V4 OPR Upgrade here
-		{ActivationHeight: 999999, MinimumVersion: 1},
+		// V4 OPR Update
+		// Estimated to be  Feb 12, 2020, 18:00 UTC
+		{ActivationHeight: 231620, MinimumVersion: 1},
 	}
 )
 
