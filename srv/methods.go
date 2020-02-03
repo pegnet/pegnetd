@@ -46,6 +46,7 @@ func (s *APIServer) jrpcMethods() jrpc.MethodMap {
 		"get-rich-list":          s.getRichList,
 		"get-global-rich-list":   s.getGlobalRichList,
 		"get-miner-distribution": s.getMiningDominance,
+		"get-bank":               s.getBank,
 		"get-transactions":       s.getTransactions(false),
 		"get-transaction-status": s.getTransactionStatus,
 		"get-transaction":        s.getTransactions(true),
@@ -76,6 +77,31 @@ func (APIServer) properties(_ context.Context, data json.RawMessage) interface{}
 		SQLiteVersion: sqliteVersion,
 		GolangVersion: runtime.Version(),
 	}
+}
+
+func (s *APIServer) getBank(ctx context.Context, data json.RawMessage) interface{} {
+	params := ParamsGetBank{}
+	_, _, err := validate(data, &params)
+	if err != nil {
+		return err
+	}
+
+	if params.Height == 0 {
+		synced, err := s.Node.Pegnet.SelectSynced(ctx, s.Node.Pegnet.DB)
+		if err != nil {
+			return err
+		}
+		params.Height = int32(synced.Synced)
+	}
+
+	if params.Height < int32(node.V4OPRUpdate) {
+		return jrpc.ErrorInvalidParams(fmt.Sprintf("the height %d is below the activation height (%d) of this feature", params.Height, node.V4OPRUpdate))
+	}
+	result, err := s.Node.Pegnet.SelectBankEntry(nil, params.Height)
+	if err != nil {
+		return err
+	}
+	return result
 }
 
 // getMiningDominance returns the representation of rewarded miners for a given
@@ -406,12 +432,21 @@ func (s *APIServer) getPegnetIssuance(_ context.Context, data json.RawMessage) i
 	}
 }
 
-func (s *APIServer) getPegnetRates(_ context.Context, data json.RawMessage) interface{} {
+func (s *APIServer) getPegnetRates(ctx context.Context, data json.RawMessage) interface{} {
 	params := ParamsGetPegnetRates{}
 	if _, _, err := validate(data, &params); err != nil {
 		return err
 	}
-	rates, err := s.Node.Pegnet.SelectRates(context.Background(), *params.Height)
+
+	if params.Height == 0 {
+		synced, err := s.Node.Pegnet.SelectSynced(ctx, s.Node.Pegnet.DB)
+		if err != nil {
+			return err
+		}
+		params.Height = uint32(synced.Synced)
+	}
+
+	rates, err := s.Node.Pegnet.SelectRates(ctx, params.Height)
 	if err == sql.ErrNoRows || rates == nil || len(rates) == 0 {
 		return ErrorNotFound
 	}

@@ -12,6 +12,8 @@ import (
 	"text/tabwriter"
 	"time"
 
+	"github.com/pegnet/pegnet/modules/conversions"
+
 	"github.com/Factom-Asset-Tokens/factom"
 	"github.com/pegnet/pegnetd/config"
 	"github.com/pegnet/pegnetd/fat/fat2"
@@ -33,6 +35,8 @@ func init() {
 
 	get.AddCommand(getTX)
 	get.AddCommand(getRates)
+	getBank.Flags().Bool("raw", false, "Print the full json data")
+	get.AddCommand(getBank)
 	getTXs.Flags().Bool("burn", false, "Show burns")
 	getTXs.Flags().Bool("cvt", false, "Show converions")
 	getTXs.Flags().Bool("tran", false, "Show transfers")
@@ -43,7 +47,7 @@ func init() {
 	get.AddCommand(getTXs)
 	rootCmd.AddCommand(get)
 
-	minerDistro.Flags().Bool("long", false, "Print the full json data")
+	minerDistro.Flags().Bool("raw", false, "Print the full json data")
 	rootCmd.AddCommand(minerDistro)
 
 	//tx.Flags()
@@ -696,19 +700,21 @@ var getRates = &cobra.Command{
 	Short:            "Fetch the pegnet quotes for the assets at a given height (if their are quotes)",
 	PersistentPreRun: always,
 	PreRun:           SoftReadConfig,
-	Args:             cobra.ExactArgs(1),
+	Args:             cobra.MaximumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		height, err := strconv.Atoi(args[0])
-		if height <= 0 || err != nil {
-			cmd.PrintErrf("height must be a number greater than 0")
-			os.Exit(1)
+		var height int
+		var err error
+		if len(args) > 0 {
+			height, err = strconv.Atoi(args[0])
+			if height <= 0 || err != nil {
+				cmd.PrintErrf("height must be a number greater than 0")
+				os.Exit(1)
+			}
 		}
 
 		cl := srv.NewClient()
 		cl.PegnetdServer = viper.GetString(config.Pegnetd)
-		var res srv.ResultPegnetTickerMap
-		uH := uint32(height)
-		err = cl.Request("get-pegnet-rates", srv.ParamsGetPegnetRates{Height: &uH}, &res)
+		res, err := getPegnetRates(uint32(height), cl)
 		if err != nil {
 			fmt.Printf("Failed to make RPC request\nDetails:\n%v\n", err)
 			os.Exit(1)
@@ -725,6 +731,73 @@ var getRates = &cobra.Command{
 			panic(err)
 		}
 		fmt.Println(string(data))
+	},
+}
+
+func getPegnetRates(height uint32, cl *srv.Client) (srv.ResultPegnetTickerMap, error) {
+	var res srv.ResultPegnetTickerMap
+	err := cl.Request("get-pegnet-rates", srv.ParamsGetPegnetRates{Height: height}, &res)
+	return res, err
+}
+
+var getBank = &cobra.Command{
+	Use:              "bank <height>",
+	Short:            "Fetch the pegnet bank properties for a given height. Put no height for the latest",
+	PersistentPreRun: always,
+	PreRun:           SoftReadConfig,
+	Args:             cobra.MaximumNArgs(1),
+	Run: func(cmd *cobra.Command, args []string) {
+		var height int
+		var err error
+		if len(args) > 0 {
+			height, err = strconv.Atoi(args[0])
+			if height <= 0 || err != nil {
+				cmd.PrintErrf("height must be a number greater than 0")
+				os.Exit(1)
+			}
+		}
+
+		cl := srv.NewClient()
+		cl.PegnetdServer = viper.GetString(config.Pegnetd)
+		var res pegnet.BankEntry
+		err = cl.Request("get-bank", srv.ParamsGetBank{Height: int32(height)}, &res)
+		if err != nil {
+			fmt.Printf("Failed to make RPC request\nDetails:\n%v\n", err)
+			os.Exit(1)
+		}
+
+		if raw, _ := cmd.Flags().GetBool("raw"); raw {
+			data, err := json.Marshal(res)
+			if err != nil {
+				panic(err)
+			}
+			fmt.Println(string(data))
+			return
+		}
+
+		if res.Height == -1 {
+			fmt.Println("No bank details found for this height. This is not a valid pegnet block. It could be skipped by miners, the block is in the future, or the block was before the bank was implemented.")
+			os.Exit(1)
+		}
+		// Pretty print
+		fmt.Printf("Bank details for height %d\n", res.Height)
+		fmt.Printf("PEG in Bank   : %s PEG\n", FactoshiToFactoid(res.BankAmount))
+		fmt.Printf("PEG Consumed  : %s PEG\n", FactoshiToFactoid(res.BankUsed))
+		fmt.Printf("PEG Requested : %s PEG\n", FactoshiToFactoid(res.PEGRequested))
+
+		rates, err := getPegnetRates(uint32(res.Height), cl)
+		if err == nil {
+			fmt.Println("")
+			fmt.Println("Value in USD")
+			dAmt, _ := conversions.Convert(res.BankAmount, rates[fat2.PTickerPEG], rates[fat2.PTickerUSD])
+			dUsed, _ := conversions.Convert(res.BankUsed, rates[fat2.PTickerPEG], rates[fat2.PTickerUSD])
+			dReq, _ := conversions.Convert(res.PEGRequested, rates[fat2.PTickerPEG], rates[fat2.PTickerUSD])
+			fmt.Printf("PEG in Bank   : $%s\n", FactoshiToFactoid(dAmt))
+			fmt.Printf("PEG Consumed  : $%s\n", FactoshiToFactoid(dUsed))
+			fmt.Printf("PEG Requested : $%s\n", FactoshiToFactoid(dReq))
+
+		}
+
 	},
 }
 

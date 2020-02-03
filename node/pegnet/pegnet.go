@@ -82,6 +82,7 @@ func (p *Pegnet) createTables() error {
 		createTableTxHistoryTx,
 		createTableTxHistoryLookup,
 		createTableSyncVersion,
+		createTableBank,
 	} {
 		if _, err := p.DB.Exec(sql); err != nil {
 			return fmt.Errorf("createTables: %v", err)
