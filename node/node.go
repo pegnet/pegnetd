@@ -3,19 +3,21 @@ package node
 import (
 	"context"
 	"database/sql"
+	"fmt"
 
 	"github.com/Factom-Asset-Tokens/factom"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/pegnet/pegnet/modules/grader"
 	"github.com/pegnet/pegnetd/config"
+	"github.com/pegnet/pegnetd/fat/fat2"
 	"github.com/pegnet/pegnetd/node/pegnet"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 )
 
 var (
-	OPRChain         = *factom.NewBytes32FromString("a642a8674f46696cc47fdb6b65f9c87b2a19c5ea8123b3d2f0c13b6f33a9d5ef")
-	TransactionChain = *factom.NewBytes32FromString("cffce0f409ebba4ed236d49d89c70e4bd1f1367d86402a3363366683265a242d")
+	OPRChain         = factom.NewBytes32("a642a8674f46696cc47fdb6b65f9c87b2a19c5ea8123b3d2f0c13b6f33a9d5ef")
+	TransactionChain = factom.NewBytes32("cffce0f409ebba4ed236d49d89c70e4bd1f1367d86402a3363366683265a242d")
 
 	// Acivation Heights
 
@@ -44,6 +46,10 @@ var (
 	// This is when PEG price is determined by the exchange price
 	// Estimated to be  Dec 9, 2019, 17:00 UTC
 	PEGFreeFloatingPriceActivation uint32 = 222270
+
+	// V4OPRUpdate indicates the activation of additional currencies and ecdsa keys.
+	// Estimated to be  Feb 12, 2020, 18:00 UTC
+	V4OPRUpdate uint32 = 231620
 )
 
 func SetAllActivations(act uint32) {
@@ -54,6 +60,8 @@ func SetAllActivations(act uint32) {
 	OneWaypFCTConversions = act
 	PegnetConversionLimitActivation = act
 	PEGFreeFloatingPriceActivation = act
+	fat2.Fat2RCDEActivation = act
+	V4OPRUpdate = act
 }
 
 type Pegnetd struct {
@@ -75,7 +83,7 @@ func NewPegnetd(ctx context.Context, conf *viper.Viper) (*Pegnetd, error) {
 		return nil, err
 	}
 
-	if sync, err := n.Pegnet.SelectSynced(ctx); err != nil {
+	if sync, err := n.Pegnet.SelectSynced(ctx, n.Pegnet.DB); err != nil {
 		if err == sql.ErrNoRows {
 			n.Sync = new(pegnet.BlockSync)
 			n.Sync.Synced = PegnetActivation
@@ -85,6 +93,16 @@ func NewPegnetd(ctx context.Context, conf *viper.Viper) (*Pegnetd, error) {
 		}
 	} else {
 		n.Sync = sync
+	}
+
+	err := n.Pegnet.CheckHardForks(n.Pegnet.DB)
+	if err != nil {
+		err = fmt.Errorf("pegnetd database hardfork check failed: %s", err.Error())
+		if conf.GetBool(config.DisableHardForkCheck) {
+			log.Warnf(err.Error())
+		} else {
+			return nil, err
+		}
 	}
 
 	grader.InitLX()

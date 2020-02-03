@@ -23,6 +23,7 @@
 package srv
 
 import (
+	"fmt"
 	"time"
 
 	jrpc "github.com/AdamSLevy/jsonrpc2/v13"
@@ -35,6 +36,36 @@ type Params interface {
 	IsValid() error
 	ValidChainID() *factom.Bytes32
 	HasIncludePending() bool
+}
+
+type ParamsGetBank struct {
+	Height int32 `json:"height,omitempty"`
+}
+
+func (p ParamsGetBank) HasIncludePending() bool { return false }
+func (p ParamsGetBank) IsValid() error {
+	return nil
+}
+func (p ParamsGetBank) ValidChainID() *factom.Bytes32 {
+	return nil
+}
+
+type ParamsGetMiningDominance struct {
+	Start int `json:"start,omitempty"`
+	Stop  int `json:"stop,omitempty"`
+}
+
+func (p ParamsGetMiningDominance) HasIncludePending() bool { return false }
+func (p ParamsGetMiningDominance) IsValid() error {
+	if p.Stop < p.Start {
+		if !(p.Stop < 0 && p.Start == 0 || p.Start > 0 && p.Stop == 0) {
+			return fmt.Errorf("stop must be >= start")
+		}
+	}
+	return nil
+}
+func (p ParamsGetMiningDominance) ValidChainID() *factom.Bytes32 {
+	return nil
 }
 
 type ParamsGetGlobalRichList struct {
@@ -113,15 +144,15 @@ func (p ParamsGetTransaction) IsValid() error {
 }
 
 type ParamsGetPegnetRates struct {
-	Height *uint32 `json:"height,omitempty"`
+	Height uint32 `json:"height,omitempty"`
 }
 
 func (ParamsGetPegnetRates) HasIncludePending() bool { return false }
 
 func (p ParamsGetPegnetRates) IsValid() error {
-	if p.Height == nil {
-		return jrpc.ErrorInvalidParams(`required: "height"`)
-	}
+	//if p.Height == nil {
+	//	return jrpc.ErrorInvalidParams(`required: "height"`)
+	//}
 	return nil
 }
 func (ParamsGetPegnetRates) ValidChainID() *factom.Bytes32 {
@@ -201,7 +232,7 @@ func (p ParamsGetPegnetTransaction) IsValid() error {
 
 	// error check input
 	if p.Address != "" {
-		if _, err := factom.NewFAAddress(p.Address); err != nil {
+		if _, err := underlyingFA(p.Address); err != nil {
 			return jrpc.ErrorInvalidParams("address: " + err.Error())
 		}
 	}
@@ -225,14 +256,17 @@ func (p ParamsGetPegnetTransaction) ValidChainID() *factom.Bytes32 {
 }
 
 type ParamsGetPegnetBalances struct {
-	Address *factom.FAAddress `json:"address,omitempty"`
+	Address string `json:"address,omitempty"`
 }
 
 func (p ParamsGetPegnetBalances) HasIncludePending() bool { return false }
 
 func (p ParamsGetPegnetBalances) IsValid() error {
-	if p.Address == nil {
+	if p.Address == "" {
 		return jrpc.ErrorInvalidParams(`required: "address"`)
+	}
+	if _, err := underlyingFA(p.Address); err != nil {
+		return jrpc.ErrorInvalidParams("address: " + err.Error())
 	}
 	return nil
 }
@@ -274,7 +308,7 @@ func (p *ParamsSendTransaction) IsValid() error {
 		Timestamp: time.Now(),
 		ChainID:   p.ChainID,
 	}
-	if _, err := p.entry.Cost(false); err != nil {
+	if _, err := p.entry.Cost(); err != nil {
 		return jrpc.ErrorInvalidParams(err)
 	}
 

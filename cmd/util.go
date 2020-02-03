@@ -10,7 +10,7 @@ import (
 
 // TODO: We should really have a simple module for these
 
-// FactoshiToFactoid converts a uint64 factoshi ammount into a fixed point
+// FactoshiToFactoid converts a uint64 factoshi amount into a fixed point
 // number represented as a string
 func FactoshiToFactoid(i int64) string {
 	d := i / 1e8

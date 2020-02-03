@@ -24,6 +24,13 @@ func (p *Pegnet) InsertSynced(tx *sql.Tx, bs *BlockSync) error {
 		return err
 	}
 
+	// Since this is called for every height, we also can mark the height
+	// synced for version checking
+	err = p.MarkHeightSynced(tx, bs.Synced)
+	if err != nil {
+		return err
+	}
+
 	_, err = tx.Exec("REPLACE INTO pn_metadata (name, value) VALUES ($1, $2)", "synced", data)
 	if err != nil {
 		return err
@@ -32,10 +39,10 @@ func (p *Pegnet) InsertSynced(tx *sql.Tx, bs *BlockSync) error {
 	return nil
 }
 
-func (p *Pegnet) SelectSynced(ctx context.Context) (*BlockSync, error) {
+func (Pegnet) SelectSynced(ctx context.Context, tx QueryAble) (*BlockSync, error) {
 
 	var data []byte
-	err := p.DB.QueryRowContext(ctx, "SELECT value FROM pn_metadata WHERE name = $1", "synced").Scan(&data)
+	err := tx.QueryRowContext(ctx, "SELECT value FROM pn_metadata WHERE name = $1", "synced").Scan(&data)
 	if err != nil {
 		return nil, err
 	}

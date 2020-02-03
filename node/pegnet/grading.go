@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/big"
+	"strings"
 
 	"github.com/Factom-Asset-Tokens/factom"
 	"github.com/pegnet/pegnet/modules/grader"
@@ -68,6 +69,11 @@ const (
 	PEGPriceIsFloating                 // PEG == ExchRate
 )
 
+const (
+	// Prefix for pAsset prices on exchanges reported by miners
+	PAssetExchangePrefix = "exch_"
+)
+
 // InsertRates adds all asset rates as rows, computing the rate for PEG if necessary
 func (p *Pegnet) InsertRates(tx *sql.Tx, height uint32, rates []opr.AssetUint, phase PEGPricingPhase) error {
 	if phase == 0 {
@@ -80,8 +86,10 @@ func (p *Pegnet) InsertRates(tx *sql.Tx, height uint32, rates []opr.AssetUint, p
 			ratePEG.SetUint64(rates[i].Value)
 			continue
 		}
+
 		// Correct rates to use `pAsset`
 		rates[i].Name = "p" + rates[i].Name
+
 		err := p.insertRate(tx, height, rates[i].Name, rates[i].Value)
 		if err != nil {
 			return err
@@ -110,7 +118,9 @@ func (p *Pegnet) InsertRates(tx *sql.Tx, height uint32, rates []opr.AssetUint, p
 			totalCapitalization.Add(totalCapitalization, assetCapitalization)
 		}
 		if issuance[fat2.PTickerPEG] == 0 {
-			ratePEG.Set(totalCapitalization)
+			// If there are no PEGs in the system, PEGs have no value (divide-by-zero)
+			// At least one block will have to be mined in order for PEGs to attain a value
+			ratePEG.SetUint64(0)
 		} else {
 			ratePEG.Div(totalCapitalization, new(big.Int).SetUint64(issuance[fat2.PTickerPEG]))
 		}
@@ -167,6 +177,22 @@ func (p *Pegnet) SelectPreviousWinners(ctx context.Context, height uint32) ([]st
 	return winners, nil
 }
 
+// SelectReferenceRates returns the pAsset rates on the external market that
+// are reported by the miners.
+//
+// So pUSD == $1, but the Reference token (pUSD) can be trading at $0.90
+// This rate call will return $0.90
+func (p *Pegnet) SelectReferenceRates(ctx context.Context, tx QueryAble, height uint32) (map[fat2.PTicker]uint64, error) {
+	if tx == nil {
+		tx = p.DB
+	}
+	rows, err := tx.Query("SELECT token, value FROM pn_rate WHERE height = $1", height)
+	if err != nil {
+		return nil, err
+	}
+	return _extractAssetsWithPrefix(rows, PAssetExchangePrefix)
+}
+
 func (p *Pegnet) SelectPendingRates(ctx context.Context, tx *sql.Tx, height uint32) (map[fat2.PTicker]uint64, error) {
 	rows, err := tx.Query("SELECT token, value FROM pn_rate WHERE height = $1", height)
 	if err != nil {
@@ -219,6 +245,10 @@ func (p *Pegnet) SelectMostRecentRatesBeforeHeight(ctx context.Context, tx Query
 }
 
 func _extractAssets(rows *sql.Rows) (map[fat2.PTicker]uint64, error) {
+	return _extractAssetsWithPrefix(rows, "")
+}
+
+func _extractAssetsWithPrefix(rows *sql.Rows, prefix string) (map[fat2.PTicker]uint64, error) {
 	defer rows.Close()
 	assets := make(map[fat2.PTicker]uint64)
 	for rows.Next() {
@@ -227,7 +257,11 @@ func _extractAssets(rows *sql.Rows) (map[fat2.PTicker]uint64, error) {
 		if err := rows.Scan(&tickerName, &rateValue); err != nil {
 			return nil, err
 		}
-		if ticker := fat2.StringToTicker(tickerName); ticker != fat2.PTickerInvalid {
+		if !strings.HasPrefix(tickerName, prefix) {
+			continue
+		}
+		trimmed := strings.TrimPrefix(tickerName, prefix)
+		if ticker := fat2.StringToTicker(trimmed); ticker != fat2.PTickerInvalid {
 			assets[ticker] = rateValue
 		}
 	}

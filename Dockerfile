@@ -2,7 +2,8 @@
 FROM golang:1.13.1-alpine
 
 # For `gcc`
-RUN apk add build-base
+RUN apk add build-base && \
+    apk add --no-cache git
 
 # Where pegnet sources will live
 WORKDIR $GOPATH/src/github.com/pegnet/pegnetd
@@ -18,6 +19,6 @@ ENV GO111MODULE=on
 
 RUN go get
 # place pegnetd in the path
-RUN go install
+RUN go install -ldflags="-X github.com/pegnet/pegnetd/config.CompiledInBuild=`git rev-parse HEAD` -X github.com/pegnet/pegnetd/config.CompiledInVersion=`git describe --tags`"
 
 ENTRYPOINT ["pegnetd"]
