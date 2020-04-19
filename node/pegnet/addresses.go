@@ -9,7 +9,13 @@ import (
 	"github.com/pegnet/pegnetd/fat/fat2"
 )
 
-const createTableAddresses = `CREATE TABLE IF NOT EXISTS "pn_addresses" (
+// pn_addresses
+
+func createTableAddressesWithTableName(tableName string) string {
+	return fmt.Sprintf(createTableAddresses, tableName)
+}
+
+const createTableAddresses = `CREATE TABLE IF NOT EXISTS "%s" (
         "id"            INTEGER PRIMARY KEY,
         "address"       BLOB NOT NULL UNIQUE,
         "peg_balance"   INTEGER NOT NULL DEFAULT 0
@@ -154,6 +160,9 @@ ALTER TABLE pn_addresses
 // Use addressSelectCols instead of '*' to ensure the order is always the same
 var addressSelectCols = ``
 
+// snapshotMinSelectCols is for querying against both snapshot tables
+var snapshotMinSelectCols = ``
+
 func init() {
 	// +2 for 2 extra cols, -1 since the max is +1
 	cols := make([]string, fat2.PTickerMax+2-1)
@@ -163,6 +172,17 @@ func init() {
 		cols[i+1] = strings.ToLower(fat2.PTicker(i).String()) + "_balance"
 	}
 	addressSelectCols = strings.Join(cols, ",") + " "
+
+	// Query from the min value of the 2 balances across the 2 snapshots
+	snCols := make([]string, fat2.PTickerMax+2-1)
+	snCols[0] = "sn_current.id as id"
+	snCols[1] = "sn_current.address as address"
+	for i := 1; i < int(fat2.PTickerMax); i++ {
+		token := strings.ToLower(fat2.PTicker(i).String()) + "_balance"
+		snCols[i+1] = fmt.Sprintf("MIN(sn_current.%s, sn_past.%s) AS %s", token, token, token)
+	}
+
+	snapshotMinSelectCols = strings.Join(snCols, ",") + " "
 }
 
 func (p *Pegnet) v4MigrationNeeded() (migrate bool, err error) {
@@ -172,7 +192,7 @@ func (p *Pegnet) v4MigrationNeeded() (migrate bool, err error) {
 }
 
 func (p *Pegnet) CreateTableAddresses() error {
-	_, err := p.DB.Exec(createTableAddresses)
+	_, err := p.DB.Exec(createTableAddressesWithTableName("pn_addresses"))
 	if err != nil {
 		return err
 	}
