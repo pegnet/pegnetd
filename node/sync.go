@@ -222,6 +222,20 @@ func (d *Pegnetd) SyncBlock(ctx context.Context, tx *sql.Tx, height uint32) erro
 		fLog.WithFields(log.Fields{"section": "grading", "reason": "no graded block"}).Tracef("block not graded")
 	}
 
+	// Before we apply any balance changes, we will snapshot the balances at the START of the block.
+	// This means the balances are the same as the end of the block n-1.
+
+	if true { // Put in act height
+		snapStart := time.Now()
+		err := d.Pegnet.SnapshotCurrent(tx)
+		if err != nil {
+			return err // Snapshot fails stop all progress and block syncing
+		}
+		fLog.WithFields(log.Fields{
+			"duration": time.Since(snapStart),
+		}).Info("balances snapshotted")
+	}
+
 	// Only apply transactions if we crossed the activation
 	if height >= TransactionConversionActivation {
 		rates, err := d.Pegnet.SelectPendingRates(ctx, tx, height)

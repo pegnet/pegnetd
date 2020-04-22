@@ -196,6 +196,16 @@ func (p *Pegnet) CreateTableAddresses() error {
 	if err != nil {
 		return err
 	}
+
+	_, err = p.DB.Exec(createTableAddressesWithTableName("snapshot_current"))
+	if err != nil {
+		return err
+	}
+
+	_, err = p.DB.Exec(createTableAddressesWithTableName("snapshot_past"))
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
