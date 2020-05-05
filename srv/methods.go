@@ -511,7 +511,6 @@ func (s *APIServer) sendTransaction(_ context.Context, data json.RawMessage) int
 		TxID    *factom.Bytes32 `json:"txid,omitempty"`
 		Hash    *factom.Bytes32 `json:"entryhash"`
 	}{ChainID: entry.ChainID, TxID: &txID, Hash: entry.Hash}
-	return nil
 }
 
 //func attemptApplyFAT2TxBatch(chain *engine.Chain, e factom.Entry) (txErr, err error) {
