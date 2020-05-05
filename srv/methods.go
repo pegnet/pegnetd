@@ -555,6 +555,14 @@ func (s *APIServer) getGraded(ctx context.Context, data json.RawMessage) interfa
 		return err
 	}
 
+	if params.Height == 0 {
+		synced, err := s.Node.Pegnet.SelectSynced(ctx, s.Node.Pegnet.DB)
+		if err != nil {
+			return err
+		}
+		params.Height = int32(synced.Synced)
+	}
+
 	result, err := s.Node.Pegnet.SelectGraded(ctx, params.Height)
 	if err != nil {
 		return err
