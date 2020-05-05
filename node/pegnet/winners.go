@@ -3,6 +3,7 @@ package pegnet
 import (
 	"context"
 	"database/sql"
+	"encoding/binary"
 	"encoding/hex"
 	"fmt"
 	"strings"
@@ -106,7 +107,7 @@ type Graded struct {
 	EntryHash  string `json:"entryhash"`
 	Payout     uint64 `json:"payout"`
 	Nonce      string `json:"nonce"`
-	Difficulty string `json:"difficulty"`
+	Difficulty uint64 `json:"difficulty"`
 	Position   uint8  `json:"position"`
 	MinerID    string `json:"minerid"`
 	Address    string `json:"address"`
@@ -145,7 +146,7 @@ func (p *Pegnet) SelectGraded(ctx context.Context, height int32) (GradedResult, 
 			EntryHash:  hex.EncodeToString(entryhash),
 			Payout:     payout,
 			Nonce:      hex.EncodeToString(nonce),
-			Difficulty: hex.EncodeToString(difficulty),
+			Difficulty: binary.BigEndian.Uint64(difficulty),
 			Position:   position,
 			MinerID:    minerid,
 			Address:    address,
