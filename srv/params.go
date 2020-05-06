@@ -274,6 +274,21 @@ func (p ParamsGetPegnetBalances) ValidChainID() *factom.Bytes32 {
 	return nil
 }
 
+type ParamsGetGraded struct {
+	Height int32 `json:"height,omitempty"`
+}
+
+func (p ParamsGetGraded) HasIncludePending() bool { return false }
+func (p ParamsGetGraded) IsValid() error {
+	if p.Height < 0 {
+		return jrpc.ErrorInvalidParams("height must be >= 0")
+	}
+	return nil
+}
+func (p ParamsGetGraded) ValidChainID() *factom.Bytes32 {
+	return nil
+}
+
 type ParamsSendTransaction struct {
 	ParamsToken
 	ExtIDs  []factom.Bytes `json:"extids,omitempty"`
