@@ -280,6 +280,9 @@ type ParamsGetGraded struct {
 
 func (p ParamsGetGraded) HasIncludePending() bool { return false }
 func (p ParamsGetGraded) IsValid() error {
+	if p.Height < 0 {
+		return jrpc.ErrorInvalidParams("height must be >= 0")
+	}
 	return nil
 }
 func (p ParamsGetGraded) ValidChainID() *factom.Bytes32 {
