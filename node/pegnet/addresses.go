@@ -96,7 +96,26 @@ const createTableAddresses = `CREATE TABLE IF NOT EXISTS "pn_addresses" (
         "pbat_balance"  INTEGER NOT NULL DEFAULT 0
                         CONSTRAINT "insufficient balance" CHECK ("pbat_balance" >= 0),
         "pxtz_balance"  INTEGER NOT NULL DEFAULT 0 
-                        CONSTRAINT "insufficient balance" CHECK ("pxtz_balance" >= 0)
+                        CONSTRAINT "insufficient balance" CHECK ("pxtz_balance" >= 0),
+		-- v5 additions
+        "phbar_balance"  INTEGER NOT NULL DEFAULT 0
+                        CONSTRAINT "insufficient balance" CHECK ("phbar_balance" >= 0),
+        "pneo_balance"  INTEGER NOT NULL DEFAULT 0
+                        CONSTRAINT "insufficient balance" CHECK ("pneo_balance" >= 0),
+        "paed_balance"  INTEGER NOT NULL DEFAULT 0
+                        CONSTRAINT "insufficient balance" CHECK ("paed_balance" >= 0),
+        "pcro_balance"  INTEGER NOT NULL DEFAULT 0
+                        CONSTRAINT "insufficient balance" CHECK ("pcro_balance" >= 0),
+        "petc_balance"  INTEGER NOT NULL DEFAULT 0
+                        CONSTRAINT "insufficient balance" CHECK ("petc_balance" >= 0),
+        "pont_balance"  INTEGER NOT NULL DEFAULT 0
+                        CONSTRAINT "insufficient balance" CHECK ("pont_balance" >= 0),
+        "pdoge_balance"  INTEGER NOT NULL DEFAULT 0
+                        CONSTRAINT "insufficient balance" CHECK ("pdoge_balance" >= 0),
+        "pvet_balance"  INTEGER NOT NULL DEFAULT 0
+                        CONSTRAINT "insufficient balance" CHECK ("pvet_balance" >= 0),
+        "pht_balance"  INTEGER NOT NULL DEFAULT 0
+                        CONSTRAINT "insufficient balance" CHECK ("pht_balance" >= 0)		
 );
 CREATE INDEX IF NOT EXISTS "idx_address_balances_address_id" ON "pn_addresses"("address");
 `
@@ -151,6 +170,59 @@ ALTER TABLE pn_addresses
 			CONSTRAINT "insufficient balance" CHECK ("pxtz_balance" >= 0);
 `
 
+func (p *Pegnet) v4MigrationNeeded() (migrate bool, err error) {
+	row := p.DB.QueryRow(v4migrationNeeded)
+	err = row.Scan(&migrate)
+	return
+}
+
+// Add additional columns if they do not exist
+const v5migrationNeeded = `
+SELECT CASE
+   -- If the new currencies do not already exist, run the query to add the columns.
+    WHEN (SELECT COUNT(*) FROM pragma_table_info('pn_addresses') WHERE name = 'pht_balance') > 0 THEN
+        false -- No migration needed
+    ELSE
+        true
+END AS migrate;
+`
+
+const addressTableV5Migration = `
+ALTER TABLE pn_addresses
+        ADD "phbar_balance"  INTEGER NOT NULL DEFAULT 0
+            CONSTRAINT "insufficient balance" CHECK ("phbar_balance" >= 0);
+ALTER TABLE pn_addresses
+        ADD "pneo_balance"  INTEGER NOT NULL DEFAULT 0
+            CONSTRAINT "insufficient balance" CHECK ("pneo_balance" >= 0);
+ALTER TABLE pn_addresses
+        ADD "paed_balance"  INTEGER NOT NULL DEFAULT 0
+            CONSTRAINT "insufficient balance" CHECK ("paed_balance" >= 0);
+ALTER TABLE pn_addresses
+        ADD "pcro_balance"  INTEGER NOT NULL DEFAULT 0
+            CONSTRAINT "insufficient balance" CHECK ("pcro_balance" >= 0);
+ALTER TABLE pn_addresses
+        ADD "petc_balance"  INTEGER NOT NULL DEFAULT 0
+            CONSTRAINT "insufficient balance" CHECK ("petc_balance" >= 0);
+ALTER TABLE pn_addresses
+        ADD "pont_balance"  INTEGER NOT NULL DEFAULT 0
+            CONSTRAINT "insufficient balance" CHECK ("pont_balance" >= 0);
+ALTER TABLE pn_addresses
+        ADD "pdoge_balance"  INTEGER NOT NULL DEFAULT 0
+            CONSTRAINT "insufficient balance" CHECK ("pdoge_balance" >= 0);
+ALTER TABLE pn_addresses
+        ADD "pvet_balance"  INTEGER NOT NULL DEFAULT 0
+            CONSTRAINT "insufficient balance" CHECK ("pvet_balance" >= 0);
+ALTER TABLE pn_addresses
+        ADD "pht_balance"  INTEGER NOT NULL DEFAULT 0
+            CONSTRAINT "insufficient balance" CHECK ("pht_balance" >= 0);
+`
+
+func (p *Pegnet) v5MigrationNeeded() (migrate bool, err error) {
+	row := p.DB.QueryRow(v5migrationNeeded)
+	err = row.Scan(&migrate)
+	return
+}
+
 // Use addressSelectCols instead of '*' to ensure the order is always the same
 var addressSelectCols = ``
 
@@ -163,12 +235,6 @@ func init() {
 		cols[i+1] = strings.ToLower(fat2.PTicker(i).String()) + "_balance"
 	}
 	addressSelectCols = strings.Join(cols, ",") + " "
-}
-
-func (p *Pegnet) v4MigrationNeeded() (migrate bool, err error) {
-	row := p.DB.QueryRow(v4migrationNeeded)
-	err = row.Scan(&migrate)
-	return
 }
 
 func (p *Pegnet) CreateTableAddresses() error {
@@ -398,6 +464,16 @@ func (Pegnet) selectBalances(q QueryAble, adr *factom.FAAddress) (map[fat2.PTick
 		&balances[fat2.PTickerATOM],
 		&balances[fat2.PTickerBAT],
 		&balances[fat2.PTickerXTZ],
+		// V5 Additions
+		&balances[fat2.PTickerHBAR],
+		&balances[fat2.PTickerNEO],
+		&balances[fat2.PTickerAED],
+		&balances[fat2.PTickerCRO],
+		&balances[fat2.PTickerETC],
+		&balances[fat2.PTickerONT],
+		&balances[fat2.PTickerDOGE],
+		&balances[fat2.PTickerVET],
+		&balances[fat2.PTickerHT],
 	)
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -478,6 +554,16 @@ func (p *Pegnet) SelectAllBalances() ([]BalancesPair, error) {
 			&bp.Balances[fat2.PTickerATOM],
 			&bp.Balances[fat2.PTickerBAT],
 			&bp.Balances[fat2.PTickerXTZ],
+			// V5 Additions
+			&bp.Balances[fat2.PTickerHBAR],
+			&bp.Balances[fat2.PTickerNEO],
+			&bp.Balances[fat2.PTickerAED],
+			&bp.Balances[fat2.PTickerCRO],
+			&bp.Balances[fat2.PTickerETC],
+			&bp.Balances[fat2.PTickerONT],
+			&bp.Balances[fat2.PTickerDOGE],
+			&bp.Balances[fat2.PTickerVET],
+			&bp.Balances[fat2.PTickerHT],
 		)
 		if err != nil {
 			return nil, err
@@ -551,6 +637,16 @@ func (p *Pegnet) SelectIssuances() (map[fat2.PTicker]uint64, error) {
 		&issuances[fat2.PTickerATOM],
 		&issuances[fat2.PTickerBAT],
 		&issuances[fat2.PTickerXTZ],
+		// V5 Additions
+		&issuances[fat2.PTickerHBAR],
+		&issuances[fat2.PTickerNEO],
+		&issuances[fat2.PTickerAED],
+		&issuances[fat2.PTickerCRO],
+		&issuances[fat2.PTickerETC],
+		&issuances[fat2.PTickerONT],
+		&issuances[fat2.PTickerDOGE],
+		&issuances[fat2.PTickerVET],
+		&issuances[fat2.PTickerHT],
 	)
 	if err != nil {
 		if err == sql.ErrNoRows {
