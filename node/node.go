@@ -52,8 +52,8 @@ var (
 	V4OPRUpdate uint32 = 231620
 
 	// V5OPRUpdate indicates the activation of additional currencies and ecdsa keys.
-	// Estimated to be  May 11, 2020, 18:00 UTC
-	V5OPRUpdate uint32 = 244970
+	// TODO: TBD
+	V5OPRUpdate uint32 = 999999
 )
 
 func SetAllActivations(act uint32) {
