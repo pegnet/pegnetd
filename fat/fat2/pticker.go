@@ -64,6 +64,9 @@ const (
 	PTickerDOGE
 	PTickerVET
 	PTickerHT
+	PTickerARS
+	PTickerTWD
+	PTickerALGO
 	PTickerMax
 )
 
@@ -121,6 +124,9 @@ var validPTickerStrings = []string{
 	"pDOGE",
 	"pVET",
 	"pHT",
+	"pARS",
+	"pTWD",
+	"pALGO",
 }
 
 var validPTickers = func() map[string]PTicker {

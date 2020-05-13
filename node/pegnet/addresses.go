@@ -115,7 +115,13 @@ const createTableAddresses = `CREATE TABLE IF NOT EXISTS "pn_addresses" (
         "pvet_balance"  INTEGER NOT NULL DEFAULT 0
                         CONSTRAINT "insufficient balance" CHECK ("pvet_balance" >= 0),
         "pht_balance"  INTEGER NOT NULL DEFAULT 0
-                        CONSTRAINT "insufficient balance" CHECK ("pht_balance" >= 0)		
+                        CONSTRAINT "insufficient balance" CHECK ("pht_balance" >= 0),
+        "pars_balance"  INTEGER NOT NULL DEFAULT 0
+                        CONSTRAINT "insufficient balance" CHECK ("pars_balance" >= 0),
+        "ptwd_balance"  INTEGER NOT NULL DEFAULT 0
+                        CONSTRAINT "insufficient balance" CHECK ("ptwd_balance" >= 0),
+        "palgo_balance"  INTEGER NOT NULL DEFAULT 0
+                        CONSTRAINT "insufficient balance" CHECK ("palgo_balance" >= 0),		
 );
 CREATE INDEX IF NOT EXISTS "idx_address_balances_address_id" ON "pn_addresses"("address");
 `
@@ -215,6 +221,15 @@ ALTER TABLE pn_addresses
 ALTER TABLE pn_addresses
         ADD "pht_balance"  INTEGER NOT NULL DEFAULT 0
             CONSTRAINT "insufficient balance" CHECK ("pht_balance" >= 0);
+ALTER TABLE pn_addresses
+        ADD "pars_balance"  INTEGER NOT NULL DEFAULT 0
+            CONSTRAINT "insufficient balance" CHECK ("pars_balance" >= 0);
+ALTER TABLE pn_addresses
+        ADD "ptwd_balance"  INTEGER NOT NULL DEFAULT 0
+            CONSTRAINT "insufficient balance" CHECK ("ptwd_balance" >= 0);
+ALTER TABLE pn_addresses
+        ADD "palgo_balance"  INTEGER NOT NULL DEFAULT 0
+            CONSTRAINT "insufficient balance" CHECK ("palgo_balance" >= 0);
 `
 
 func (p *Pegnet) v5MigrationNeeded() (migrate bool, err error) {
@@ -474,6 +489,9 @@ func (Pegnet) selectBalances(q QueryAble, adr *factom.FAAddress) (map[fat2.PTick
 		&balances[fat2.PTickerDOGE],
 		&balances[fat2.PTickerVET],
 		&balances[fat2.PTickerHT],
+		&balances[fat2.PTickerARS],
+		&balances[fat2.PTickerTWD],
+		&balances[fat2.PTickerALGO],
 	)
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -564,6 +582,9 @@ func (p *Pegnet) SelectAllBalances() ([]BalancesPair, error) {
 			&bp.Balances[fat2.PTickerDOGE],
 			&bp.Balances[fat2.PTickerVET],
 			&bp.Balances[fat2.PTickerHT],
+			&bp.Balances[fat2.PTickerARS],
+			&bp.Balances[fat2.PTickerTWD],
+			&bp.Balances[fat2.PTickerALGO],
 		)
 		if err != nil {
 			return nil, err
@@ -647,6 +668,9 @@ func (p *Pegnet) SelectIssuances() (map[fat2.PTicker]uint64, error) {
 		&issuances[fat2.PTickerDOGE],
 		&issuances[fat2.PTickerVET],
 		&issuances[fat2.PTickerHT],
+		&issuances[fat2.PTickerARS],
+		&issuances[fat2.PTickerTWD],
+		&issuances[fat2.PTickerALGO],
 	)
 	if err != nil {
 		if err == sql.ErrNoRows {
