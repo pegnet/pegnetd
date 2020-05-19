@@ -259,7 +259,7 @@ func (s *APIServer) getRichList(_ context.Context, data json.RawMessage) interfa
 
 type ResultGetTransactionStatus struct {
 	Height   uint32 `json:"height"`
-	Executed uint32 `json:"executed"`
+	Executed int32  `json:"executed"`
 }
 
 func (s *APIServer) getTransactionStatus(_ context.Context, data json.RawMessage) interface{} {
