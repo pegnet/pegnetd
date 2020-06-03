@@ -50,6 +50,9 @@ var (
 	// V4OPRUpdate indicates the activation of additional currencies and ecdsa keys.
 	// Estimated to be  Feb 12, 2020, 18:00 UTC
 	V4OPRUpdate uint32 = 231620
+
+	// SnapshotStakingActivation
+	SnapshotStakingActivation uint32 = 0
 )
 
 func SetAllActivations(act uint32) {
@@ -62,6 +65,7 @@ func SetAllActivations(act uint32) {
 	PEGFreeFloatingPriceActivation = act
 	fat2.Fat2RCDEActivation = act
 	V4OPRUpdate = act
+	SnapshotStakingActivation = act
 }
 
 type Pegnetd struct {

@@ -8,6 +8,11 @@ import (
 	"github.com/pegnet/pegnetd/fat/fat2"
 )
 
+const (
+	// SnapshotRate is how often snapshots are taken and paid out on a block basis
+	SnapshotRate = 5 // Default is 144
+)
+
 // SnapshotCurrent moves the current snapshot to the past, and updates the current snapshot.
 // 1. Clear snapshot_past
 // 2. Save snapshot_current to past
@@ -42,7 +47,8 @@ func (p *Pegnet) SnapshotCurrent(tx QueryAble) error {
 // SelectSnapshotBalances returns a map of all valid PTickers and their associated
 // snapshot balances for the given address. The snapshot balance is the minimum of the past, and current
 // snapshot.
-func (p *Pegnet) SelectSnapshotBalances(tx QueryAble) ([]BalancesPair, error) {
+// You must provide the table to query on
+func (Pegnet) SelectSnapshotBalances(tx QueryAble) ([]BalancesPair, error) {
 	// This query merges all addresses that exist in both snapshots. The balance
 	// in the column is the minimum balance of the 2 snapshots. If the
 	// address does not exist in either column, it will not be present in the
@@ -51,7 +57,7 @@ func (p *Pegnet) SelectSnapshotBalances(tx QueryAble) ([]BalancesPair, error) {
 		FROM snapshot_past as sn_past
        		INNER JOIN snapshot_current as sn_current
 		WHERE sn_past.address = sn_current.address;`, snapshotMinSelectCols)
-	rows, err := p.DB.Query(query)
+	rows, err := tx.Query(query)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, nil
