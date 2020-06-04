@@ -269,9 +269,9 @@ func (d *Pegnetd) SyncBlock(ctx context.Context, tx *sql.Tx, height uint32) erro
 	return nil
 }
 
-// DevelopersPayouts works along with SnapshotPayouts. We assume that the current shapshot moved to the "past", and updated the current snapshot. 
+// DevelopersPayouts works along with SnapshotPayouts. We assume that the current shapshot moved to the "past", and updated the current snapshot.
 // So we can proceed to do the snapshot developer payouts.
-func (d *Pegnetd) DevelopersPayouts( tx *sql.Tx, fLog *log.Entry, height uint32, heightTimestamp time.Time) error {
+func (d *Pegnetd) DevelopersPayouts(tx *sql.Tx, fLog *log.Entry, height uint32, heightTimestamp time.Time) error {
 
 	// TODO: 1. read developer addresses from config file
 	//       2. calculate payouts and prepare structure
@@ -285,7 +285,7 @@ func (d *Pegnetd) DevelopersPayouts( tx *sql.Tx, fLog *log.Entry, height uint32,
 		Address factom.FAAddress
 		PUSD    uint64
 	}
-	
+
 	var list []RewardAmount
 	var totalPayout = 2000 * 5 // Should length of the list
 
@@ -296,7 +296,6 @@ func (d *Pegnetd) DevelopersPayouts( tx *sql.Tx, fLog *log.Entry, height uint32,
 	}).Info("balances snapshotted & developer rewards paid")
 
 	return nil
-
 }
 
 func multiFetch(eblock *factom.EBlock, c *factom.Client) error {
