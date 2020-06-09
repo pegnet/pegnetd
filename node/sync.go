@@ -9,6 +9,7 @@ import (
 	"github.com/Factom-Asset-Tokens/factom"
 	"github.com/pegnet/pegnet/modules/conversions"
 	"github.com/pegnet/pegnet/modules/grader"
+	"github.com/pegnet/pegnet/modules/opr"
 	"github.com/pegnet/pegnet/modules/transactionid"
 	"github.com/pegnet/pegnetd/config"
 	"github.com/pegnet/pegnetd/fat/fat2"
@@ -77,6 +78,10 @@ OuterSyncLoop:
 				return
 			}
 
+			// get latest sync from directoryBlock
+			var latestSync bool
+			latestSync = heights.DirectoryBlock - d.Sync.Synced == 1
+
 			// start transaction for all block actions
 			tx, err := d.Pegnet.DB.BeginTx(ctx, nil)
 			if err != nil {
@@ -86,7 +91,7 @@ OuterSyncLoop:
 			// We are not synced, so we need to iterate through the dblocks and sync them
 			// one by one. We can only sync our current synced height +1
 			// TODO: This skips the genesis block. I'm sure that is fine
-			if err := d.SyncBlock(ctx, tx, d.Sync.Synced+1); err != nil {
+			if err := d.SyncBlock(ctx, tx, d.Sync.Synced+1, latestSync); err != nil {
 				hLog.WithError(err).Errorf("failed to sync height")
 				time.Sleep(retryPeriod)
 				// If we fail, we backout to the outer loop. This allows error handling on factomd state to be a bit
@@ -158,7 +163,7 @@ OuterSyncLoop:
 // If SyncBlock returns no error, than that height was synced and saved. If any part of the sync fails,
 // the whole sync should be rolled back and not applied. An error should then be returned.
 // The context should be respected if it is cancelled
-func (d *Pegnetd) SyncBlock(ctx context.Context, tx *sql.Tx, height uint32) error {
+func (d *Pegnetd) SyncBlock(ctx context.Context, tx *sql.Tx, height uint32, latestSync bool) error {
 	fLog := log.WithFields(log.Fields{"height": height})
 	if isDone(ctx) { // Just an example about how to handle it being cancelled
 		return context.Canceled
@@ -211,7 +216,18 @@ func (d *Pegnetd) SyncBlock(ctx context.Context, tx *sql.Tx, height uint32) erro
 				phase = pegnet.PEGPriceIsFloating
 			}
 
-			err = d.Pegnet.InsertRates(tx, height, winners[0].OPR.GetOrderedAssetsUint(), phase)
+			var winnerRates []opr.AssetUint
+			// Detecting & Preventing False Price Spikes - PIP 15
+			if latestSync {
+				winnerRates, err = d.DetectFalsePriceSpikes(winners[0].OPR.GetOrderedAssetsUint())
+				if  err != nil {
+					return err
+				}
+			} else {
+				winnerRates = winners[0].OPR.GetOrderedAssetsUint()
+			}
+
+			err = d.Pegnet.InsertRates(tx, height, winnerRates, phase)
 			if err != nil {
 				return err
 			}
@@ -228,6 +244,7 @@ func (d *Pegnetd) SyncBlock(ctx context.Context, tx *sql.Tx, height uint32) erro
 		if err != nil {
 			return err
 		}
+		log.Debugf("$$$$$$$$$$$$$$$$$$$$$$", rates)
 
 		// At this point, we start making updates to the database in a specific order:
 		// TODO: ensure we rollback the tx when needed
@@ -802,4 +819,18 @@ func isDone(ctx context.Context) bool {
 	default:
 		return false
 	}
+}
+
+/**
+ *	DetectFalsePriceSpikes checks the Risk of
+ *	Faulty Data From An Aggregator Provided to Miners (PIP 15)
+ */
+func (d *Pegnetd) DetectFalsePriceSpikes(winnerRates []opr.AssetUint) ([]opr.AssetUint, error) {
+	/**
+	 *	Compare winnerRates with OPR Microservice result.
+	 *  If pAssets or PEG prices have a greater than 50% reduction or 100%,
+	 *	return OPR Microservice result, otherwise use winnerRates
+	 */
+
+	return winnerRates, nil
 }
