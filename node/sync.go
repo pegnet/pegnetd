@@ -219,10 +219,7 @@ func (d *Pegnetd) SyncBlock(ctx context.Context, tx *sql.Tx, height uint32, late
 			var winnerRates []opr.AssetUint
 			// Detecting & Preventing False Price Spikes - PIP 15
 			if latestSync {
-				winnerRates, err = d.DetectFalsePriceSpikes(winners[0].OPR.GetOrderedAssetsUint())
-				if  err != nil {
-					return err
-				}
+				winnerRates = d.DetectFalsePriceSpikes(winners[0].OPR.GetOrderedAssetsUint())
 			} else {
 				winnerRates = winners[0].OPR.GetOrderedAssetsUint()
 			}
@@ -825,12 +822,12 @@ func isDone(ctx context.Context) bool {
  *	DetectFalsePriceSpikes checks the Risk of
  *	Faulty Data From An Aggregator Provided to Miners (PIP 15)
  */
-func (d *Pegnetd) DetectFalsePriceSpikes(winnerRates []opr.AssetUint) ([]opr.AssetUint, error) {
+func (d *Pegnetd) DetectFalsePriceSpikes(winnerRates []opr.AssetUint) []opr.AssetUint {
 	/**
 	 *	Compare winnerRates with OPR Microservice result.
 	 *  If pAssets or PEG prices have a greater than 50% reduction or 100%,
 	 *	return OPR Microservice result, otherwise use winnerRates
 	 */
 
-	return winnerRates, nil
+	return winnerRates
 }
