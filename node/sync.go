@@ -80,8 +80,7 @@ OuterSyncLoop:
 
 			// get latest sync from directoryBlock
 			var latestSync bool
-			//latestSync = heights.DirectoryBlock - d.Sync.Synced == 1
-			latestSync = true
+			latestSync = heights.DirectoryBlock - d.Sync.Synced == 1
 
 			// start transaction for all block actions
 			tx, err := d.Pegnet.DB.BeginTx(ctx, nil)
@@ -242,7 +241,6 @@ func (d *Pegnetd) SyncBlock(ctx context.Context, tx *sql.Tx, height uint32, late
 		if err != nil {
 			return err
 		}
-		log.Debugf("$$$$$$$$$$$$$$$$$$$$$$", rates)
 
 		// At this point, we start making updates to the database in a specific order:
 		// TODO: ensure we rollback the tx when needed
