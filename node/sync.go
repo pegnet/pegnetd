@@ -80,7 +80,8 @@ OuterSyncLoop:
 
 			// get latest sync from directoryBlock
 			var latestSync bool
-			latestSync = heights.DirectoryBlock - d.Sync.Synced == 1
+			//latestSync = heights.DirectoryBlock - d.Sync.Synced == 1
+			latestSync = true
 
 			// start transaction for all block actions
 			tx, err := d.Pegnet.DB.BeginTx(ctx, nil)
@@ -824,6 +825,7 @@ func isDone(ctx context.Context) bool {
  */
 func (d *Pegnetd) DetectFalsePriceSpikes(winnerRates []opr.AssetUint) []opr.AssetUint {
 	/**
+	 *	Todo:
 	 *	Compare winnerRates with OPR Microservice result.
 	 *  If pAssets or PEG prices have a greater than 50% reduction or 100%,
 	 *	return OPR Microservice result, otherwise use winnerRates
