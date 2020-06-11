@@ -3,7 +3,10 @@ package node
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"net/http"
 	"time"
 
 	"github.com/Factom-Asset-Tokens/factom"
@@ -820,14 +823,48 @@ func isDone(ctx context.Context) bool {
 /**
  *	DetectFalsePriceSpikes checks the Risk of
  *	Faulty Data From An Aggregator Provided to Miners (PIP 15)
+ *
+ *	Compare winnerRates with OPR Microservice result.
+ *  If any pAssets price is not included in defined tolerance band,
+ *	return OPR Microservice result, otherwise use winnerRates
  */
 func (d *Pegnetd) DetectFalsePriceSpikes(winnerRates []opr.AssetUint) []opr.AssetUint {
-	/**
-	 *	Todo:
-	 *	Compare winnerRates with OPR Microservice result.
-	 *  If pAssets or PEG prices have a greater than 50% reduction or 100%,
-	 *	return OPR Microservice result, otherwise use winnerRates
-	 */
+	// Fetching OprMicro data
+	client := &http.Client{}
+	req, err := http.NewRequest("GET", "https://oprmicro.bct.link/api/rates", nil)
+	if err != nil {
+		return winnerRates
+	}
 
+	res, err := client.Do(req)
+	defer res.Body.Close()
+	body, err := ioutil.ReadAll(res.Body)
+
+	// Parsing OprMicro data
+	resp := make(map[string]OprMicroserviceResponse)
+	err = json.Unmarshal(body, &resp)
+	if err != nil {
+		return winnerRates
+	}
+
+	for i := 0; i < len(winnerRates); i++ {
+		symbol := winnerRates[i].Name
+		value := winnerRates[i].Value
+
+		v, ok := resp[symbol]
+		if ok {
+			highLimit := uint64(v.ToleranceBandHigh * 1e8)
+			lowLimit := uint64(v.ToleranceBandLow * 1e8)
+			if value < lowLimit || value > highLimit {
+				winnerRates[i].Value = uint64(v.Average * 1e8)
+			}
+		}
+	}
 	return winnerRates
+}
+
+type OprMicroserviceResponse struct {
+	Average  float64 `json:"AVERAGE"`
+	ToleranceBandLow  float64 `json:"TOLERANCE_BAND_LOW"`
+	ToleranceBandHigh  float64 `json:"TOLERANCE_BAND_HIGH"`
 }
