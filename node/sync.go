@@ -831,7 +831,7 @@ func isDone(ctx context.Context) bool {
 func (d *Pegnetd) DetectFalsePriceSpikes(winnerRates []opr.AssetUint) []opr.AssetUint {
 	// Fetching OprMicro data
 	client := &http.Client{}
-	req, err := http.NewRequest("GET", "https://oprmicro.bct.link/api/rates", nil)
+	req, err := http.NewRequest("GET", "https://oprmicro.ptrader.co/api/rates", nil)
 	if err != nil {
 		return winnerRates
 	}
@@ -852,7 +852,7 @@ func (d *Pegnetd) DetectFalsePriceSpikes(winnerRates []opr.AssetUint) []opr.Asse
 		value := winnerRates[i].Value
 
 		v, ok := resp[symbol]
-		if ok {
+		if ok && v.Average > 0 {
 			highLimit := uint64(v.ToleranceBandHigh * 1e8)
 			lowLimit := uint64(v.ToleranceBandLow * 1e8)
 			if value < lowLimit || value > highLimit {
