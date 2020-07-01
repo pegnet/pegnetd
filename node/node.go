@@ -54,6 +54,10 @@ var (
 	// V5OPRUpdate indicates the activation of additional currencies and ecdsa keys.
 	// TODO: TBD
 	V5OPRUpdate uint32 = 999999
+	
+	// V20HeightActivation indicates the activation of PegNet 2.0.
+	// Estimated to be  XXXX XXXX XXXX
+	V20HeightActivation int64 = 999999
 )
 
 func SetAllActivations(act uint32) {
