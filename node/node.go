@@ -50,6 +50,10 @@ var (
 	// V4OPRUpdate indicates the activation of additional currencies and ecdsa keys.
 	// Estimated to be  Feb 12, 2020, 18:00 UTC
 	V4OPRUpdate uint32 = 231620
+	
+	// V20HeightActivation indicates the activation of PegNet 2.0.
+	// Estimated to be  XXXX XXXX XXXX
+	V20HeightActivation int64 = 999999
 )
 
 func SetAllActivations(act uint32) {
