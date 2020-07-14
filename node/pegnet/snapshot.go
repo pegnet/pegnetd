@@ -119,6 +119,20 @@ func (Pegnet) SelectSnapshotBalances(tx QueryAble) ([]BalancesPair, error) {
 			&bp.Balances[fat2.PTickerATOM],
 			&bp.Balances[fat2.PTickerBAT],
 			&bp.Balances[fat2.PTickerXTZ],
+			// v5 Additions
+			&bp.Balances[fat2.PTickerHBAR],
+			&bp.Balances[fat2.PTickerNEO],
+			&bp.Balances[fat2.PTickerAED],
+			&bp.Balances[fat2.PTickerCRO],
+			&bp.Balances[fat2.PTickerETC],
+			&bp.Balances[fat2.PTickerONT],
+			&bp.Balances[fat2.PTickerDOGE],
+			&bp.Balances[fat2.PTickerVET],
+			&bp.Balances[fat2.PTickerHT],
+			&bp.Balances[fat2.PTickerARS],
+			&bp.Balances[fat2.PTickerTWD],
+			&bp.Balances[fat2.PTickerALGO],
+			&bp.Balances[fat2.PTickerMax],
 		)
 		if err != nil {
 			return nil, err
