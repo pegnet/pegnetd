@@ -174,8 +174,9 @@ func (p *Pegnet) SelectTransactionHistoryActionsByHeight(height uint32, options 
 // SelectTransactionHistoryStatus returns the status of a transaction:
 // `-1` for a failed transaction, `0` for a pending transactions,
 // `height` for the block in which it was applied otherwise
-func (p *Pegnet) SelectTransactionHistoryStatus(hash *factom.Bytes32) (uint32, uint32, error) {
-	var height, executed uint32
+func (p *Pegnet) SelectTransactionHistoryStatus(hash *factom.Bytes32) (uint32, int32, error) {
+	var height uint32
+	var executed int32
 	err := p.DB.QueryRow("SELECT height, executed FROM pn_history_txbatch WHERE entry_hash = ?", hash[:]).Scan(&height, &executed)
 	if err != nil {
 		if err == sql.ErrNoRows {
