@@ -3,6 +3,8 @@ package pegnet
 import (
 	"context"
 	"database/sql"
+	"encoding/binary"
+	"encoding/hex"
 	"fmt"
 	"strings"
 )
@@ -91,6 +93,65 @@ func (p *Pegnet) SelectMinerDominance(ctx context.Context, start, stop int) (Min
 			m.GradedPercentage = float64(m.TotalGraded) / float64(result.TotalGraded)
 			result.Miners[add] = m
 		}
+	}
+
+	return result, nil
+}
+
+type GradedResult struct {
+	Height int32    `json:"height"`
+	Graded []Graded `json:"graded"`
+}
+
+type Graded struct {
+	EntryHash  string `json:"entryhash"`
+	Payout     uint64 `json:"payout"`
+	Nonce      string `json:"nonce"`
+	Difficulty uint64 `json:"difficulty"`
+	Position   uint8  `json:"position"`
+	MinerID    string `json:"minerid"`
+	Address    string `json:"address"`
+}
+
+func (p *Pegnet) SelectGraded(ctx context.Context, height int32) (GradedResult, error) {
+	result := GradedResult{Height: height, Graded: make([]Graded, 0)}
+
+	stmtString := `
+	SELECT entryhash, payout, nonce, difficulty, position, minerid, address 
+	FROM pn_winners 
+	WHERE height = ?
+	`
+
+	rows, err := p.DB.QueryContext(ctx, stmtString, result.Height)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return result, nil
+		}
+		return result, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var entryhash, nonce, difficulty sql.RawBytes
+		var address, minerid string
+		var payout uint64
+		var position uint8
+		err := rows.Scan(&entryhash, &payout, &nonce, &difficulty, &position, &minerid, &address)
+		if err != nil {
+			return result, err
+		}
+
+		// Add address results
+		result.Graded = append(result.Graded, Graded{
+			EntryHash:  hex.EncodeToString(entryhash),
+			Payout:     payout,
+			Nonce:      hex.EncodeToString(nonce),
+			Difficulty: binary.BigEndian.Uint64(difficulty),
+			Position:   position,
+			MinerID:    minerid,
+			Address:    address,
+		})
+
 	}
 
 	return result, nil
