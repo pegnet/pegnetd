@@ -412,10 +412,11 @@ func (p *Pegnet) InsertStakingCoinbase(tx *sql.Tx, txid string, height uint32, h
 
 	// Now we record each staking payout.
 	for addTxid, payout := range payouts {
-		faAdd := addressMap[addTxid] // The address to pay
-		add := faAdd[:]              // All addresses are stored as bytes in the sqlitedb
-		// TODO: Should we associate the index with the address in the addressMap instead
-		//		of recalculating the indexid
+		// The address to pay
+		faAdd := addressMap[addTxid]
+		// All addresses are stored as bytes in the sqlitedb
+		add := faAdd[:]
+		// index for the address
 		index, _, err := SplitTxID(addTxid)
 		if err != nil {
 			return err
