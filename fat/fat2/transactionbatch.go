@@ -2,7 +2,9 @@ package fat2
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
+	"math"
 
 	"github.com/Factom-Asset-Tokens/factom"
 	"github.com/Factom-Asset-Tokens/factom/fat103"
@@ -109,6 +111,13 @@ func (t *TransactionBatch) Validate(height int32) error {
 	if err = t.ValidExtIDs(height); err != nil {
 		return err
 	}
+
+	for _, t := range t.Transactions {
+		if t.Input.Amount > math.MaxInt64 {
+			return errors.New("input value exceeded int64")
+		}
+	}
+
 	return nil
 }
 
