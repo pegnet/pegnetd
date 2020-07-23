@@ -30,7 +30,7 @@ func (d *Pegnetd) Grade(ctx context.Context, block *factom.EBlock) (grader.Grade
 	if block.Height >= V4OPRUpdate {
 		ver = 4
 	}
-	if block.Height >= V5OPRUpdate {
+	if block.Height >= V20HeightActivation {
 		ver = 5
 	}
 
