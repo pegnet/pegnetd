@@ -50,14 +50,10 @@ var (
 	// V4OPRUpdate indicates the activation of additional currencies and ecdsa keys.
 	// Estimated to be  Feb 12, 2020, 18:00 UTC
 	V4OPRUpdate uint32 = 231620
-
-	// V5OPRUpdate indicates the activation of additional currencies and ecdsa keys.
-	// TODO: TBD
-	V5OPRUpdate uint32 = 999999
 	
 	// V20HeightActivation indicates the activation of PegNet 2.0.
-	// Estimated to be  XXXX XXXX XXXX
-	V20HeightActivation int64 = 999999
+	// Estimated to be  July 29th 2020 16:40 UTC
+	V20HeightActivation uint32 = 255778
 )
 
 func SetAllActivations(act uint32) {
@@ -70,7 +66,7 @@ func SetAllActivations(act uint32) {
 	PEGFreeFloatingPriceActivation = act
 	fat2.Fat2RCDEActivation = act
 	V4OPRUpdate = act
-	V5OPRUpdate = act
+	V20HeightActivation = act
 }
 
 type Pegnetd struct {
