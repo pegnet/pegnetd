@@ -57,16 +57,24 @@ const (
 	// V5 Additions
 	PTickerHBAR
 	PTickerNEO
-	PTickerAED
 	PTickerCRO
 	PTickerETC
 	PTickerONT
 	PTickerDOGE
 	PTickerVET
 	PTickerHT
+	PTickerALGO
+	PTickerDGB
+	PTickerAED
 	PTickerARS
 	PTickerTWD
-	PTickerALGO
+	PTickerRWF
+	PTickerKES
+	PTickerUGX
+	PTickerTZS
+	PTickerBIF
+	PTickerETB
+	PTickerNGN
 	PTickerMax
 )
 
@@ -117,16 +125,24 @@ var validPTickerStrings = []string{
 	// V5 Additions
 	"pHBAR",
 	"pNEO",
-	"pAED",
 	"pCRO",
 	"pETC",
 	"pONT",
 	"pDOGE",
 	"pVET",
 	"pHT",
+	"pALGO",
+	"pDGB",
+	"pAED",
 	"pARS",
 	"pTWD",
-	"pALGO",
+	"pRWF",
+	"pKES",
+	"pUGX",
+	"pTZS",
+	"pBIF",
+	"pETB",
+	"pNGN",
 }
 
 var validPTickers = func() map[string]PTicker {

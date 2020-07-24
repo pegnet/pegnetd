@@ -38,8 +38,8 @@ var (
 		{ActivationHeight: 231620, MinimumVersion: 1},
 
 		// V5 OPR Update
-		// Estimated to be  May 11, 2020, 18:00 UTC
-		{ActivationHeight: 999999, MinimumVersion: 2},
+		// Estimated to be  July 29th 2020 16:40 UTC
+		{ActivationHeight: 255778, MinimumVersion: 2},
 	}
 )
 
