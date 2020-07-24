@@ -16,7 +16,7 @@ var (
 	// detect if a pegnetd was updated late, and therefore has an invalid state.
 	//
 	// Each fork should increment this number by at least 1
-	PegnetdSyncVersion = 1
+	PegnetdSyncVersion = 2
 )
 
 type ForkEvent struct {
@@ -36,6 +36,10 @@ var (
 		// V4 OPR Update
 		// Estimated to be  Feb 12, 2020, 18:00 UTC
 		{ActivationHeight: 231620, MinimumVersion: 1},
+
+		// V5 OPR Update
+		// Estimated to be  July 29th 2020 16:40 UTC
+		{ActivationHeight: 255778, MinimumVersion: 2},
 	}
 )
 
