@@ -119,6 +119,20 @@ func (p *Pegnet) migrations() error {
 		}
 	}
 
+	v5Migrate, err := p.v5MigrationNeeded()
+	if err != nil {
+		return err
+	}
+	if v5Migrate {
+		log.Infof("Running v5 migrations")
+		for _, sql := range []string{
+			addressTableV5Migration,
+		} {
+			if _, err := p.DB.Exec(sql); err != nil {
+				return err
+			}
+		}
+	}
 	return nil
 }
 
