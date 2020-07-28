@@ -69,7 +69,7 @@ func (Pegnet) SelectSnapshotBalances(tx QueryAble) ([]BalancesPair, error) {
 	var res []BalancesPair
 	for rows.Next() {
 		var bp BalancesPair
-		bp.Balances = make([]uint64, int(fat2.PTickerMax))
+		bp.Balances = make([]uint64, int(fat2.PTickerMax)+1)
 
 		var id int
 		var address []byte
@@ -140,8 +140,9 @@ func (Pegnet) SelectSnapshotBalances(tx QueryAble) ([]BalancesPair, error) {
 			&bp.Balances[fat2.PTickerBIF],
 			&bp.Balances[fat2.PTickerETB],
 			&bp.Balances[fat2.PTickerNGN],
-			&bp.Balances[fat2.PTickerMax],
 		)
+
+
 		if err != nil {
 			return nil, err
 		}
