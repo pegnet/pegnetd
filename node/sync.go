@@ -366,7 +366,7 @@ func (d *Pegnetd) SnapshotPayouts(tx *sql.Tx, fLog *log.Entry, rates map[fat2.PT
 
 	// 4.5K per block allowed
 	// as described in conversions
-	totalPayout := conversions.PerBlockAssetHolders * pegnet.SnapshotRate
+	totalPayout := uint64(conversions.PerBlockAssetHolders) * pegnet.SnapshotRate
 	set := conversions.NewConversionSupply(totalPayout)
 	for i, stake := range list {
 		addTxid := fmt.Sprintf("%d-%s", i, txid)
