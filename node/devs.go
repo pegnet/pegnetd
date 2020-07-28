@@ -2,15 +2,15 @@ package node
 
 // Special structure
 type DevReward struct {
-	dev_group      string  // group or comment about reward
-	dev_address    string  // address where to send developer reward
-	dev_reward_pct float64 // % from total development rewards
+	DevGroup     string  // group or comment about reward
+	DevAddress   string  // address where to send developer reward
+	DevRewardPct float64 // % from total development rewards
 }
 
 var (
 	// Hardcode developers who work active on PegNet
 	// to avoid manipulations from config files
-	// TODO v2.5 move into special DevRewards chain
+	// TODO: v2.5 move into special Developer Rewards Chain (DRC)
 	DeveloperRewardAddress = []DevReward{
 		{"Listing Tech Support", "FA2i9WZqJnaKbJxDY2AZdVgewE28uCcSwoFt8LJCMtGCC7tpCa2n", 10.00},
 		{"Archecture Dev for PegNet 2.5", "FA37cGXKWMtf2MmHy3n1rMCYeLVuR5MpDaP4VXVeFavjJCJLYYez", 9.0},
