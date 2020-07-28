@@ -142,7 +142,6 @@ func (Pegnet) SelectSnapshotBalances(tx QueryAble) ([]BalancesPair, error) {
 			&bp.Balances[fat2.PTickerNGN],
 		)
 
-
 		if err != nil {
 			return nil, err
 		}
