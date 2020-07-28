@@ -353,7 +353,8 @@ func (d *Pegnetd) SnapshotPayouts(tx *sql.Tx, fLog *log.Entry, rates map[fat2.PT
 		fLog.WithFields(log.Fields{
 			"duration": time.Since(snapStart),
 			"eligible": len(list),
-		}).Info("balances snapshotted & staking not paid as there none eligible")
+		}).Info("staking | balances snapshotted | not paid, there none eligible")
+		return nil
 	}
 
 	sort.Slice(list, func(i, j int) bool {
@@ -401,7 +402,7 @@ func (d *Pegnetd) SnapshotPayouts(tx *sql.Tx, fLog *log.Entry, rates map[fat2.PT
 		"eligible": len(list),
 		"PEG":      float64(totalPayout) / 1e8, // Float is good enough here,
 		"txid":     txid,
-	}).Info("balances snapshotted & staking paid")
+	}).Info("staking | balances snapshotted | paid to eligible")
 	return nil
 }
 
