@@ -234,10 +234,15 @@ func (d *Pegnetd) SyncBlock(ctx context.Context, tx *sql.Tx, height uint32) erro
 		// Before we apply any balance changes, we will snapshot the balances at the START of the block.
 		// This means the balances are the same as the end of the block n-1.
 		// This activation is nested in the activation that has the rates
-		// TODO: if the height has no rates, what do we do?
-		//		We need to handle the no rates case. Miners could avoid mining this last block.
-		// 		Can we use the last valid rates?
-		if height >= V20HeightActivation && height%pegnet.SnapshotRate == 0 { // Put in act height
+		if height >= V20HeightActivation && height%pegnet.SnapshotRate == 0 {
+
+			// check if the height has no rates, what do we do?
+			if rates == nil {
+				// We need to handle the no rates case. Miners could avoid mining this last block.
+				// use the last valid rates from last block
+				rates, err = d.Pegnet.SelectPendingRates(ctx, tx, height-1)
+			}
+
 			err := d.SnapshotPayouts(tx, fLog, rates, height, dblock.Timestamp)
 			if err != nil {
 				return err
