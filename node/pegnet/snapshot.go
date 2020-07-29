@@ -10,7 +10,7 @@ import (
 
 const (
 	// SnapshotRate is how often snapshots are taken and paid out on a block basis
-	SnapshotRate = 5 // Default is 144
+	SnapshotRate = 144 // Default is 144, once a day
 )
 
 // SnapshotCurrent moves the current snapshot to the past, and updates the current snapshot.
