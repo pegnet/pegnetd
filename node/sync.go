@@ -237,15 +237,24 @@ func (d *Pegnetd) SyncBlock(ctx context.Context, tx *sql.Tx, height uint32) erro
 		if height >= V20HeightActivation && height%pegnet.SnapshotRate == 0 {
 
 			// check if the height has no rates, what do we do?
+			// check rates from previous height
 			if rates == nil {
 				// We need to handle the no rates case. Miners could avoid mining this last block.
 				// use the last valid rates from last block
 				rates, err = d.Pegnet.SelectPendingRates(ctx, tx, height-1)
+				// We don't return error as it will stop synchronisation
+				// we continue execution but skiping payout for this time
+				fLog.WithFields(log.Fields{"section": "staking", "reason": "no rates"}).Tracef("2 last blocks does not contains rates")
 			}
 
-			err := d.SnapshotPayouts(tx, fLog, rates, height, dblock.Timestamp)
-			if err != nil {
-				return err
+			// If no rates for second time, skip Snapshot logic
+			// otherwise proceed with payout
+			if rates != nil {
+				err := d.SnapshotPayouts(tx, fLog, rates, height, dblock.Timestamp)
+				if err != nil {
+					// something wrong happend during payout execution
+					return err
+				}
 			}
 		}
 
