@@ -267,16 +267,14 @@ func (d *Pegnetd) SyncBlock(ctx context.Context, tx *sql.Tx, height uint32) erro
 		}
 	}
 
-
 	// 5) Apply Developers Rewards
 	if height >= V20HeightActivation {
-	  err := d.DevelopersPayouts(tx, fLog, rates, height, dblock.Timestamp)
-	  if err != nil {
-					// something wrong happend during payout execution
-					return err
-				}
+		err := d.DevelopersPayouts(tx, fLog, height, dblock.Timestamp)
+		if err != nil {
+			// something wrong happend during payout execution
+			return err
+		}
 	}
-
 
 	return nil
 }
@@ -284,19 +282,20 @@ func (d *Pegnetd) SyncBlock(ctx context.Context, tx *sql.Tx, height uint32) erro
 // DevelopersPayouts for PIP16 sending rewards for developers
 func (d *Pegnetd) DevelopersPayouts(tx *sql.Tx, fLog *log.Entry, height uint32, heightTimestamp time.Time) error {
 
-	var totalPayout = 2000 // PEG
-
 	// we use hardcoded list of dev payouts
-	for _, dev :=  DeveloperRewardAddreses {
+	for _, dev := range DeveloperRewardAddreses {
 
-	    // TODO: move real txid
-	    txid := fmt.Sprintf("%064d", height)
+		// here PerBlockDevelopers is total payout value
+		reward := (PerBlockDevelopers / 100) * dev.DevRewardPct
 
-	    fLog.WithFields(log.Fields{
-		    "eligible": len(list),
-		    "PEG":      float64(totalPayout) / 1e8, // Float is good enough here,
-		    "txid":     txid,
-	    }).Info("developer rewards | paid out ")
+		// TODO: move real txid
+		txid := fmt.Sprintf("%064d", height)
+
+		fLog.WithFields(log.Fields{
+			"developer": len(dev.DevAddress),
+			"PEG":       float64(reward) / 1e8, // Float is good enough here,
+			"txid":      txid,
+		}).Info("developer reward | paid out to")
 
 	}
 
