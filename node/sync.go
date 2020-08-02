@@ -252,11 +252,14 @@ func (d *Pegnetd) SyncBlock(ctx context.Context, tx *sql.Tx, height uint32) erro
 		}
 	}
 
-	// 3) Apply FCT --> pFCT burns that happened in this block
-	//    These funds will be available for transactions and conversions executed in the next block
-	// TODO: Check the order of operations on this and what block to add burns from.
-	if err := d.ApplyFactoidBlock(ctx, tx, dblock); err != nil {
-		return err
+	// Only apply burn transaction if height does not cross the activation
+	if height < V20HeightActivation {
+		// 3) Apply FCT --> pFCT burns that happened in this block
+		//    These funds will be available for transactions and conversions executed in the next block
+		// TODO: Check the order of operations on this and what block to add burns from.
+		if err := d.ApplyFactoidBlock(ctx, tx, dblock); err != nil {
+			return err
+		}
 	}
 
 	// 4) Apply effects of graded OPR Block (PEG rewards, if any)
