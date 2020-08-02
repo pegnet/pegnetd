@@ -266,34 +266,39 @@ func (d *Pegnetd) SyncBlock(ctx context.Context, tx *sql.Tx, height uint32) erro
 			return err
 		}
 	}
+
+
+	// 5) Apply Developers Rewards
+	if height >= V20HeightActivation {
+	  err := d.DevelopersPayouts(tx, fLog, rates, height, dblock.Timestamp)
+	  if err != nil {
+					// something wrong happend during payout execution
+					return err
+				}
+	}
+
+
 	return nil
 }
 
-// DevelopersPayouts works along with SnapshotPayouts. We assume that the current shapshot moved to the "past", and updated the current snapshot.
-// So we can proceed to do the snapshot developer payouts.
+// DevelopersPayouts for PIP16 sending rewards for developers
 func (d *Pegnetd) DevelopersPayouts(tx *sql.Tx, fLog *log.Entry, height uint32, heightTimestamp time.Time) error {
 
-	// TODO: 1. read developer addresses from config file
-	//       2. calculate payouts and prepare structure
-	//       3. Insert tx into the db
+	var totalPayout = 2000 // PEG
 
-	// We need to mock a TXID for the reward payouts
-	// to remove unnecessary network load
-	txid := fmt.Sprintf("%064d", height)
+	// we use hardcoded list of dev payouts
+	for _, dev :=  DeveloperRewardAddreses {
 
-	type RewardAmount struct {
-		Address factom.FAAddress
-		PUSD    uint64
+	    // TODO: move real txid
+	    txid := fmt.Sprintf("%064d", height)
+
+	    fLog.WithFields(log.Fields{
+		    "eligible": len(list),
+		    "PEG":      float64(totalPayout) / 1e8, // Float is good enough here,
+		    "txid":     txid,
+	    }).Info("developer rewards | paid out ")
+
 	}
-
-	var list []RewardAmount
-	var totalPayout = 2000 * 5 // Should length of the list
-
-	fLog.WithFields(log.Fields{
-		"eligible": len(list),
-		"PEG":      float64(totalPayout) / 1e8, // Float is good enough here,
-		"txid":     txid,
-	}).Info("balances snapshotted & developer rewards paid")
 
 	return nil
 }

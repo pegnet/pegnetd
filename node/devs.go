@@ -11,7 +11,7 @@ var (
 	// Hardcode developers who work active on PegNet
 	// to avoid manipulations from config files
 	// TODO: v2.5 move into special Developer Rewards Chain (DRC)
-	DeveloperRewardAddress = []DevReward{
+	DeveloperRewardAddreses = []DevReward{
 		{"Listing Tech Support", "FA2i9WZqJnaKbJxDY2AZdVgewE28uCcSwoFt8LJCMtGCC7tpCa2n", 10.00},
 		{"Archecture Dev for PegNet 2.5", "FA37cGXKWMtf2MmHy3n1rMCYeLVuR5MpDaP4VXVeFavjJCJLYYez", 9.0},
 		{"Trading Bots Work", "FA2wDRieaBrWeZHVuXXWUHY6t9nKCVCCKAMS5xknLUExuVAq3ziS", 9.0},
