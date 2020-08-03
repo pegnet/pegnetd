@@ -312,31 +312,6 @@ func (d *Pegnetd) SyncBlock(ctx context.Context, tx *sql.Tx, height uint32) erro
 	return nil
 }
 
-// DevelopersPayouts for PIP16 sending rewards for developers
-func (d *Pegnetd) DevelopersPayouts(tx *sql.Tx, fLog *log.Entry, height uint32, heightTimestamp time.Time) error {
-
-	totalPayout := uint64(conversions.PerBlockDevelopers) * 144 // once a day, should be changed to SnapshotRate when it's integrated
-
-	// we use hardcoded list of dev payouts
-	for _, dev := range DeveloperRewardAddreses {
-
-		// here PerBlockDevelopers is total payout value
-		reward := (conversions.PerBlockDevelopers / 100) * dev.DevRewardPct
-
-		// TODO: move real txid
-		txid := fmt.Sprintf("%064d", height)
-
-		fLog.WithFields(log.Fields{
-			"total":     float64(totalPayout) / 1e8,
-			"developer": len(dev.DevAddress),
-			"PEG":       float64(reward) / 1e8, // Float is good enough here,
-			"txid":      txid,
-		}).Info("developer reward | paid out to")
-
-	}
-
-	return nil
-}
 
 // SnapshotPayouts moves the current shapshot to the "past", and updates the current snapshot. Then
 // it proceeds to do the snapshot staking payouts.
@@ -454,6 +429,33 @@ func (d *Pegnetd) SnapshotPayouts(tx *sql.Tx, fLog *log.Entry, rates map[fat2.PT
 		"PEG":      float64(totalPayout) / 1e8, // Float is good enough here,
 		"txid":     txid,
 	}).Info("staking | balances snapshotted | paid to eligible")
+	return nil
+}
+
+
+// DevelopersPayouts for PIP16 sending rewards for developers
+func (d *Pegnetd) DevelopersPayouts(tx *sql.Tx, fLog *log.Entry, height uint32, heightTimestamp time.Time) error {
+
+	totalPayout := uint64(conversions.PerBlockDevelopers) * pegnet.SnapshotRate // once a day
+
+	// we use hardcoded list of dev payouts
+	for _, dev := range DeveloperRewardAddreses {
+
+		// here PerBlockDevelopers is total payout value
+		reward := (conversions.PerBlockDevelopers / 100) * dev.DevRewardPct
+
+		// TODO: move real txid
+		txid := fmt.Sprintf("%064d", height)
+
+		fLog.WithFields(log.Fields{
+			"total":     float64(totalPayout) / 1e8,
+			"developer": len(dev.DevAddress),
+			"PEG":       float64(reward) / 1e8, // Float is good enough here,
+			"txid":      txid,
+		}).Info("developer reward | paid out to")
+
+	}
+
 	return nil
 }
 
