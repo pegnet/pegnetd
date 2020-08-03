@@ -450,3 +450,7 @@ func (p *Pegnet) InsertStakingCoinbase(tx *sql.Tx, txid string, height uint32, h
 
 	return nil
 }
+
+func (p *Pegnet) InsertDeveloperRewardsCoinbase(tx *sql.Tx, txid string, height uint32, heightTimestamp time.Time, payouts map[string]uint64, addressMap map[string]factom.FAAddress) error {
+	return nil
+}

@@ -312,7 +312,6 @@ func (d *Pegnetd) SyncBlock(ctx context.Context, tx *sql.Tx, height uint32) erro
 	return nil
 }
 
-
 // SnapshotPayouts moves the current shapshot to the "past", and updates the current snapshot. Then
 // it proceeds to do the snapshot staking payouts.
 func (d *Pegnetd) SnapshotPayouts(tx *sql.Tx, fLog *log.Entry, rates map[fat2.PTicker]uint64, height uint32, heightTimestamp time.Time) error {
@@ -432,29 +431,44 @@ func (d *Pegnetd) SnapshotPayouts(tx *sql.Tx, fLog *log.Entry, rates map[fat2.PT
 	return nil
 }
 
-
 // DevelopersPayouts for PIP16 sending rewards for developers
 func (d *Pegnetd) DevelopersPayouts(tx *sql.Tx, fLog *log.Entry, height uint32, heightTimestamp time.Time) error {
 
 	totalPayout := uint64(conversions.PerBlockDevelopers) * pegnet.SnapshotRate // once a day
+	payoutStart := time.Now()
 
 	// we use hardcoded list of dev payouts
 	for _, dev := range DeveloperRewardAddreses {
 
-		// here PerBlockDevelopers is total payout value
-		reward := (conversions.PerBlockDevelopers / 100) * dev.DevRewardPct
+		// we calculate developers reward from % pre-defined
+		rewardPayout := uint64((conversions.PerBlockDevelopers / 100) * dev.DevRewardPct)
+		addr, err := factom.NewFAAddress(dev.DevAddress)
 
-		// TODO: move real txid
-		txid := fmt.Sprintf("%064d", height)
+		_, err = d.Pegnet.AddToBalance(tx, &addr, fat2.PTickerPEG, rewardPayout)
+		if err != nil {
+			return err
+		}
 
 		fLog.WithFields(log.Fields{
 			"total":     float64(totalPayout) / 1e8,
 			"developer": len(dev.DevAddress),
-			"PEG":       float64(reward) / 1e8, // Float is good enough here,
-			"txid":      txid,
+			"PEG":       float64(rewardPayout) / 1e8, // Float is good enough here,
+			//"txid":      txid,
 		}).Info("developer reward | paid out to")
 
 	}
+
+	//We need to mock a TXID for the payouts
+	txid := fmt.Sprintf("%064d", height)
+
+	/////////////////////////////////////////////////
+	fLog.WithFields(log.Fields{
+		"total": float64(totalPayout) / 1e8,
+		//"developer": len(dev.DevAddress),
+		//"PEG":       float64(reward) / 1e8, // Float is good enough here,
+		"elapsed": time.Since(payoutStart),
+		"txid":    txid,
+	}).Info("developer reward | paid out to")
 
 	return nil
 }
