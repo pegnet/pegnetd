@@ -71,7 +71,9 @@ func (p *Pegnet) Init() error {
 
 func (p *Pegnet) createTables() error {
 	for _, sql := range []string{
-		createTableAddresses,
+		createTableAddressesWithTableName("pn_addresses"),
+		createTableAddressesWithTableName("snapshot_past"),
+		createTableAddressesWithTableName("snapshot_current"),
 		createTableGrade,
 		createTableRate,
 		createTableMetadata,
