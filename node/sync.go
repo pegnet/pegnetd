@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"math/big"
+	"sort"
 	"time"
 
 	"github.com/Factom-Asset-Tokens/factom"
@@ -229,6 +231,34 @@ func (d *Pegnetd) SyncBlock(ctx context.Context, tx *sql.Tx, height uint32) erro
 			return err
 		}
 
+		// Before we apply any balance changes, we will snapshot the balances at the START of the block.
+		// This means the balances are the same as the end of the block n-1.
+		// This activation is nested in the activation that has the rates
+		if height >= V20HeightActivation && height%pegnet.SnapshotRate == 0 {
+
+			// check if the height has no rates, what do we do?
+			// check rates from previous height
+			if rates == nil {
+				// We need to handle the no rates case. Miners could avoid mining this last block.
+				// use the last valid rates from last block
+				rates, err = d.Pegnet.SelectPendingRates(ctx, tx, height-1)
+			}
+
+			// If no rates for second time, skip Snapshot logic
+			// otherwise proceed with payout
+			if rates != nil {
+				err := d.SnapshotPayouts(tx, fLog, rates, height, dblock.Timestamp)
+				if err != nil {
+					// something wrong happend during payout execution
+					return err
+				}
+			} else {
+				// We don't return error as it will stop synchronisation
+				// we continue execution but skiping payout for this time
+				fLog.WithFields(log.Fields{"section": "staking", "reason": "no rates"}).Tracef("2 last blocks does not contains rates")
+			}
+		}
+
 		// At this point, we start making updates to the database in a specific order:
 		// TODO: ensure we rollback the tx when needed
 		// 1) Apply transaction batches that are in holding (conversions are always applied here)
@@ -269,6 +299,125 @@ func (d *Pegnetd) SyncBlock(ctx context.Context, tx *sql.Tx, height uint32) erro
 			return err
 		}
 	}
+	return nil
+}
+
+// SnapshotPayouts moves the current shapshot to the "past", and updates the current snapshot. Then
+// it proceeds to do the snapshot staking payouts.
+func (d *Pegnetd) SnapshotPayouts(tx *sql.Tx, fLog *log.Entry, rates map[fat2.PTicker]uint64, height uint32, heightTimestamp time.Time) error {
+	// Snapshot
+	snapStart := time.Now()
+	err := d.Pegnet.SnapshotCurrent(tx)
+	if err != nil {
+		return err // Snapshot fails stop all progress and block syncing
+	}
+
+	// Payout snapshot
+	balances, err := d.Pegnet.SelectSnapshotBalances(tx)
+	if err != nil {
+		return err // Need to do staking payouts
+	}
+	staked := make(map[factom.FAAddress]*big.Int)
+	for _, bal := range balances {
+		// We want all balances in pUSD
+		total := new(big.Int)
+		for i := fat2.PTicker(1); i < fat2.PTickerMax; i++ {
+			if i == fat2.PTickerPEG {
+				continue // PEG does not count towards stake total
+			}
+			if bal.Balances[i] == 0 { // Ignore 0 balances
+				continue
+			}
+
+			// Convert from pXXX -> pUSD
+			c, err := conversions.Convert(int64(bal.Balances[i]), rates[i], rates[fat2.PTickerUSD])
+			if err != nil {
+				return err
+			}
+
+			// add c to running sum
+			total = total.Add(total, big.NewInt(c))
+		}
+
+		staked[*bal.Address] = total
+	}
+	// We need to mock a TXID for the staked payouts
+	txid := fmt.Sprintf("%064d", height)
+	// Sort the staked by highest PUSD
+	type StakedAmount struct {
+		Address factom.FAAddress
+		PUSD    uint64
+	}
+
+	var list []StakedAmount
+	for add, amt := range staked {
+		if !amt.IsUint64() {
+			return fmt.Errorf("%s has balance that is not uint64: %s", add, amt)
+		}
+
+		uAmt := amt.Uint64()
+		if uAmt <= 0 { // Apply a minimum required amount in pUSD
+			continue
+		}
+		// TODO: Check uint64 is safe
+		list = append(list, StakedAmount{Address: add, PUSD: uAmt})
+	}
+
+	if len(list) == 0 {
+		// Abort early since there is no one to pay out
+		fLog.WithFields(log.Fields{
+			"duration": time.Since(snapStart),
+			"eligible": len(list),
+		}).Info("staking | balances snapshotted | not paid, there none eligible")
+		return nil
+	}
+
+	sort.Slice(list, func(i, j int) bool {
+		return list[i].PUSD < list[j].PUSD
+	})
+
+	// Calculate payouts
+	payoutindex := make(map[string]int)
+	addressMap := make(map[string]factom.FAAddress)
+
+	// 4.5K per block allowed
+	// as described in conversions
+	totalPayout := uint64(conversions.PerBlockAssetHolders) * pegnet.SnapshotRate
+	set := conversions.NewConversionSupply(totalPayout)
+	for i, stake := range list {
+		addTxid := fmt.Sprintf("%d-%s", i, txid)
+		payoutindex[addTxid] = i
+		addressMap[addTxid] = stake.Address
+		err := set.AddConversion(addTxid, stake.PUSD)
+		if err != nil {
+			return err
+		}
+	}
+
+	// ---- Database Payouts ----
+	// Inserts tx into the db
+	err = d.Pegnet.InsertStakingCoinbase(tx, txid, height, heightTimestamp, set.Payouts(), addressMap)
+	if err != nil {
+		return err
+	}
+
+	// Increase balances
+	for addTxid, payout := range set.Payouts() {
+		add := addressMap[addTxid] // The address to pay
+
+		_, err = d.Pegnet.AddToBalance(tx, &add, fat2.PTickerPEG, payout)
+		if err != nil {
+			return err
+		}
+	}
+
+	// -- End staking calculations
+	fLog.WithFields(log.Fields{
+		"duration": time.Since(snapStart),
+		"eligible": len(list),
+		"PEG":      float64(totalPayout) / 1e8, // Float is good enough here,
+		"txid":     txid,
+	}).Info("staking | balances snapshotted | paid to eligible")
 	return nil
 }
 
