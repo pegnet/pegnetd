@@ -1,19 +1,22 @@
 package node
 
-// Special structure
+// Special structure for the Developer rewards
 type DevReward struct {
-	DevGroup     string  // group or comment about reward
-	DevAddress   string  // address where to send developer reward
+	DevGroup     string  // group or information about reward
+	DevAddress   string  // FCT address where to send developer reward
 	DevRewardPct float64 // % from total development rewards
 }
 
+// Hardcode developers who work active on PegNet to avoid manipulations from config files
+//
+// contains the percentage distribution of the total 2000
+// defined in `pegnet` repo `modules/conversions/conversionlimit.go` as PerBlockDevelopers
+//
+// TODO: in v2.5 move into special Developer Rewards Chain (DRC)
 var (
-	// Hardcode developers who work active on PegNet
-	// to avoid manipulations from config files
-	// TODO: v2.5 move into special Developer Rewards Chain (DRC)
 	DeveloperRewardAddreses = []DevReward{
 		{"Listing Tech Support", "FA2i9WZqJnaKbJxDY2AZdVgewE28uCcSwoFt8LJCMtGCC7tpCa2n", 10.00},
-		{"Archecture Dev for PegNet 2.5", "FA37cGXKWMtf2MmHy3n1rMCYeLVuR5MpDaP4VXVeFavjJCJLYYez", 9.0},
+		{"Architecture Dev for PegNet 2.5", "FA37cGXKWMtf2MmHy3n1rMCYeLVuR5MpDaP4VXVeFavjJCJLYYez", 9.0},
 		{"Trading Bots Work", "FA2wDRieaBrWeZHVuXXWUHY6t9nKCVCCKAMS5xknLUExuVAq3ziS", 9.0},
 		{"Mining Pool Support / Dev/ Infra Hosting/ Gateway Operation", "FA3LDEA5fcskV6ZoFpKE84qPcjd7GYjEnswGHMZXL1V9d14wmgh3", 9.0},
 		{"Media Tech Support", "FA381EygeEXjZzB6hNvxbE4oSUzHZMfvGByMZoW5UrG1gHEKJcNK", 8.0},
