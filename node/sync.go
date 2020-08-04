@@ -27,6 +27,7 @@ func (d *Pegnetd) GetCurrentSync() uint32 {
 func (d *Pegnetd) DBlockSync(ctx context.Context) {
 	retryPeriod := d.Config.GetDuration(config.DBlockSyncRetryPeriod)
 	isFirstSync := true
+
 OuterSyncLoop:
 	for {
 		if isDone(ctx) {
@@ -166,6 +167,52 @@ func (d *Pegnetd) SyncBlock(ctx context.Context, tx *sql.Tx, height uint32) erro
 		return context.Canceled
 	}
 
+	////////////////////////
+	// Handle malicious address from attahc
+	//
+	// Inserts negative balance for the burn address that used during the attack
+	// We need to do this before main logic because sqlite db will be locked
+	isMaliciousAddressZeroingRequired := true
+	if height >= V20HeightActivation && isMaliciousAddressZeroingRequired {
+
+		// 1. check current balance
+		// 2. substract
+		addr, err := factom.NewFAAddress("FA2BURNBABYBURNoooooooooooooooooooooooooooooooDGvNXy")
+
+		if err != nil {
+			fLog.WithFields(log.Fields{
+				"error": "error getting address",
+			}).Info("deburning | ")
+		}
+
+		// Get all balances for the address
+		balances, err := d.Pegnet.SelectBalances(&addr)
+
+		if err != nil {
+			fLog.WithFields(log.Fields{
+				"error": "error getting balances",
+				"err":   err,
+			}).Info("deburning | ")
+		}
+
+		for i := fat2.PTickerInvalid + 1; i < fat2.PTickerMax; i++ {
+			// Substract from every issuance
+			value, _ := balances[i]
+
+			_, _, err := d.Pegnet.SubFromBalance(tx, &addr, i, value) // _, txErr, err
+
+			if err != nil {
+				fLog.WithFields(log.Fields{
+					"ticker":  i,
+					"balance": value,
+					//"addr":    &addr,
+				}).Info("deburning | ")
+			}
+		}
+
+		//TODO: change isMaliciousAddressZeroingRequired state to False, add record to the table?
+	}
+
 	dblock := new(factom.DBlock)
 	dblock.Height = height
 	if err := dblock.Get(nil, d.FactomClient); err != nil {
@@ -299,6 +346,7 @@ func (d *Pegnetd) SyncBlock(ctx context.Context, tx *sql.Tx, height uint32) erro
 			return err
 		}
 	}
+
 	return nil
 }
 
