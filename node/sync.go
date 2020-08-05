@@ -170,16 +170,26 @@ OuterSyncLoop:
 
 }
 
-func (d *Pegnetd) NullifyBurnAddress(ctx context.Context, tx *sql.Tx, height uint32) {
+func (d *Pegnetd) NullifyBurnAddress(ctx context.Context, tx *sql.Tx, height uint32) error {
 	fLog := log.WithFields(log.Fields{"height": height})
+
+	dblock := new(factom.DBlock)
+	dblock.Height = height
+	if err := dblock.Get(nil, d.FactomClient); err != nil {
+		return err
+	}
+	heightTimestamp := dblock.Timestamp
+	// We need to mock a TXID to record zeroing
+	txid := fmt.Sprintf("%064d", height)
+
 	// 1. check current balance
 	// 2. substract amounts for every ticker
 	addr, err := factom.NewFAAddress(burnAddr)
 
 	if err != nil {
 		fLog.WithFields(log.Fields{
-			"error": "error getting address",
-		}).Info("zeroing burn | ")
+			"error": err,
+		}).Info("zeroing burn | error getting address")
 	}
 
 	// Get all balances for the address
@@ -187,25 +197,34 @@ func (d *Pegnetd) NullifyBurnAddress(ctx context.Context, tx *sql.Tx, height uin
 
 	if err != nil {
 		fLog.WithFields(log.Fields{
-			"error": "error getting balances",
-			"err":   err,
-		}).Info("zeroing burn | ")
+			"err": err,
+		}).Info("zeroing burn | balances retrieval failed")
 	}
 
 	for i := fat2.PTickerInvalid + 1; i < fat2.PTickerMax; i++ {
 		// Substract from every issuance
 		value, _ := balances[i]
-
-		_, _, err := d.Pegnet.SubFromBalance(tx, &addr, i, value) // _, txErr, err
-
+		_, _, err := d.Pegnet.SubFromBalance(tx, &addr, i, value) // lastInd, txErr, err
 		if err != nil {
 			fLog.WithFields(log.Fields{
 				"ticker":  i,
 				"balance": value,
 				//"addr":    &addr,
-			}).Info("deburning | ")
+			}).Info("zeroing burn | ")
 		}
+
+		addTxid := fmt.Sprintf("%d-%s", i, txid)
+		err = d.Pegnet.InsertZeroingCoinbase(tx, txid, addTxid, height, heightTimestamp, value, addr)
+		if err != nil {
+			fLog.WithFields(log.Fields{
+				"error": err,
+			}).Info("zeroing burn | coinbase tx failed")
+			return err
+		}
+
 	}
+
+	return nil
 }
 
 // If SyncBlock returns no error, than that height was synced and saved. If any part of the sync fails,
@@ -791,7 +810,8 @@ func (d *Pegnetd) recordBatch(sqlTx *sql.Tx, txBatch *fat2.TransactionBatch, rat
 		}
 
 		// Outputs
-		if tx.IsConversion() { // Conv Output
+		if tx.IsConversion() {
+			// Conversions Output
 			outputAmount, err := conversions.Convert(int64(tx.Input.Amount), rates[tx.Input.Type], rates[tx.Conversion])
 			if err != nil {
 				return err
@@ -806,15 +826,26 @@ func (d *Pegnetd) recordBatch(sqlTx *sql.Tx, txBatch *fat2.TransactionBatch, rat
 				return err
 			}
 
-		} else { // Transfer Outputs
+		} else {
+			// Transfer Outputs
+			burnAddress, err := factom.NewFAAddress(burnAddr)
+
+			if err != nil {
+				log.WithFields(log.Fields{
+					"error": "error getting burn address",
+				}).Info("check burn address | ")
+			}
 			for _, transfer := range tx.Transfers {
-				_, err = d.Pegnet.AddToBalance(sqlTx, &transfer.Address, tx.Input.Type, transfer.Amount)
-				if err != nil {
-					return err
-				}
-				_, err = d.Pegnet.InsertTransactionRelation(sqlTx, transfer.Address, txBatch.Entry.Hash, uint64(txIndex), true, false)
-				if err != nil {
-					return err
+				// if transfer to Burn address do nothing, otherwise add balances
+				if transfer.Address != burnAddress {
+					_, err = d.Pegnet.AddToBalance(sqlTx, &transfer.Address, tx.Input.Type, transfer.Amount)
+					if err != nil {
+						return err
+					}
+					_, err = d.Pegnet.InsertTransactionRelation(sqlTx, transfer.Address, txBatch.Entry.Hash, uint64(txIndex), true, false)
+					if err != nil {
+						return err
+					}
 				}
 			}
 		}
