@@ -515,7 +515,7 @@ func (d *Pegnetd) DevelopersPayouts(tx *sql.Tx, fLog *log.Entry, height uint32, 
 		}
 
 		// Mock entry hash value
-		addTxid := fmt.Sprintf("%d-%s", dev.DevAddress, txid)
+		addTxid := fmt.Sprintf("%d-%s", 0, txid)
 
 		// Get dev address as FAAdress
 		FADevAddress, err := factom.NewFAAddress(dev.DevAddress)
