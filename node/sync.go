@@ -18,8 +18,6 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-var burnAddr = "FA2BURNBABYBURNoooooooooooooooooooooooooooooooDGvNXy"
-
 func (d *Pegnetd) GetCurrentSync() uint32 {
 	// Should be thread safe since we only have 1 routine writing to it
 	return d.Sync.Synced
@@ -184,16 +182,9 @@ func (d *Pegnetd) NullifyBurnAddress(ctx context.Context, tx *sql.Tx, height uin
 
 	// 1. check current balance
 	// 2. substract amounts for every ticker
-	addr, err := factom.NewFAAddress(burnAddr)
-
-	if err != nil {
-		fLog.WithFields(log.Fields{
-			"error": err,
-		}).Info("zeroing burn | error getting address")
-	}
 
 	// Get all balances for the address
-	balances, err := d.Pegnet.SelectBalances(&addr)
+	balances, err := d.Pegnet.SelectBalances(&FAGlobalBurnAddress)
 
 	if err != nil {
 		fLog.WithFields(log.Fields{
@@ -201,20 +192,21 @@ func (d *Pegnetd) NullifyBurnAddress(ctx context.Context, tx *sql.Tx, height uin
 		}).Info("zeroing burn | balances retrieval failed")
 	}
 
-	for i := fat2.PTickerInvalid + 1; i < fat2.PTickerMax; i++ {
+	for ticker := fat2.PTickerInvalid + 1; ticker < fat2.PTickerMax; ticker++ {
 		// Substract from every issuance
-		value, _ := balances[i]
-		_, _, err := d.Pegnet.SubFromBalance(tx, &addr, i, value) // lastInd, txErr, err
+		value, _ := balances[ticker]
+		_, _, err := d.Pegnet.SubFromBalance(tx, &FAGlobalBurnAddress, ticker, value) // lastInd, txErr, err
 		if err != nil {
 			fLog.WithFields(log.Fields{
-				"ticker":  i,
+				"ticker":  ticker,
 				"balance": value,
-				//"addr":    &addr,
-			}).Info("zeroing burn | ")
+			}).Info("zeroing burn | substract from balance failed")
 		}
 
-		addTxid := fmt.Sprintf("%d-%s", i, txid)
-		err = d.Pegnet.InsertZeroingCoinbase(tx, txid, addTxid, height, heightTimestamp, value, addr)
+		// Mock entry hash value
+		addTxid := fmt.Sprintf("%d-%s", ticker, txid)
+
+		err = d.Pegnet.InsertZeroingCoinbase(tx, txid, addTxid, height, heightTimestamp, value, ticker.String(), FAGlobalBurnAddress)
 		if err != nil {
 			fLog.WithFields(log.Fields{
 				"error": err,
@@ -828,16 +820,10 @@ func (d *Pegnetd) recordBatch(sqlTx *sql.Tx, txBatch *fat2.TransactionBatch, rat
 
 		} else {
 			// Transfer Outputs
-			burnAddress, err := factom.NewFAAddress(burnAddr)
 
-			if err != nil {
-				log.WithFields(log.Fields{
-					"error": "error getting burn address",
-				}).Info("check burn address | ")
-			}
 			for _, transfer := range tx.Transfers {
 				// if transfer to Burn address do nothing, otherwise add balances
-				if transfer.Address != burnAddress {
+				if transfer.Address != FAGlobalBurnAddress {
 					_, err = d.Pegnet.AddToBalance(sqlTx, &transfer.Address, tx.Input.Type, transfer.Amount)
 					if err != nil {
 						return err
