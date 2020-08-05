@@ -301,7 +301,7 @@ func (d *Pegnetd) SyncBlock(ctx context.Context, tx *sql.Tx, height uint32) erro
 	}
 
 	// 5) Apply Developers Rewards
-	if height >= V20HeightActivation {
+	if height >= V20HeightActivation && height%pegnet.SnapshotRate == 0 {
 		err := d.DevelopersPayouts(tx, fLog, height, dblock.Timestamp)
 		if err != nil {
 			// something wrong happend during payout execution
@@ -437,7 +437,7 @@ func (d *Pegnetd) DevelopersPayouts(tx *sql.Tx, fLog *log.Entry, height uint32, 
 	totalPayout := uint64(conversions.PerBlockDevelopers) * pegnet.SnapshotRate // once a day
 	payoutStart := time.Now()
 
-	// We need to mock a TXID to record zeroing
+	// We need to mock a TXID to record dev rewards
 	txid := fmt.Sprintf("%064d", height)
 
 	// we use hardcoded list of dev payouts
@@ -462,6 +462,7 @@ func (d *Pegnetd) DevelopersPayouts(tx *sql.Tx, fLog *log.Entry, height uint32, 
 				"error": err,
 				"addr": dev.DevAddress,
 			}).Info("error getting developer address")
+			return err
 		}
 
 		// ---- Database Payouts ----
