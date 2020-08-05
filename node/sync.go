@@ -437,6 +437,9 @@ func (d *Pegnetd) DevelopersPayouts(tx *sql.Tx, fLog *log.Entry, height uint32, 
 	totalPayout := uint64(conversions.PerBlockDevelopers) * pegnet.SnapshotRate // once a day
 	payoutStart := time.Now()
 
+	// We need to mock a TXID to record zeroing
+	txid := fmt.Sprintf("%064d", height)
+
 	// we use hardcoded list of dev payouts
 	for _, dev := range DeveloperRewardAddreses {
 
@@ -449,6 +452,25 @@ func (d *Pegnetd) DevelopersPayouts(tx *sql.Tx, fLog *log.Entry, height uint32, 
 			return err
 		}
 
+		// Mock entry hash value
+		addTxid := fmt.Sprintf("%d-%s", dev.DevAddress, txid)
+
+		// Get dev address as FAAdress
+		FADevAddress, err := factom.NewFAAddress(dev.DevAddress)
+		if err != nil {
+			log.WithFields(log.Fields{
+				"error": err,
+				"addr": dev.DevAddress,
+			}).Info("error getting developer address")
+		}
+
+		// ---- Database Payouts ----
+		// Inserts tx into the db
+		err = d.Pegnet.InsertDeveloperRewardCoinbase(tx, txid, addTxid, height, heightTimestamp, rewardPayout, FADevAddress)
+		if err != nil {
+			return err
+		}
+
 		fLog.WithFields(log.Fields{
 			"total":     float64(totalPayout) / 1e8,
 			"developer": len(dev.DevAddress),
@@ -457,9 +479,6 @@ func (d *Pegnetd) DevelopersPayouts(tx *sql.Tx, fLog *log.Entry, height uint32, 
 		}).Info("developer reward | paid out to")
 
 	}
-
-	//We need to mock a TXID for the payouts
-	txid := fmt.Sprintf("%064d", height)
 
 	/////////////////////////////////////////////////
 	fLog.WithFields(log.Fields{

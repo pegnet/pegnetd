@@ -451,7 +451,7 @@ func (p *Pegnet) InsertStakingCoinbase(tx *sql.Tx, txid string, height uint32, h
 	return nil
 }
 
-func (p *Pegnet) InsertDeveloperRewardsCoinbase(tx *sql.Tx, txid string, height uint32, heightTimestamp time.Time, payouts map[string]uint64, addressMap map[string]factom.FAAddress) error {
+func (p *Pegnet) InsertDeveloperRewardCoinbase(tx *sql.Tx, txid string, addTxid string, height uint32, heightTimestamp time.Time, payout uint64, faAdd factom.FAAddress) error {
 	txidBytes, err := hex.DecodeString(txid)
 	if err != nil {
 		return err
@@ -474,41 +474,37 @@ func (p *Pegnet) InsertDeveloperRewardsCoinbase(tx *sql.Tx, txid string, height 
 	}
 
 	// Now we record each developer reward.
-	for addTxid, payout := range payouts {
-		// The address to pay
-		faAdd := addressMap[addTxid]
-		// All addresses are stored as bytes in the sqlitedb
-		add := faAdd[:]
-		// index for the address
-		index, _, err := SplitTxID(addTxid)
-		if err != nil {
-			return err
-		}
 
-		// Insert each payout as a coinbase.
-		// Insert the TX
-		coinbaseStatement, err := tx.Prepare(`INSERT INTO "pn_history_transaction"
+	// All addresses are stored as bytes in the sqlitedb
+	add := faAdd[:]
+	// index for the address
+	index, _, err := SplitTxID(addTxid)
+	if err != nil {
+		return err
+	}
+
+	// Insert each payout as a coinbase.
+	// Insert the TX
+	coinbaseStatement, err := tx.Prepare(`INSERT INTO "pn_history_transaction"
 		            (entry_hash, tx_index, action_type, from_address, from_asset, from_amount, to_asset, to_amount, outputs) VALUES
 		            (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-		if err != nil {
-			return err
-		}
+	if err != nil {
+		return err
+	}
 
-		_, err = coinbaseStatement.Exec(txidBytes, index, Coinbase, add, "", 0, "PEG", payout, "")
-		if err != nil {
-			return err
-		}
+	_, err = coinbaseStatement.Exec(txidBytes, index, Coinbase, add, "", 0, "PEG", payout, "")
+	if err != nil {
+		return err
+	}
 
-		// Insert into lookup table
-		lookup, err := tx.Prepare(insertLookupQuery)
-		if err != nil {
-			return err
-		}
+	// Insert into lookup table
+	lookup, err := tx.Prepare(insertLookupQuery)
+	if err != nil {
+		return err
+	}
 
-		if _, err = lookup.Exec(txidBytes, index, add); err != nil {
-			return err
-		}
-
+	if _, err = lookup.Exec(txidBytes, index, add); err != nil {
+		return err
 	}
 
 	return nil
