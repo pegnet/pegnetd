@@ -503,6 +503,7 @@ func (d *Pegnetd) DevelopersPayouts(tx *sql.Tx, fLog *log.Entry, height uint32, 
 	txid := fmt.Sprintf("%064d", height)
 
 	// we use hardcoded list of dev payouts
+	i := 0
 	for _, dev := range DeveloperRewardAddreses {
 
 		// we calculate developers reward from % pre-defined
@@ -515,7 +516,8 @@ func (d *Pegnetd) DevelopersPayouts(tx *sql.Tx, fLog *log.Entry, height uint32, 
 		}
 
 		// Mock entry hash value
-		addTxid := fmt.Sprintf("%d-%s", 0, txid)
+		addTxid := fmt.Sprintf("%d-%s", i, txid)
+		i++
 
 		// Get dev address as FAAdress
 		FADevAddress, err := factom.NewFAAddress(dev.DevAddress)
