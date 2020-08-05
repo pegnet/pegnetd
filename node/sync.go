@@ -364,7 +364,7 @@ func (d *Pegnetd) SyncBlock(ctx context.Context, tx *sql.Tx, height uint32) erro
 
 	// 5) Apply Developers Rewards
 	if height >= V20HeightActivation && height%pegnet.SnapshotRate == 0 {
-		err := d.DevelopersPayouts(tx, fLog, height, dblock.Timestamp)
+		err := d.DevelopersPayouts(tx, fLog, height, dblock.Timestamp, DeveloperRewardAddreses)
 		if err != nil {
 			// something wrong happend during payout execution
 			return err
@@ -493,8 +493,9 @@ func (d *Pegnetd) SnapshotPayouts(tx *sql.Tx, fLog *log.Entry, rates map[fat2.PT
 	return nil
 }
 
-// DevelopersPayouts for PIP16 sending rewards for developers
-func (d *Pegnetd) DevelopersPayouts(tx *sql.Tx, fLog *log.Entry, height uint32, heightTimestamp time.Time) error {
+// Developers Reward Payouts
+// implementation of PIP16 - distributed rewards collected for developers every 24h
+func (d *Pegnetd) DevelopersPayouts(tx *sql.Tx, fLog *log.Entry, height uint32, heightTimestamp time.Time, developers []DevReward) error {
 
 	totalPayout := uint64(conversions.PerBlockDevelopers) * pegnet.SnapshotRate // once a day
 	payoutStart := time.Now()
@@ -504,7 +505,7 @@ func (d *Pegnetd) DevelopersPayouts(tx *sql.Tx, fLog *log.Entry, height uint32, 
 
 	// we use hardcoded list of dev payouts
 	i := 0
-	for _, dev := range DeveloperRewardAddreses {
+	for _, dev := range developers {
 
 		// we calculate developers reward from % pre-defined
 		rewardPayout := uint64((conversions.PerBlockDevelopers / 100) * dev.DevRewardPct)
