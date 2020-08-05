@@ -18,6 +18,8 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+var burnAddr = "FA2BURNBABYBURNoooooooooooooooooooooooooooooooDGvNXy"
+
 func (d *Pegnetd) GetCurrentSync() uint32 {
 	// Should be thread safe since we only have 1 routine writing to it
 	return d.Sync.Synced
@@ -168,16 +170,15 @@ func (d *Pegnetd) SyncBlock(ctx context.Context, tx *sql.Tx, height uint32) erro
 	}
 
 	////////////////////////
-	// Handle malicious address from attahc
-	//
-	// Inserts negative balance for the burn address that used during the attack
+	// Zeroing funds at Global Burn Address
+
+	// One time operation, Inserts negative balance for the burn address that used during the attack
 	// We need to do this before main logic because sqlite db will be locked
-	isMaliciousAddressZeroingRequired := true
-	if height >= V20HeightActivation && isMaliciousAddressZeroingRequired {
+	if d.Sync.Synced+1 == V20HeightActivation {
 
 		// 1. check current balance
-		// 2. substract
-		addr, err := factom.NewFAAddress("FA2BURNBABYBURNoooooooooooooooooooooooooooooooDGvNXy")
+		// 2. substract amounts for every ticker
+		addr, err := factom.NewFAAddress(burnAddr)
 
 		if err != nil {
 			fLog.WithFields(log.Fields{
@@ -209,8 +210,6 @@ func (d *Pegnetd) SyncBlock(ctx context.Context, tx *sql.Tx, height uint32) erro
 				}).Info("deburning | ")
 			}
 		}
-
-		//TODO: change isMaliciousAddressZeroingRequired state to False, add record to the table?
 	}
 
 	dblock := new(factom.DBlock)
