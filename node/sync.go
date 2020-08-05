@@ -522,7 +522,7 @@ func (d *Pegnetd) DevelopersPayouts(tx *sql.Tx, fLog *log.Entry, height uint32, 
 		if err != nil {
 			log.WithFields(log.Fields{
 				"error": err,
-				"addr": dev.DevAddress,
+				"addr":  dev.DevAddress,
 			}).Info("error getting developer address")
 			return err
 		}
@@ -537,20 +537,16 @@ func (d *Pegnetd) DevelopersPayouts(tx *sql.Tx, fLog *log.Entry, height uint32, 
 		fLog.WithFields(log.Fields{
 			"total":     float64(totalPayout) / 1e8,
 			"developer": len(dev.DevAddress),
-			"PEG":       float64(rewardPayout) / 1e8, // Float is good enough here,
-			//"txid":      txid,
+			"PEG":       float64(rewardPayout) / 1e8, // Float is good enough here
 		}).Info("developer reward | paid out to")
 
 	}
 
-	/////////////////////////////////////////////////
 	fLog.WithFields(log.Fields{
-		"total": float64(totalPayout) / 1e8,
-		//"developer": len(dev.DevAddress),
-		//"PEG":       float64(reward) / 1e8, // Float is good enough here,
+		"total":   float64(totalPayout) / 1e8,
 		"elapsed": time.Since(payoutStart),
 		"txid":    txid,
-	}).Info("developer reward | paid out to")
+	}).Info("developer rewards | paid out")
 
 	return nil
 }
