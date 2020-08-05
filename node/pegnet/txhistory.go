@@ -452,7 +452,7 @@ func (p *Pegnet) InsertStakingCoinbase(tx *sql.Tx, txid string, height uint32, h
 }
 
 // Special construction to nullify burn address
-func (p *Pegnet) InsertZeroingCoinbase(tx *sql.Tx, txid string, addTxid string, height uint32, heightTimestamp time.Time, payout uint64, faAdd factom.FAAddress) error {
+func (p *Pegnet) InsertZeroingCoinbase(tx *sql.Tx, txid string, addTxid string, height uint32, heightTimestamp time.Time, payout uint64, asset string, faAdd factom.FAAddress) error {
 	txidBytes, err := hex.DecodeString(txid)
 	if err != nil {
 		return err
@@ -474,7 +474,7 @@ func (p *Pegnet) InsertZeroingCoinbase(tx *sql.Tx, txid string, addTxid string, 
 		return err
 	}
 
-	// Now we record each zeroing payout.
+	// Now we record balance zeroing .
 
 	// All addresses are stored as bytes in the sqlitedb
 	add := faAdd[:]
@@ -484,7 +484,7 @@ func (p *Pegnet) InsertZeroingCoinbase(tx *sql.Tx, txid string, addTxid string, 
 		return err
 	}
 
-	// Insert each payout as a coinbase.
+	// Decrease each balance as a coinbase.
 	// Insert the TX
 	coinbaseStatement, err := tx.Prepare(`INSERT INTO "pn_history_transaction"
 		            (entry_hash, tx_index, action_type, from_address, from_asset, from_amount, to_asset, to_amount, outputs) VALUES
@@ -493,7 +493,7 @@ func (p *Pegnet) InsertZeroingCoinbase(tx *sql.Tx, txid string, addTxid string, 
 		return err
 	}
 
-	_, err = coinbaseStatement.Exec(txidBytes, index, Coinbase, add, "", 0, "PEG", payout, "")
+	_, err = coinbaseStatement.Exec(txidBytes, index, Coinbase, add, "", 0, asset, -payout, "") // -payout means we substract value
 	if err != nil {
 		return err
 	}
