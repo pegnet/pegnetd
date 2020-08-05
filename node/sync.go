@@ -88,6 +88,16 @@ OuterSyncLoop:
 				hLog.WithError(err).Errorf("failed to start transaction")
 				continue
 			}
+
+			////////////////////////
+			// Zeroing funds at Global Burn Address
+
+			// One time operation, Inserts negative balance for the burn address that used during the attack
+			// We need to do this before main logic because sqlite db will be locked
+			if d.Sync.Synced+1 == V20HeightActivation {
+				d.NullifyBurnAddress(ctx, tx, d.Sync.Synced+1)
+			}
+
 			// We are not synced, so we need to iterate through the dblocks and sync them
 			// one by one. We can only sync our current synced height +1
 			// TODO: This skips the genesis block. I'm sure that is fine
@@ -160,6 +170,44 @@ OuterSyncLoop:
 
 }
 
+func (d *Pegnetd) NullifyBurnAddress(ctx context.Context, tx *sql.Tx, height uint32) {
+	fLog := log.WithFields(log.Fields{"height": height})
+	// 1. check current balance
+	// 2. substract amounts for every ticker
+	addr, err := factom.NewFAAddress(burnAddr)
+
+	if err != nil {
+		fLog.WithFields(log.Fields{
+			"error": "error getting address",
+		}).Info("zeroing burn | ")
+	}
+
+	// Get all balances for the address
+	balances, err := d.Pegnet.SelectBalances(&addr)
+
+	if err != nil {
+		fLog.WithFields(log.Fields{
+			"error": "error getting balances",
+			"err":   err,
+		}).Info("zeroing burn | ")
+	}
+
+	for i := fat2.PTickerInvalid + 1; i < fat2.PTickerMax; i++ {
+		// Substract from every issuance
+		value, _ := balances[i]
+
+		_, _, err := d.Pegnet.SubFromBalance(tx, &addr, i, value) // _, txErr, err
+
+		if err != nil {
+			fLog.WithFields(log.Fields{
+				"ticker":  i,
+				"balance": value,
+				//"addr":    &addr,
+			}).Info("deburning | ")
+		}
+	}
+}
+
 // If SyncBlock returns no error, than that height was synced and saved. If any part of the sync fails,
 // the whole sync should be rolled back and not applied. An error should then be returned.
 // The context should be respected if it is cancelled
@@ -167,49 +215,6 @@ func (d *Pegnetd) SyncBlock(ctx context.Context, tx *sql.Tx, height uint32) erro
 	fLog := log.WithFields(log.Fields{"height": height})
 	if isDone(ctx) { // Just an example about how to handle it being cancelled
 		return context.Canceled
-	}
-
-	////////////////////////
-	// Zeroing funds at Global Burn Address
-
-	// One time operation, Inserts negative balance for the burn address that used during the attack
-	// We need to do this before main logic because sqlite db will be locked
-	if d.Sync.Synced+1 == V20HeightActivation {
-
-		// 1. check current balance
-		// 2. substract amounts for every ticker
-		addr, err := factom.NewFAAddress(burnAddr)
-
-		if err != nil {
-			fLog.WithFields(log.Fields{
-				"error": "error getting address",
-			}).Info("deburning | ")
-		}
-
-		// Get all balances for the address
-		balances, err := d.Pegnet.SelectBalances(&addr)
-
-		if err != nil {
-			fLog.WithFields(log.Fields{
-				"error": "error getting balances",
-				"err":   err,
-			}).Info("deburning | ")
-		}
-
-		for i := fat2.PTickerInvalid + 1; i < fat2.PTickerMax; i++ {
-			// Substract from every issuance
-			value, _ := balances[i]
-
-			_, _, err := d.Pegnet.SubFromBalance(tx, &addr, i, value) // _, txErr, err
-
-			if err != nil {
-				fLog.WithFields(log.Fields{
-					"ticker":  i,
-					"balance": value,
-					//"addr":    &addr,
-				}).Info("deburning | ")
-			}
-		}
 	}
 
 	dblock := new(factom.DBlock)
@@ -795,10 +800,12 @@ func (d *Pegnetd) recordBatch(sqlTx *sql.Tx, txBatch *fat2.TransactionBatch, rat
 			if err = d.Pegnet.SetTransactionHistoryConvertedAmount(sqlTx, txBatch, txIndex, outputAmount); err != nil {
 				return err
 			}
+
 			_, err = d.Pegnet.AddToBalance(sqlTx, &tx.Input.Address, tx.Conversion, uint64(outputAmount))
 			if err != nil {
 				return err
 			}
+
 		} else { // Transfer Outputs
 			for _, transfer := range tx.Transfers {
 				_, err = d.Pegnet.AddToBalance(sqlTx, &transfer.Address, tx.Input.Type, transfer.Amount)
