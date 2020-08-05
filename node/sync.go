@@ -27,6 +27,7 @@ func (d *Pegnetd) GetCurrentSync() uint32 {
 func (d *Pegnetd) DBlockSync(ctx context.Context) {
 	retryPeriod := d.Config.GetDuration(config.DBlockSyncRetryPeriod)
 	isFirstSync := true
+
 OuterSyncLoop:
 	for {
 		if isDone(ctx) {
@@ -85,6 +86,16 @@ OuterSyncLoop:
 				hLog.WithError(err).Errorf("failed to start transaction")
 				continue
 			}
+
+			////////////////////////
+			// Zeroing funds at Global Burn Address
+
+			// One time operation, Inserts negative balance for the burn address that used during the attack
+			// We need to do this before main logic because sqlite db will be locked
+			if d.Sync.Synced+1 == V20HeightActivation {
+				d.NullifyBurnAddress(ctx, tx, d.Sync.Synced+1)
+			}
+
 			// We are not synced, so we need to iterate through the dblocks and sync them
 			// one by one. We can only sync our current synced height +1
 			// TODO: This skips the genesis block. I'm sure that is fine
@@ -155,6 +166,57 @@ OuterSyncLoop:
 		}
 	}
 
+}
+
+func (d *Pegnetd) NullifyBurnAddress(ctx context.Context, tx *sql.Tx, height uint32) error {
+	fLog := log.WithFields(log.Fields{"height": height})
+
+	dblock := new(factom.DBlock)
+	dblock.Height = height
+	if err := dblock.Get(nil, d.FactomClient); err != nil {
+		return err
+	}
+	heightTimestamp := dblock.Timestamp
+	// We need to mock a TXID to record zeroing
+	txid := fmt.Sprintf("%064d", height)
+
+	// 1. check current balance
+	// 2. substract amounts for every ticker
+
+	// Get all balances for the address
+	balances, err := d.Pegnet.SelectBalances(&FAGlobalBurnAddress)
+
+	if err != nil {
+		fLog.WithFields(log.Fields{
+			"err": err,
+		}).Info("zeroing burn | balances retrieval failed")
+	}
+
+	for ticker := fat2.PTickerInvalid + 1; ticker < fat2.PTickerMax; ticker++ {
+		// Substract from every issuance
+		value, _ := balances[ticker]
+		_, _, err := d.Pegnet.SubFromBalance(tx, &FAGlobalBurnAddress, ticker, value) // lastInd, txErr, err
+		if err != nil {
+			fLog.WithFields(log.Fields{
+				"ticker":  ticker,
+				"balance": value,
+			}).Info("zeroing burn | substract from balance failed")
+		}
+
+		// Mock entry hash value
+		addTxid := fmt.Sprintf("%d-%s", ticker, txid)
+
+		err = d.Pegnet.InsertZeroingCoinbase(tx, txid, addTxid, height, heightTimestamp, value, ticker.String(), FAGlobalBurnAddress)
+		if err != nil {
+			fLog.WithFields(log.Fields{
+				"error": err,
+			}).Info("zeroing burn | coinbase tx failed")
+			return err
+		}
+
+	}
+
+	return nil
 }
 
 // If SyncBlock returns no error, than that height was synced and saved. If any part of the sync fails,
@@ -299,6 +361,7 @@ func (d *Pegnetd) SyncBlock(ctx context.Context, tx *sql.Tx, height uint32) erro
 			return err
 		}
 	}
+
 	return nil
 }
 
@@ -739,7 +802,8 @@ func (d *Pegnetd) recordBatch(sqlTx *sql.Tx, txBatch *fat2.TransactionBatch, rat
 		}
 
 		// Outputs
-		if tx.IsConversion() { // Conv Output
+		if tx.IsConversion() {
+			// Conversions Output
 			outputAmount, err := conversions.Convert(int64(tx.Input.Amount), rates[tx.Input.Type], rates[tx.Conversion])
 			if err != nil {
 				return err
@@ -748,19 +812,26 @@ func (d *Pegnetd) recordBatch(sqlTx *sql.Tx, txBatch *fat2.TransactionBatch, rat
 			if err = d.Pegnet.SetTransactionHistoryConvertedAmount(sqlTx, txBatch, txIndex, outputAmount); err != nil {
 				return err
 			}
+
 			_, err = d.Pegnet.AddToBalance(sqlTx, &tx.Input.Address, tx.Conversion, uint64(outputAmount))
 			if err != nil {
 				return err
 			}
-		} else { // Transfer Outputs
+
+		} else {
+			// Transfer Outputs
+
 			for _, transfer := range tx.Transfers {
-				_, err = d.Pegnet.AddToBalance(sqlTx, &transfer.Address, tx.Input.Type, transfer.Amount)
-				if err != nil {
-					return err
-				}
-				_, err = d.Pegnet.InsertTransactionRelation(sqlTx, transfer.Address, txBatch.Entry.Hash, uint64(txIndex), true, false)
-				if err != nil {
-					return err
+				// if transfer to Burn address do nothing, otherwise add balances
+				if transfer.Address != FAGlobalBurnAddress {
+					_, err = d.Pegnet.AddToBalance(sqlTx, &transfer.Address, tx.Input.Type, transfer.Amount)
+					if err != nil {
+						return err
+					}
+					_, err = d.Pegnet.InsertTransactionRelation(sqlTx, transfer.Address, txBatch.Entry.Hash, uint64(txIndex), true, false)
+					if err != nil {
+						return err
+					}
 				}
 			}
 		}
