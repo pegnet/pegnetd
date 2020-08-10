@@ -52,8 +52,8 @@ var (
 	V4OPRUpdate uint32 = 231620
 
 	// V20HeightActivation indicates the activation of PegNet 2.0.
-	// Estimated to be  July 29th 2020 16:40 UTC
-	V20HeightActivation uint32 = 255778
+	// Estimated to be  Aug 19th 2020 14:00 UTC
+	V20HeightActivation uint32 = 258796
 )
 
 func SetAllActivations(act uint32) {
