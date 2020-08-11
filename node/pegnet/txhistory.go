@@ -451,6 +451,65 @@ func (p *Pegnet) InsertStakingCoinbase(tx *sql.Tx, txid string, height uint32, h
 	return nil
 }
 
+func (p *Pegnet) InsertDeveloperRewardCoinbase(tx *sql.Tx, txid string, addTxid string, height uint32, heightTimestamp time.Time, payout uint64, faAdd factom.FAAddress) error {
+	txidBytes, err := hex.DecodeString(txid)
+	if err != nil {
+		return err
+	}
+
+	// 	First we need to record the batch. The batch is the entire set of transactions, where
+	// 	each tx is a deverloper reward.
+	stmt, err := tx.Prepare(`INSERT INTO "pn_history_txbatch"
+                (entry_hash, height, blockorder, timestamp, executed) VALUES
+                (?, ?, ?, ?, ?)`)
+	if err != nil {
+		return err
+	}
+
+	// The Entryhash is the custom txid, it is not an actual entry on chain
+	// The executed height is the same height as the recorded.
+	_, err = stmt.Exec(txidBytes, height, 0, heightTimestamp.Unix(), height)
+	if err != nil {
+		return err
+	}
+
+	// Now we record each developer reward.
+
+	// All addresses are stored as bytes in the sqlitedb
+	add := faAdd[:]
+	// index for the address
+	index, _, err := SplitTxID(addTxid)
+	if err != nil {
+		return err
+	}
+
+	// Insert each payout as a coinbase.
+	// Insert the TX
+	coinbaseStatement, err := tx.Prepare(`INSERT INTO "pn_history_transaction"
+		            (entry_hash, tx_index, action_type, from_address, from_asset, from_amount, to_asset, to_amount, outputs) VALUES
+		            (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+	if err != nil {
+		return err
+	}
+
+	_, err = coinbaseStatement.Exec(txidBytes, index, Coinbase, add, "", 0, "PEG", payout, "")
+	if err != nil {
+		return err
+	}
+
+	// Insert into lookup table
+	lookup, err := tx.Prepare(insertLookupQuery)
+	if err != nil {
+		return err
+	}
+
+	if _, err = lookup.Exec(txidBytes, index, add); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 // Special construction to nullify burn address
 func (p *Pegnet) InsertZeroingCoinbase(tx *sql.Tx, txid string, addTxid string, height uint32, heightTimestamp time.Time, payout uint64, asset string, faAdd factom.FAAddress) error {
 	txidBytes, err := hex.DecodeString(txid)

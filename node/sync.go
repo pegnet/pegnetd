@@ -362,6 +362,15 @@ func (d *Pegnetd) SyncBlock(ctx context.Context, tx *sql.Tx, height uint32) erro
 		}
 	}
 
+	// 5) Apply Developers Rewards
+	if height >= V20HeightActivation && height%pegnet.SnapshotRate == 0 {
+		err := d.DevelopersPayouts(tx, fLog, height, dblock.Timestamp, DeveloperRewardAddreses)
+		if err != nil {
+			// something wrong happend during payout execution
+			return err
+		}
+	}
+
 	return nil
 }
 
@@ -481,6 +490,67 @@ func (d *Pegnetd) SnapshotPayouts(tx *sql.Tx, fLog *log.Entry, rates map[fat2.PT
 		"PEG":      float64(totalPayout) / 1e8, // Float is good enough here,
 		"txid":     txid,
 	}).Info("staking | balances snapshotted | paid to eligible")
+	return nil
+}
+
+// Developers Reward Payouts
+// implementation of PIP16 - distributed rewards collected for developers every 24h
+func (d *Pegnetd) DevelopersPayouts(tx *sql.Tx, fLog *log.Entry, height uint32, heightTimestamp time.Time, developers []DevReward) error {
+
+	totalPayout := uint64(conversions.PerBlockDevelopers) * pegnet.SnapshotRate // once a day
+	payoutStart := time.Now()
+
+	// We need to mock a TXID to record dev rewards
+	txid := fmt.Sprintf("%064d", height)
+
+	// we use hardcoded list of dev payouts
+	i := 0
+	for _, dev := range developers {
+
+		// we calculate developers reward from % pre-defined
+		rewardPayout := uint64((conversions.PerBlockDevelopers / 100) * dev.DevRewardPct)
+		addr, err := factom.NewFAAddress(dev.DevAddress)
+
+		_, err = d.Pegnet.AddToBalance(tx, &addr, fat2.PTickerPEG, rewardPayout)
+		if err != nil {
+			return err
+		}
+
+		// Mock entry hash value
+		addTxid := fmt.Sprintf("%d-%s", i, txid)
+		i++
+
+		// Get dev address as FAAdress
+		FADevAddress, err := factom.NewFAAddress(dev.DevAddress)
+		if err != nil {
+			log.WithFields(log.Fields{
+				"error": err,
+				"addr":  dev.DevAddress,
+			}).Info("error getting developer address")
+			return err
+		}
+
+		// ---- Database Payouts ----
+		// Inserts tx into the db
+		err = d.Pegnet.InsertDeveloperRewardCoinbase(tx, txid, addTxid, height, heightTimestamp, rewardPayout, FADevAddress)
+		if err != nil {
+			return err
+		}
+
+		fLog.WithFields(log.Fields{
+			"total":     float64(totalPayout) / 1e8,
+			"developer": len(dev.DevAddress),
+			"PEG":       float64(rewardPayout) / 1e8, // Float is good enough here
+		}).Info("developer reward | paid out to")
+
+	}
+
+	fLog.WithFields(log.Fields{
+		"total":   float64(totalPayout) / 1e8,
+		"elapsed": time.Since(payoutStart),
+		"txid":    txid,
+	}).Info("developer rewards | paid out")
+
 	return nil
 }
 
