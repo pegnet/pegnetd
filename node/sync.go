@@ -247,40 +247,56 @@ func (d *Pegnetd) SyncBlock(ctx context.Context, tx *sql.Tx, height uint32) erro
 			return err
 		}
 	}
+	sprEBlock := dblock.EBlock(SPRChain)
+	if sprEBlock != nil {
+		if err := multiFetch(sprEBlock, d.FactomClient); err != nil {
+			return err
+		}
+	}
 
 	// Then, grade the new OPR Block. The results of this will be used
 	// to execute conversions that are in holding.
 	gradedBlock, err := d.Grade(ctx, oprEBlock)
+	gradedSPRBlock, err_s := d.Grade(ctx, sprEBlock)
 	if err != nil {
 		return err
 	} else if gradedBlock != nil {
-		err = d.Pegnet.InsertGradeBlock(tx, oprEBlock, gradedBlock)
-		if err != nil {
-			return err
-		}
-		winners := gradedBlock.Winners()
-		if 0 < len(winners) {
-			// PEG has 3 current pricing phases
-			// 1: Price is 0
-			// 2: Price is determined by equation
-			// 3: Price is determine by miners
-			var phase pegnet.PEGPricingPhase
-			if height < PEGPricingActivation {
-				phase = pegnet.PEGPriceIsZero
-			}
-			if height >= PEGPricingActivation {
-				phase = pegnet.PEGPriceIsEquation
-			}
-			if height >= PEGFreeFloatingPriceActivation {
-				phase = pegnet.PEGPriceIsFloating
-			}
-
-			err = d.Pegnet.InsertRates(tx, height, winners[0].OPR.GetOrderedAssetsUint(), phase)
+		if height < V20HeightActivation {
+			err = d.Pegnet.InsertGradeBlock(tx, oprEBlock, gradedBlock)
 			if err != nil {
 				return err
 			}
+			winners := gradedBlock.Winners()
+			if 0 < len(winners) {
+				// PEG has 3 current pricing phases
+				// 1: Price is 0
+				// 2: Price is determined by equation
+				// 3: Price is determine by miners
+				var phase pegnet.PEGPricingPhase
+				if height < PEGPricingActivation {
+					phase = pegnet.PEGPriceIsZero
+				}
+				if height >= PEGPricingActivation {
+					phase = pegnet.PEGPriceIsEquation
+				}
+				if height >= PEGFreeFloatingPriceActivation {
+					phase = pegnet.PEGPriceIsFloating
+				}
+
+				err = d.Pegnet.InsertRates(tx, height, winners[0].OPR.GetOrderedAssetsUint(), phase)
+				if err != nil {
+					return err
+				}
+			} else {
+				fLog.WithFields(log.Fields{"section": "grading", "reason": "no winners"}).Tracef("block not graded")
+			}
 		} else {
-			fLog.WithFields(log.Fields{"section": "grading", "reason": "no winners"}).Tracef("block not graded")
+			if err_s != nil {
+				return err_s
+			}
+			// Todo:
+			// 1. Determine the rate from 3 OPRs (OPR, SPR, DPR)
+			// 2. Insert rate to DB
 		}
 	} else {
 		fLog.WithFields(log.Fields{"section": "grading", "reason": "no graded block"}).Tracef("block not graded")
@@ -362,7 +378,17 @@ func (d *Pegnetd) SyncBlock(ctx context.Context, tx *sql.Tx, height uint32) erro
 		}
 	}
 
-	// 5) Apply Developers Rewards
+	if height >= V20HeightActivation {
+		// 5) Apply effects of graded SPR Block (PEG rewards, if any)
+		//    These funds will be available for transactions and conversions executed in the next block
+		if gradedSPRBlock != nil {
+			if err := d.ApplyGradedOPRBlock(tx, gradedSPRBlock, dblock.Timestamp); err != nil {
+				return err
+			}
+		}
+	}
+
+	// 6) Apply Developers Rewards
 	if height >= V20HeightActivation && height%pegnet.SnapshotRate == 0 {
 		err := d.DevelopersPayouts(tx, fLog, height, dblock.Timestamp, DeveloperRewardAddreses)
 		if err != nil {
