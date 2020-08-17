@@ -1,6 +1,7 @@
 package pegnet
 
 import (
+	"bytes"
 	"database/sql"
 	"fmt"
 	"strings"
@@ -436,6 +437,29 @@ type BalancePair struct {
 type BalancesPair struct {
 	Address  *factom.FAAddress
 	Balances []uint64
+}
+
+func (p *Pegnet) IsIncludedTopPEGAddress(address []byte) bool {
+	count := 100 // Top 100 addresses
+	stmtStringFmt := `SELECT address, %[1]s_balance FROM pn_addresses WHERE %[1]s_balance > 0 ORDER BY %[1]s_balance DESC LIMIT ?;`
+	stmt := fmt.Sprintf(stmtStringFmt, strings.ToLower("PEG"))
+	rows, err := p.DB.Query(stmt, count)
+	if err != nil {
+		return false
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var Balance uint64
+		var adr []byte
+		if err := rows.Scan(&adr, &Balance); err != nil {
+			return false
+		}
+		if bytes.Equal(address, adr) {
+			return true
+		}
+	}
+	return false
 }
 
 // SelectRichList returns the balance of all addresses for a given ticker

@@ -11,6 +11,8 @@ import (
 	"github.com/Factom-Asset-Tokens/factom"
 	"github.com/pegnet/pegnet/modules/conversions"
 	"github.com/pegnet/pegnet/modules/grader"
+	"github.com/pegnet/pegnet/modules/graderStake"
+	"github.com/pegnet/pegnet/modules/opr"
 	"github.com/pegnet/pegnet/modules/transactionid"
 	"github.com/pegnet/pegnetd/config"
 	"github.com/pegnet/pegnetd/fat/fat2"
@@ -247,43 +249,94 @@ func (d *Pegnetd) SyncBlock(ctx context.Context, tx *sql.Tx, height uint32) erro
 			return err
 		}
 	}
+	sprEBlock := dblock.EBlock(SPRChain)
+	if sprEBlock != nil {
+		if err := multiFetch(sprEBlock, d.FactomClient); err != nil {
+			return err
+		}
+	}
 
 	// Then, grade the new OPR Block. The results of this will be used
 	// to execute conversions that are in holding.
 	gradedBlock, err := d.Grade(ctx, oprEBlock)
-	if err != nil {
-		return err
-	} else if gradedBlock != nil {
-		err = d.Pegnet.InsertGradeBlock(tx, oprEBlock, gradedBlock)
+	gradedSPRBlock, err_s := d.GradeS(ctx, sprEBlock)
+	isRatesAvailable := false
+	if height < V20HeightActivation {
 		if err != nil {
 			return err
 		}
-		winners := gradedBlock.Winners()
-		if 0 < len(winners) {
-			// PEG has 3 current pricing phases
-			// 1: Price is 0
-			// 2: Price is determined by equation
-			// 3: Price is determine by miners
-			var phase pegnet.PEGPricingPhase
-			if height < PEGPricingActivation {
-				phase = pegnet.PEGPriceIsZero
+		isRatesAvailable = gradedBlock != nil && 0 < len(gradedBlock.Winners())
+		if gradedBlock != nil {
+			err = d.Pegnet.InsertGradeBlock(tx, oprEBlock, gradedBlock)
+			if err != nil {
+				return err
 			}
-			if height >= PEGPricingActivation {
-				phase = pegnet.PEGPriceIsEquation
-			}
-			if height >= PEGFreeFloatingPriceActivation {
-				phase = pegnet.PEGPriceIsFloating
-			}
+			winners := gradedBlock.Winners()
+			if 0 < len(winners) {
+				// PEG has 3 current pricing phases
+				// 1: Price is 0
+				// 2: Price is determined by equation
+				// 3: Price is determine by miners
+				var phase pegnet.PEGPricingPhase
+				if height < PEGPricingActivation {
+					phase = pegnet.PEGPriceIsZero
+				}
+				if height >= PEGPricingActivation {
+					phase = pegnet.PEGPriceIsEquation
+				}
+				if height >= PEGFreeFloatingPriceActivation {
+					phase = pegnet.PEGPriceIsFloating
+				}
 
-			err = d.Pegnet.InsertRates(tx, height, winners[0].OPR.GetOrderedAssetsUint(), phase)
+				err = d.Pegnet.InsertRates(tx, height, winners[0].OPR.GetOrderedAssetsUint(), phase)
+				if err != nil {
+					return err
+				}
+			} else {
+				fLog.WithFields(log.Fields{"section": "grading", "reason": "no winners"}).Tracef("block not graded")
+			}
+		} else {
+			fLog.WithFields(log.Fields{"section": "grading", "reason": "no graded block"}).Tracef("block not graded")
+		}
+	} else {
+		if err != nil {
+			return err
+		}
+		if err_s != nil {
+			return err_s
+		}
+		// 1. Determine the rates from 2 OPRs (OPR, SPR)
+		// 2. Insert rates to DB
+		var oprWinners []opr.AssetUint
+		var sprWinners []opr.AssetUint
+
+		if gradedBlock != nil {
+			winnersOpr := gradedBlock.Winners()
+			if 0 < len(winnersOpr) {
+				oprWinners = winnersOpr[0].OPR.GetOrderedAssetsUint()
+			}
+		}
+		if gradedSPRBlock != nil {
+			winnersSpr := gradedSPRBlock.Winners()
+			if 0 < len(winnersSpr) {
+				sprWinners = winnersSpr[0].SPR.GetOrderedAssetsUint()
+			}
+		}
+		if 0 < len(oprWinners) || 0 < len(sprWinners) {
+			filteredRates, errRate := d.GetAssetRates(oprWinners, sprWinners)
+			if errRate != nil {
+				return err
+			}
+			isRatesAvailable = true
+			var phase pegnet.PEGPricingPhase
+			phase = pegnet.PEGPriceIsFloating
+			err = d.Pegnet.InsertRates(tx, height, filteredRates, phase)
 			if err != nil {
 				return err
 			}
 		} else {
-			fLog.WithFields(log.Fields{"section": "grading", "reason": "no winners"}).Tracef("block not graded")
+			fLog.WithFields(log.Fields{"section": "grading", "reason": "no winners from OPR & SPR"}).Tracef("block not graded")
 		}
-	} else {
-		fLog.WithFields(log.Fields{"section": "grading", "reason": "no graded block"}).Tracef("block not graded")
 	}
 
 	// Only apply transactions if we crossed the activation
@@ -324,7 +377,7 @@ func (d *Pegnetd) SyncBlock(ctx context.Context, tx *sql.Tx, height uint32) erro
 		// At this point, we start making updates to the database in a specific order:
 		// TODO: ensure we rollback the tx when needed
 		// 1) Apply transaction batches that are in holding (conversions are always applied here)
-		if gradedBlock != nil && 0 < len(gradedBlock.Winners()) {
+		if isRatesAvailable {
 			// Before conversions can be run, we have to adjust and discover the bank's value.
 			// We also only sync the bank if the block is a pegnet block
 			if err := d.SyncBank(ctx, tx, height); err != nil {
@@ -362,7 +415,17 @@ func (d *Pegnetd) SyncBlock(ctx context.Context, tx *sql.Tx, height uint32) erro
 		}
 	}
 
-	// 5) Apply Developers Rewards
+	if height >= V20HeightActivation {
+		// 5) Apply effects of graded SPR Block (PEG rewards, if any)
+		//    These funds will be available for transactions and conversions executed in the next block
+		if gradedSPRBlock != nil {
+			if err := d.ApplyGradedSPRBlock(tx, gradedSPRBlock, dblock.Timestamp); err != nil {
+				return err
+			}
+		}
+	}
+
+	// 6) Apply Developers Rewards
 	if height >= V20HeightActivation && height%pegnet.SnapshotRate == 0 {
 		err := d.DevelopersPayouts(tx, fLog, height, dblock.Timestamp, DeveloperRewardAddreses)
 		if err != nil {
@@ -1088,6 +1151,34 @@ func (d *Pegnetd) ApplyGradedOPRBlock(tx *sql.Tx, gradedBlock grader.GradedBlock
 	return nil
 }
 
+// ApplyGradedOPRBlock pays out PEG to the winners of the given GradedBlock.
+// If an error is returned, the sql.Tx should be rolled back by the caller.
+func (d *Pegnetd) ApplyGradedSPRBlock(tx *sql.Tx, gradedSPRBlock graderStake.GradedBlock, timestamp time.Time) error {
+	winners := gradedSPRBlock.Winners()
+	for i := range winners {
+		addr, err := factom.NewFAAddress(winners[i].SPR.GetAddress())
+		if err != nil {
+			// TODO: This is kinda an odd case. I think we should just drop the rewards
+			// 		for an invalid address. We can always add back the rewards and they will have
+			//		a higher balance after a change.
+			log.WithError(err).WithFields(log.Fields{
+				"height": winners[i].SPR.GetHeight(),
+				"ehash":  fmt.Sprintf("%x", winners[i].EntryHash),
+			}).Warnf("failed to reward")
+			continue
+		}
+
+		if _, err := d.Pegnet.AddToBalance(tx, &addr, fat2.PTickerPEG, uint64(winners[i].Payout())); err != nil {
+			return err
+		}
+
+		if err := d.Pegnet.InsertStaking100Coinbase(tx, winners[i], addr[:], timestamp); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func isDone(ctx context.Context) bool {
 	select {
 	case <-ctx.Done():
@@ -1095,4 +1186,41 @@ func isDone(ctx context.Context) bool {
 	default:
 		return false
 	}
+}
+
+func (d *Pegnetd) GetAssetRates(oprWinners []opr.AssetUint, sprWinners []opr.AssetUint) ([]opr.AssetUint, error) {
+	if 0 < len(oprWinners) && 0 == len(sprWinners) {
+		return oprWinners, nil
+	}
+	if 0 == len(oprWinners) && 0 < len(sprWinners) {
+		return sprWinners, nil
+	}
+	if 0 < len(oprWinners) && 0 < len(sprWinners) {
+		// 1) sprWinners determine tolerance range
+		// 2) oprWinners set the real rates
+		if len(oprWinners) != len(sprWinners) {
+			return nil, fmt.Errorf("SPR & OPR use different assets version")
+		}
+
+		var filteredRates []opr.AssetUint
+		for i := range oprWinners {
+			if oprWinners[i].Name == sprWinners[i].Name {
+				sprRate := sprWinners[i].Value
+				oprRate := oprWinners[i].Value
+				toleranceRate := 0.01 // 1% band
+				if sprRate >= 100000 {
+					toleranceRate = 0.001 // 0.1% band
+				}
+				toleranceBandHigh := float64(sprRate) * (1 + toleranceRate)
+				toleranceBandLow := float64(sprRate) * (1 - toleranceRate)
+				if (float64(oprRate) >= toleranceBandLow) && (float64(oprRate) <= toleranceBandHigh) {
+					filteredRates = append(filteredRates, oprWinners[i])
+				} else {
+					return nil, fmt.Errorf("opr is out side of tolerance band")
+				}
+			}
+		}
+		return filteredRates, nil
+	}
+	return nil, fmt.Errorf("no winners")
 }
