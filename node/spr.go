@@ -35,14 +35,13 @@ func (d *Pegnetd) GradeS(ctx context.Context, block *factom.EBlock) (graderStake
 		}
 		// allow only top 100 stake holders submit prices
 		stakerRCD := extids[1]
-		if !d.Pegnet.IsIncludedTopPEGAddress(stakerRCD) {
-			return nil, fmt.Errorf("trying to submit without enough peg. only top 100 peg holders can submit prices")
-		}
-		// ignore bad opr errors
-		err = g.AddSPR(entry.Hash[:], extids, entry.Content)
-		if err != nil {
-			// This is a noisy debug print
-			//logrus.WithError(err).WithFields(logrus.Fields{"hash": entry.Hash.String()}).Debug("failed to add spr")
+		if d.Pegnet.IsIncludedTopPEGAddress(stakerRCD) {
+			// ignore bad opr errors
+			err = g.AddSPR(entry.Hash[:], extids, entry.Content)
+			if err != nil {
+				// This is a noisy debug print
+				//logrus.WithError(err).WithFields(logrus.Fields{"hash": entry.Hash.String()}).Debug("failed to add spr")
+			}
 		}
 	}
 
