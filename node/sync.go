@@ -480,6 +480,7 @@ func (d *Pegnetd) SnapshotPayouts(tx *sql.Tx, fLog *log.Entry, rates map[fat2.PT
 	}
 	// We need to mock a TXID for the staked payouts
 	txid := fmt.Sprintf("%064d", height)
+
 	// Sort the staked by highest PUSD
 	type StakedAmount struct {
 		Address factom.FAAddress
@@ -565,12 +566,15 @@ func (d *Pegnetd) DevelopersPayouts(tx *sql.Tx, fLog *log.Entry, height uint32, 
 	totalPayout := uint64(conversions.PerBlockDevelopers) * pegnet.SnapshotRate // once a day
 	payoutStart := time.Now()
 
-	// We need to mock a TXID to record dev rewards
 	txid := fmt.Sprintf("%064d", height)
 
 	// we use hardcoded list of dev payouts
 	i := 0
+	j := 0 // we need more values for unique hash
 	for _, dev := range developers {
+
+		// We need to mock a TXID to record dev rewards
+		txid = fmt.Sprintf("%064d", height-(uint32(j)))
 
 		// we calculate developers reward from % pre-defined
 		rewardPayout := uint64((conversions.PerBlockDevelopers / 100) * dev.DevRewardPct)
@@ -583,7 +587,16 @@ func (d *Pegnetd) DevelopersPayouts(tx *sql.Tx, fLog *log.Entry, height uint32, 
 
 		// Mock entry hash value
 		addTxid := fmt.Sprintf("%d-%s", i, txid)
+		j++ // iterate all the time to build unique hash
 		i++
+		if i > 9 {
+			i = 0
+		}
+
+		fLog.WithFields(log.Fields{
+			"txid":    txid,
+			"addtxid": addTxid,
+		}).Info("developer reward | prep")
 
 		// Get dev address as FAAdress
 		FADevAddress, err := factom.NewFAAddress(dev.DevAddress)
@@ -599,12 +612,14 @@ func (d *Pegnetd) DevelopersPayouts(tx *sql.Tx, fLog *log.Entry, height uint32, 
 		// Inserts tx into the db
 		err = d.Pegnet.InsertDeveloperRewardCoinbase(tx, txid, addTxid, height, heightTimestamp, rewardPayout, FADevAddress)
 		if err != nil {
+			log.Info("dev insertion error")
 			return err
 		}
 
 		fLog.WithFields(log.Fields{
 			"total":     float64(totalPayout) / 1e8,
 			"developer": len(dev.DevAddress),
+			"addr":      FADevAddress,
 			"PEG":       float64(rewardPayout) / 1e8, // Float is good enough here
 		}).Info("developer reward | paid out to")
 
