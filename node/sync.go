@@ -311,6 +311,10 @@ func (d *Pegnetd) SyncBlock(ctx context.Context, tx *sql.Tx, height uint32) erro
 		var sprWinners []opr.AssetUint
 
 		if gradedBlock != nil {
+			err = d.Pegnet.InsertGradeBlock(tx, oprEBlock, gradedBlock)
+			if err != nil {
+				return err
+			}
 			winnersOpr := gradedBlock.Winners()
 			if 0 < len(winnersOpr) {
 				oprWinners = winnersOpr[0].OPR.GetOrderedAssetsUint()
@@ -429,10 +433,8 @@ func (d *Pegnetd) SyncBlock(ctx context.Context, tx *sql.Tx, height uint32) erro
 	if height >= V20HeightActivation && height%pegnet.SnapshotRate == 0 {
 		err := d.DevelopersPayouts(tx, fLog, height, dblock.Timestamp, DeveloperRewardAddreses)
 		if err != nil {
-			// something wrong happend during payout execution
-			// We don't return error as it will stop synchronisation
-			// we continue execution but skiping payout for this time
 			fLog.WithFields(log.Fields{"section": "devReward", "reason": "developer reward"}).Tracef("something wrong happend during dev payout execution")
+			return err
 		}
 	}
 
