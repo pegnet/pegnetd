@@ -311,6 +311,10 @@ func (d *Pegnetd) SyncBlock(ctx context.Context, tx *sql.Tx, height uint32) erro
 		var sprWinners []opr.AssetUint
 
 		if gradedBlock != nil {
+			err = d.Pegnet.InsertGradeBlock(tx, oprEBlock, gradedBlock)
+			if err != nil {
+				return err
+			}
 			winnersOpr := gradedBlock.Winners()
 			if 0 < len(winnersOpr) {
 				oprWinners = winnersOpr[0].OPR.GetOrderedAssetsUint()
