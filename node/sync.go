@@ -94,7 +94,7 @@ OuterSyncLoop:
 
 			// One time operation, Inserts negative balance for the burn address that used during the attack
 			// We need to do this before main logic because sqlite db will be locked
-			if d.Sync.Synced+1 == V20HeightActivation+400 {
+			if d.Sync.Synced+1 == V20HeightActivation+1000 {
 				d.NullifyBurnAddress(ctx, tx, d.Sync.Synced+1)
 			}
 
@@ -736,6 +736,13 @@ func (d *Pegnetd) ApplyTransactionBatchesInHolding(ctx context.Context, sqlTx *s
 		for i, txBatch := range txBatches {
 			// Re-validate transaction batch because timestamp might not be valid anymore
 
+			if currentHeight >= V20HeightActivation {
+				if err := txBatch.ValidatePegTx(int32(currentHeight)); err != nil {
+					d.Pegnet.SetTransactionHistoryExecuted(sqlTx, txBatch, -2)
+					continue
+				}
+			}
+
 			if err := txBatch.Validate(int32(currentHeight)); err != nil {
 				d.Pegnet.SetTransactionHistoryExecuted(sqlTx, txBatch, -2)
 				continue
@@ -882,11 +889,6 @@ func (d *Pegnetd) applyTransactionBatch(sqlTx *sql.Tx, txBatch *fat2.Transaction
 				// This error will fail the block
 				return fmt.Errorf("rates must exist if TransactionBatch contains conversions")
 			}
-
-			if (tx.Conversion == fat2.PTickerPEG) && (currentHeight >= V20HeightActivation) {
-				return pegnet.PEGConversionError
-			}
-
 			if rates[tx.Input.Type] == 0 || rates[tx.Conversion] == 0 {
 				// This error will not fail the block, skip the tx
 				return pegnet.ZeroRatesError // 0 rates result in an invalid tx. So we drop it

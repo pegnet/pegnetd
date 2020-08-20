@@ -121,6 +121,20 @@ func (t *TransactionBatch) Validate(height int32) error {
 	return nil
 }
 
+
+func (t *TransactionBatch) ValidatePegTx(height int32) error {
+	err := t.ValidData()
+	if err != nil {
+		return err
+	}
+	for _, t := range t.Transactions {
+		if t.Conversion == PTickerPEG {
+			return errors.New("pAssets to PEG conversion is disabled")
+		}
+	}
+	return nil
+}
+
 // ValidData validates all Transaction data included in the batch and returns
 // nil if it is valid. This function assumes that the entry content (or an
 // independent JSON object) has been unmarshaled.
