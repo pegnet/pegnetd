@@ -334,6 +334,7 @@ func (d *Pegnetd) SyncBlock(ctx context.Context, tx *sql.Tx, height uint32) erro
 			isRatesAvailable = true
 			var phase pegnet.PEGPricingPhase
 			phase = pegnet.PEGPriceIsFloating
+			fmt.Println("==== filteredRates:", filteredRates, ", phase:", phase)
 			err = d.Pegnet.InsertRates(tx, height, filteredRates, phase)
 			if err != nil {
 				return err
@@ -382,23 +383,17 @@ func (d *Pegnetd) SyncBlock(ctx context.Context, tx *sql.Tx, height uint32) erro
 		// TODO: ensure we rollback the tx when needed
 		// 1) Apply transaction batches that are in holding (conversions are always applied here)
 		if isRatesAvailable {
-			// Before conversions can be run, we have to adjust and discover the bank's value.
-			// We also only sync the bank if the block is a pegnet block
-			if err := d.SyncBank(ctx, tx, height); err != nil {
-				return err
-			}
-
 			if err = d.ApplyTransactionBatchesInHolding(ctx, tx, height, rates); err != nil {
 				return err
 			}
 		}
 
 		// 2) Sync transactions in current height and apply transactions
-		if transactionsEBlock != nil {
-			if err = d.ApplyTransactionBlock(tx, transactionsEBlock); err != nil {
-				return err
-			}
-		}
+		//if transactionsEBlock != nil {
+		//	if err = d.ApplyTransactionBlock(tx, transactionsEBlock); err != nil {
+		//		return err
+		//	}
+		//}
 	}
 
 	// Only apply burn transaction if height does not cross the activation
@@ -414,9 +409,9 @@ func (d *Pegnetd) SyncBlock(ctx context.Context, tx *sql.Tx, height uint32) erro
 	// 4) Apply effects of graded OPR Block (PEG rewards, if any)
 	//    These funds will be available for transactions and conversions executed in the next block
 	if gradedBlock != nil {
-		if err := d.ApplyGradedOPRBlock(tx, gradedBlock, dblock.Timestamp); err != nil {
-			return err
-		}
+		//if err := d.ApplyGradedOPRBlock(tx, gradedBlock, dblock.Timestamp); err != nil {
+		//	return err
+		//}
 	}
 
 	if height >= V20HeightActivation {
@@ -666,19 +661,6 @@ func multiFetch(eblock *factom.EBlock, c *factom.Client) error {
 	return nil
 }
 
-// SyncBank will input the bank value for all heights >= V4OPRUpdate
-// The bank table helps track the demand for peg at a given height.
-// The bank is the total amount of PEG allowed to be issued for any given height.
-func (d *Pegnetd) SyncBank(ctx context.Context, sqlTx *sql.Tx, currentHeight uint32) error {
-	if currentHeight >= V4OPRUpdate { // V4 forward tracks this
-		err := d.Pegnet.InsertBankAmount(sqlTx, int32(currentHeight), int64(pegnet.BankBaseAmount))
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
 // ApplyTransactionBatchesInHolding attempts to apply the transaction batches from previous
 // blocks that were put into holding because they contained conversions.
 // If an error is returned, the sql.Tx should be rolled back by the caller.
@@ -687,9 +669,6 @@ func (d *Pegnetd) ApplyTransactionBatchesInHolding(ctx context.Context, sqlTx *s
 	if err != nil {
 		return err
 	}
-
-	// All batches with a PEG conversion
-	var pegConversions []*fat2.TransactionBatch
 
 	// Usually height is just currentHeight-1, but it can be farther back
 	// if the miners have skipped a block
@@ -702,8 +681,9 @@ func (d *Pegnetd) ApplyTransactionBatchesInHolding(ctx context.Context, sqlTx *s
 		// For all conversions, we need to apply the PEG conversion limit.
 		// This means, we need to find all valid conversions and pay them out
 		// on a proportional basis.
-		for i, txBatch := range txBatches {
+		for _, txBatch := range txBatches {
 			// Re-validate transaction batch because timestamp might not be valid anymore
+
 			if err := txBatch.Validate(int32(currentHeight)); err != nil {
 				d.Pegnet.SetTransactionHistoryExecuted(sqlTx, txBatch, -2)
 				continue
@@ -727,45 +707,7 @@ func (d *Pegnetd) ApplyTransactionBatchesInHolding(ctx context.Context, sqlTx *s
 				return err
 			} else if rejectCode < 0 { // Tx rejected
 				d.Pegnet.SetTransactionHistoryExecuted(sqlTx, txBatch, rejectCode)
-			} else if err == nil { // Tx accepted
-				// If PegnetConversion limits are on, we process conversions to
-				// peg in a second pass.
-				if currentHeight >= PegnetConversionLimitActivation && txBatch.HasPEGRequest() {
-					// Batch applied, we need to do the PEG conversions at the end
-					pegConversions = append(pegConversions, txBatches[i])
-				}
 			}
-		}
-
-		// Apply all PEG Requests
-		// The `conversions.PerBlock` is the allowed amount of PEG to be
-		// converted. So when the bank is implemented, it should be passed in
-		// here.
-		//
-		// This is processing each height of conversions as its own block
-		// of conversions. After the v4 update, all pending conversions get
-		// processed together for peg conversions
-		if currentHeight >= PegnetConversionLimitActivation && currentHeight < V4OPRUpdate {
-			// All heights before v4 use the currentHeight-1 with a 5K PEG bank
-			bank := pegnet.BankBaseAmount
-			err = d.recordPegnetRequests(sqlTx, pegConversions, rates, currentHeight, bank, int32(currentHeight-1))
-			if err != nil {
-				return err
-			}
-			pegConversions = []*fat2.TransactionBatch{}
-		}
-	}
-
-	// Process all pending using the same bank
-	if currentHeight >= V4OPRUpdate {
-		// The bank entry should be here from the sync banks called before this function.
-		bentry, err := d.Pegnet.SelectBankEntry(sqlTx, int32(currentHeight))
-		if err != nil {
-			return err
-		}
-		err = d.recordPegnetRequests(sqlTx, pegConversions, rates, currentHeight, uint64(bentry.BankAmount), int32(currentHeight))
-		if err != nil {
-			return err
 		}
 	}
 	return nil
@@ -1193,13 +1135,13 @@ func isDone(ctx context.Context) bool {
 }
 
 func (d *Pegnetd) GetAssetRates(oprWinners []opr.AssetUint, sprWinners []opr.AssetUint) ([]opr.AssetUint, error) {
-	if 0 < len(oprWinners) && 0 == len(sprWinners) {
+	if oprWinners != nil && sprWinners == nil {
 		return oprWinners, nil
 	}
-	if 0 == len(oprWinners) && 0 < len(sprWinners) {
+	if oprWinners == nil && sprWinners != nil {
 		return sprWinners, nil
 	}
-	if 0 < len(oprWinners) && 0 < len(sprWinners) {
+	if oprWinners != nil && sprWinners != nil {
 		// 1) sprWinners determine tolerance range
 		// 2) oprWinners set the real rates
 		if len(oprWinners) != len(sprWinners) {
