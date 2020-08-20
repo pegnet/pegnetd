@@ -346,7 +346,6 @@ func (d *Pegnetd) SyncBlock(ctx context.Context, tx *sql.Tx, height uint32) erro
 			if errRate != nil {
 				return err
 			}
-			fmt.Println("filteredRates:", filteredRates)
 			isRatesAvailable = true
 			var phase pegnet.PEGPricingPhase
 			phase = pegnet.PEGPriceIsFloating
