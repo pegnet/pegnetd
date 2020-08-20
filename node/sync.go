@@ -194,19 +194,35 @@ func (d *Pegnetd) NullifyBurnAddress(ctx context.Context, tx *sql.Tx, height uin
 		}).Info("zeroing burn | balances retrieval failed")
 	}
 
+	i := 0 // value to keep witin 0-9 range for mock tx
+	j := 0 //
 	for ticker := fat2.PTickerInvalid + 1; ticker < fat2.PTickerMax; ticker++ {
 		// Substract from every issuance
 		value, _ := balances[ticker]
 		_, _, err := d.Pegnet.SubFromBalance(tx, &FAGlobalBurnAddress, ticker, value) // lastInd, txErr, err
 		if err != nil {
 			fLog.WithFields(log.Fields{
+				"time":    heightTimestamp,
 				"ticker":  ticker,
 				"balance": value,
 			}).Info("zeroing burn | substract from balance failed")
 		}
 
+		// We need to mock a TXID to record zeroing and it should be unique
+		txid = fmt.Sprintf("%064d", height-(uint32(j)))
+
 		// Mock entry hash value
-		addTxid := fmt.Sprintf("%d-%s", ticker, txid)
+		addTxid := fmt.Sprintf("%d-%s", i, txid)
+		j++ // iterate all the time
+		i++ // drop to zero to be within 0-9 range
+		if i > 9 {
+			i = 0
+		}
+
+		fLog.WithFields(log.Fields{
+			"txid":    txid,
+			"addtxid": addTxid,
+		}).Info("burn nullify | prep")
 
 		err = d.Pegnet.InsertZeroingCoinbase(tx, txid, addTxid, height, heightTimestamp, value, ticker.String(), FAGlobalBurnAddress)
 		if err != nil {
