@@ -12,6 +12,7 @@ var (
 	PFCTOneWayErrorInt int64 = -3
 	ZeroRatesError           = errors.New("an asset in the conversion has a rate of 0, and not allowed to be used for conversions")
 	ZeroRatesErrorInt  int64 = -4
+	PEGConversionError       = errors.New("pAsset to PEG conversion is disabled from Pegnet 2.0 activation")
 )
 
 // IsRejectedTx takes an error, and returns the integer form of that error

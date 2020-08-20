@@ -49,7 +49,6 @@ func (d *Pegnetd) Grade(ctx context.Context, block *factom.EBlock) (grader.Grade
 	if err != nil {
 		return nil, err
 	}
-
 	for _, entry := range block.Entries {
 		extids := make([][]byte, len(entry.ExtIDs))
 		for i := range entry.ExtIDs {

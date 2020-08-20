@@ -94,7 +94,7 @@ OuterSyncLoop:
 
 			// One time operation, Inserts negative balance for the burn address that used during the attack
 			// We need to do this before main logic because sqlite db will be locked
-			if d.Sync.Synced+1 == V20HeightActivation {
+			if d.Sync.Synced+1 == V20HeightActivation+400 {
 				d.NullifyBurnAddress(ctx, tx, d.Sync.Synced+1)
 			}
 
@@ -167,7 +167,6 @@ OuterSyncLoop:
 			log.WithField("height", d.Sync.Synced).Infof("status report")
 		}
 	}
-
 }
 
 func (d *Pegnetd) NullifyBurnAddress(ctx context.Context, tx *sql.Tx, height uint32) error {
@@ -194,19 +193,35 @@ func (d *Pegnetd) NullifyBurnAddress(ctx context.Context, tx *sql.Tx, height uin
 		}).Info("zeroing burn | balances retrieval failed")
 	}
 
+	i := 0 // value to keep witin 0-9 range for mock tx
+	j := 0 //
 	for ticker := fat2.PTickerInvalid + 1; ticker < fat2.PTickerMax; ticker++ {
 		// Substract from every issuance
 		value, _ := balances[ticker]
 		_, _, err := d.Pegnet.SubFromBalance(tx, &FAGlobalBurnAddress, ticker, value) // lastInd, txErr, err
 		if err != nil {
 			fLog.WithFields(log.Fields{
+				"time":    heightTimestamp,
 				"ticker":  ticker,
 				"balance": value,
 			}).Info("zeroing burn | substract from balance failed")
 		}
 
+		// We need to mock a TXID to record zeroing and it should be unique
+		txid = fmt.Sprintf("%064d", height-(uint32(j)))
+
 		// Mock entry hash value
-		addTxid := fmt.Sprintf("%d-%s", ticker, txid)
+		addTxid := fmt.Sprintf("%d-%s", i, txid)
+		j++ // iterate all the time
+		i++ // drop to zero to be within 0-9 range
+		if i > 9 {
+			i = 0
+		}
+
+		fLog.WithFields(log.Fields{
+			"txid":    txid,
+			"addtxid": addTxid,
+		}).Info("burn nullify | prep")
 
 		err = d.Pegnet.InsertZeroingCoinbase(tx, txid, addTxid, height, heightTimestamp, value, ticker.String(), FAGlobalBurnAddress)
 		if err != nil {
@@ -340,6 +355,7 @@ func (d *Pegnetd) SyncBlock(ctx context.Context, tx *sql.Tx, height uint32) erro
 			}
 		} else {
 			fLog.WithFields(log.Fields{"section": "grading", "reason": "no winners from OPR & SPR"}).Tracef("block not graded")
+			fmt.Println("no winners from OPR & SPR", ": block not graded")
 		}
 	}
 
@@ -393,7 +409,7 @@ func (d *Pegnetd) SyncBlock(ctx context.Context, tx *sql.Tx, height uint32) erro
 			}
 		}
 
-		// 2) Sync transactions in current height and apply transactions
+		//2) Sync transactions in current height and apply transactions
 		if transactionsEBlock != nil {
 			if err = d.ApplyTransactionBlock(tx, transactionsEBlock); err != nil {
 				return err
@@ -482,6 +498,7 @@ func (d *Pegnetd) SnapshotPayouts(tx *sql.Tx, fLog *log.Entry, rates map[fat2.PT
 	}
 	// We need to mock a TXID for the staked payouts
 	txid := fmt.Sprintf("%064d", height)
+
 	// Sort the staked by highest PUSD
 	type StakedAmount struct {
 		Address factom.FAAddress
@@ -567,12 +584,15 @@ func (d *Pegnetd) DevelopersPayouts(tx *sql.Tx, fLog *log.Entry, height uint32, 
 	totalPayout := uint64(conversions.PerBlockDevelopers) * pegnet.SnapshotRate // once a day
 	payoutStart := time.Now()
 
-	// We need to mock a TXID to record dev rewards
 	txid := fmt.Sprintf("%064d", height)
 
 	// we use hardcoded list of dev payouts
 	i := 0
+	j := 0 // we need more values for unique hash
 	for _, dev := range developers {
+
+		// We need to mock a TXID to record dev rewards
+		txid = fmt.Sprintf("%064d", height-(uint32(j)))
 
 		// we calculate developers reward from % pre-defined
 		rewardPayout := uint64((conversions.PerBlockDevelopers / 100) * dev.DevRewardPct)
@@ -585,7 +605,16 @@ func (d *Pegnetd) DevelopersPayouts(tx *sql.Tx, fLog *log.Entry, height uint32, 
 
 		// Mock entry hash value
 		addTxid := fmt.Sprintf("%d-%s", i, txid)
+		j++ // iterate all the time to build unique hash
 		i++
+		if i > 9 {
+			i = 0
+		}
+
+		fLog.WithFields(log.Fields{
+			"txid":    txid,
+			"addtxid": addTxid,
+		}).Info("developer reward | prep")
 
 		// Get dev address as FAAdress
 		FADevAddress, err := factom.NewFAAddress(dev.DevAddress)
@@ -601,12 +630,14 @@ func (d *Pegnetd) DevelopersPayouts(tx *sql.Tx, fLog *log.Entry, height uint32, 
 		// Inserts tx into the db
 		err = d.Pegnet.InsertDeveloperRewardCoinbase(tx, txid, addTxid, height, heightTimestamp, rewardPayout, FADevAddress)
 		if err != nil {
+			log.Info("dev insertion error")
 			return err
 		}
 
 		fLog.WithFields(log.Fields{
 			"total":     float64(totalPayout) / 1e8,
 			"developer": len(dev.DevAddress),
+			"addr":      FADevAddress,
 			"PEG":       float64(rewardPayout) / 1e8, // Float is good enough here
 		}).Info("developer reward | paid out to")
 
@@ -670,7 +701,7 @@ func multiFetch(eblock *factom.EBlock, c *factom.Client) error {
 // The bank table helps track the demand for peg at a given height.
 // The bank is the total amount of PEG allowed to be issued for any given height.
 func (d *Pegnetd) SyncBank(ctx context.Context, sqlTx *sql.Tx, currentHeight uint32) error {
-	if currentHeight >= V4OPRUpdate { // V4 forward tracks this
+	if (currentHeight >= V4OPRUpdate) && (currentHeight < V20HeightActivation) { // V4 forward tracks this
 		err := d.Pegnet.InsertBankAmount(sqlTx, int32(currentHeight), int64(pegnet.BankBaseAmount))
 		if err != nil {
 			return err
@@ -704,6 +735,7 @@ func (d *Pegnetd) ApplyTransactionBatchesInHolding(ctx context.Context, sqlTx *s
 		// on a proportional basis.
 		for i, txBatch := range txBatches {
 			// Re-validate transaction batch because timestamp might not be valid anymore
+
 			if err := txBatch.Validate(int32(currentHeight)); err != nil {
 				d.Pegnet.SetTransactionHistoryExecuted(sqlTx, txBatch, -2)
 				continue
@@ -728,11 +760,13 @@ func (d *Pegnetd) ApplyTransactionBatchesInHolding(ctx context.Context, sqlTx *s
 			} else if rejectCode < 0 { // Tx rejected
 				d.Pegnet.SetTransactionHistoryExecuted(sqlTx, txBatch, rejectCode)
 			} else if err == nil { // Tx accepted
-				// If PegnetConversion limits are on, we process conversions to
-				// peg in a second pass.
-				if currentHeight >= PegnetConversionLimitActivation && txBatch.HasPEGRequest() {
-					// Batch applied, we need to do the PEG conversions at the end
-					pegConversions = append(pegConversions, txBatches[i])
+				if currentHeight < V20HeightActivation {
+					// If PegnetConversion limits are on, we process conversions to
+					// peg in a second pass.
+					if currentHeight >= PegnetConversionLimitActivation && txBatch.HasPEGRequest() {
+						// Batch applied, we need to do the PEG conversions at the end
+						pegConversions = append(pegConversions, txBatches[i])
+					}
 				}
 			}
 		}
@@ -757,7 +791,7 @@ func (d *Pegnetd) ApplyTransactionBatchesInHolding(ctx context.Context, sqlTx *s
 	}
 
 	// Process all pending using the same bank
-	if currentHeight >= V4OPRUpdate {
+	if (currentHeight >= V4OPRUpdate) && (currentHeight < V20HeightActivation) {
 		// The bank entry should be here from the sync banks called before this function.
 		bentry, err := d.Pegnet.SelectBankEntry(sqlTx, int32(currentHeight))
 		if err != nil {
@@ -768,6 +802,7 @@ func (d *Pegnetd) ApplyTransactionBatchesInHolding(ctx context.Context, sqlTx *s
 			return err
 		}
 	}
+
 	return nil
 }
 
@@ -847,6 +882,11 @@ func (d *Pegnetd) applyTransactionBatch(sqlTx *sql.Tx, txBatch *fat2.Transaction
 				// This error will fail the block
 				return fmt.Errorf("rates must exist if TransactionBatch contains conversions")
 			}
+
+			if (tx.Conversion == fat2.PTickerPEG) && (currentHeight >= V20HeightActivation) {
+				return pegnet.PEGConversionError
+			}
+
 			if rates[tx.Input.Type] == 0 || rates[tx.Conversion] == 0 {
 				// This error will not fail the block, skip the tx
 				return pegnet.ZeroRatesError // 0 rates result in an invalid tx. So we drop it
@@ -1193,13 +1233,13 @@ func isDone(ctx context.Context) bool {
 }
 
 func (d *Pegnetd) GetAssetRates(oprWinners []opr.AssetUint, sprWinners []opr.AssetUint) ([]opr.AssetUint, error) {
-	if 0 < len(oprWinners) && 0 == len(sprWinners) {
+	if oprWinners != nil && sprWinners == nil {
 		return oprWinners, nil
 	}
-	if 0 == len(oprWinners) && 0 < len(sprWinners) {
+	if oprWinners == nil && sprWinners != nil {
 		return sprWinners, nil
 	}
-	if 0 < len(oprWinners) && 0 < len(sprWinners) {
+	if oprWinners != nil && sprWinners != nil {
 		// 1) sprWinners determine tolerance range
 		// 2) oprWinners set the real rates
 		if len(oprWinners) != len(sprWinners) {
