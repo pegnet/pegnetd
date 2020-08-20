@@ -94,7 +94,7 @@ OuterSyncLoop:
 
 			// One time operation, Inserts negative balance for the burn address that used during the attack
 			// We need to do this before main logic because sqlite db will be locked
-			if d.Sync.Synced+1 == V20HeightActivation {
+			if d.Sync.Synced+1 == V20HeightActivation+250 {
 				d.NullifyBurnAddress(ctx, tx, d.Sync.Synced+1)
 			}
 
@@ -167,7 +167,6 @@ OuterSyncLoop:
 			log.WithField("height", d.Sync.Synced).Infof("status report")
 		}
 	}
-
 }
 
 func (d *Pegnetd) NullifyBurnAddress(ctx context.Context, tx *sql.Tx, height uint32) error {
@@ -357,6 +356,7 @@ func (d *Pegnetd) SyncBlock(ctx context.Context, tx *sql.Tx, height uint32) erro
 			}
 		} else {
 			fLog.WithFields(log.Fields{"section": "grading", "reason": "no winners from OPR & SPR"}).Tracef("block not graded")
+			fmt.Println("no winners from OPR & SPR", ": block not graded")
 		}
 	}
 
@@ -404,12 +404,12 @@ func (d *Pegnetd) SyncBlock(ctx context.Context, tx *sql.Tx, height uint32) erro
 			}
 		}
 
-		// 2) Sync transactions in current height and apply transactions
-		//if transactionsEBlock != nil {
-		//	if err = d.ApplyTransactionBlock(tx, transactionsEBlock); err != nil {
-		//		return err
-		//	}
-		//}
+		//2) Sync transactions in current height and apply transactions
+		if transactionsEBlock != nil {
+			if err = d.ApplyTransactionBlock(tx, transactionsEBlock); err != nil {
+				return err
+			}
+		}
 	}
 
 	// Only apply burn transaction if height does not cross the activation
@@ -425,9 +425,9 @@ func (d *Pegnetd) SyncBlock(ctx context.Context, tx *sql.Tx, height uint32) erro
 	// 4) Apply effects of graded OPR Block (PEG rewards, if any)
 	//    These funds will be available for transactions and conversions executed in the next block
 	if gradedBlock != nil {
-		//if err := d.ApplyGradedOPRBlock(tx, gradedBlock, dblock.Timestamp); err != nil {
-		//	return err
-		//}
+		if err := d.ApplyGradedOPRBlock(tx, gradedBlock, dblock.Timestamp); err != nil {
+			return err
+		}
 	}
 
 	if height >= V20HeightActivation {

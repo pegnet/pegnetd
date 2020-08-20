@@ -584,7 +584,7 @@ func (p *Pegnet) InsertZeroingCoinbase(tx *sql.Tx, txid string, addTxid string, 
 	// All addresses are stored as bytes in the sqlitedb
 	add := faAdd[:]
 	// index for the address
-	index, _, err := SplitTxID(txid)
+	index, _, err := SplitTxID(addTxid)
 	if err != nil {
 		return err
 	}
