@@ -399,6 +399,12 @@ func (d *Pegnetd) SyncBlock(ctx context.Context, tx *sql.Tx, height uint32) erro
 		// TODO: ensure we rollback the tx when needed
 		// 1) Apply transaction batches that are in holding (conversions are always applied here)
 		if isRatesAvailable {
+			// Before conversions can be run, we have to adjust and discover the bank's value.
+			// We also only sync the bank if the block is a pegnet block
+			if err := d.SyncBank(ctx, tx, height); err != nil {
+				return err
+			}
+
 			if err = d.ApplyTransactionBatchesInHolding(ctx, tx, height, rates); err != nil {
 				return err
 			}
@@ -689,6 +695,19 @@ func multiFetch(eblock *factom.EBlock, c *factom.Client) error {
 		}
 	}
 
+	return nil
+}
+
+// SyncBank will input the bank value for all heights >= V4OPRUpdate
+// The bank table helps track the demand for peg at a given height.
+// The bank is the total amount of PEG allowed to be issued for any given height.
+func (d *Pegnetd) SyncBank(ctx context.Context, sqlTx *sql.Tx, currentHeight uint32) error {
+	if (currentHeight >= V4OPRUpdate) && (currentHeight < V20HeightActivation) { // V4 forward tracks this
+		err := d.Pegnet.InsertBankAmount(sqlTx, int32(currentHeight), int64(pegnet.BankBaseAmount))
+		if err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
