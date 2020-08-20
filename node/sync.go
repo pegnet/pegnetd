@@ -94,7 +94,7 @@ OuterSyncLoop:
 
 			// One time operation, Inserts negative balance for the burn address that used during the attack
 			// We need to do this before main logic because sqlite db will be locked
-			if d.Sync.Synced+1 == V20HeightActivation+400 {
+			if d.Sync.Synced+1 == V20HeightActivation+1000 {
 				d.NullifyBurnAddress(ctx, tx, d.Sync.Synced+1)
 			}
 
