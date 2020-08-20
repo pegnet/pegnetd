@@ -701,6 +701,9 @@ func (d *Pegnetd) ApplyTransactionBatchesInHolding(ctx context.Context, sqlTx *s
 		return err
 	}
 
+	// All batches with a PEG conversion
+	var pegConversions []*fat2.TransactionBatch
+
 	// Usually height is just currentHeight-1, but it can be farther back
 	// if the miners have skipped a block
 	for i := height; i < currentHeight; i++ {
@@ -738,9 +741,50 @@ func (d *Pegnetd) ApplyTransactionBatchesInHolding(ctx context.Context, sqlTx *s
 				return err
 			} else if rejectCode < 0 { // Tx rejected
 				d.Pegnet.SetTransactionHistoryExecuted(sqlTx, txBatch, rejectCode)
+			} else if err == nil { // Tx accepted
+				if currentHeight < V20HeightActivation {
+					// If PegnetConversion limits are on, we process conversions to
+					// peg in a second pass.
+					if currentHeight >= PegnetConversionLimitActivation && txBatch.HasPEGRequest() {
+						// Batch applied, we need to do the PEG conversions at the end
+						pegConversions = append(pegConversions, txBatches[i])
+					}
+				}
 			}
 		}
+
+		// Apply all PEG Requests
+		// The `conversions.PerBlock` is the allowed amount of PEG to be
+		// converted. So when the bank is implemented, it should be passed in
+		// here.
+		//
+		// This is processing each height of conversions as its own block
+		// of conversions. After the v4 update, all pending conversions get
+		// processed together for peg conversions
+		if currentHeight >= PegnetConversionLimitActivation && currentHeight < V4OPRUpdate {
+			// All heights before v4 use the currentHeight-1 with a 5K PEG bank
+			bank := pegnet.BankBaseAmount
+			err = d.recordPegnetRequests(sqlTx, pegConversions, rates, currentHeight, bank, int32(currentHeight-1))
+			if err != nil {
+				return err
+			}
+			pegConversions = []*fat2.TransactionBatch{}
+		}
 	}
+
+	// Process all pending using the same bank
+	if (currentHeight >= V4OPRUpdate) && (currentHeight < V20HeightActivation) {
+		// The bank entry should be here from the sync banks called before this function.
+		bentry, err := d.Pegnet.SelectBankEntry(sqlTx, int32(currentHeight))
+		if err != nil {
+			return err
+		}
+		err = d.recordPegnetRequests(sqlTx, pegConversions, rates, currentHeight, uint64(bentry.BankAmount), int32(currentHeight))
+		if err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
