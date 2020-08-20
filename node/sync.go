@@ -346,6 +346,7 @@ func (d *Pegnetd) SyncBlock(ctx context.Context, tx *sql.Tx, height uint32) erro
 			if errRate != nil {
 				return err
 			}
+			fmt.Println("filteredRates:", filteredRates)
 			isRatesAvailable = true
 			var phase pegnet.PEGPricingPhase
 			phase = pegnet.PEGPriceIsFloating
@@ -819,6 +820,11 @@ func (d *Pegnetd) applyTransactionBatch(sqlTx *sql.Tx, txBatch *fat2.Transaction
 				// This error will fail the block
 				return fmt.Errorf("rates must exist if TransactionBatch contains conversions")
 			}
+
+			if (tx.Conversion == fat2.PTickerPEG) && (currentHeight >= V20HeightActivation) {
+				return pegnet.PEGConversionError
+			}
+
 			if rates[tx.Input.Type] == 0 || rates[tx.Conversion] == 0 {
 				// This error will not fail the block, skip the tx
 				return pegnet.ZeroRatesError // 0 rates result in an invalid tx. So we drop it
