@@ -715,7 +715,7 @@ func (d *Pegnetd) ApplyTransactionBatchesInHolding(ctx context.Context, sqlTx *s
 		// For all conversions, we need to apply the PEG conversion limit.
 		// This means, we need to find all valid conversions and pay them out
 		// on a proportional basis.
-		for _, txBatch := range txBatches {
+		for i, txBatch := range txBatches {
 			// Re-validate transaction batch because timestamp might not be valid anymore
 
 			if err := txBatch.Validate(int32(currentHeight)); err != nil {
