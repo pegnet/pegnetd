@@ -494,6 +494,7 @@ func (p *Pegnet) InsertStakingCoinbase(tx *sql.Tx, txid string, height uint32, h
 func (p *Pegnet) InsertDeveloperRewardCoinbase(tx *sql.Tx, txid string, addTxid string, height uint32, heightTimestamp time.Time, payout uint64, faAdd factom.FAAddress) error {
 	txidBytes, err := hex.DecodeString(txid)
 	if err != nil {
+		log.WithError(err).Errorf("bytes not decoded")
 		return err
 	}
 
@@ -503,6 +504,7 @@ func (p *Pegnet) InsertDeveloperRewardCoinbase(tx *sql.Tx, txid string, addTxid 
                 (entry_hash, height, blockorder, timestamp, executed) VALUES
                 (?, ?, ?, ?, ?)`)
 	if err != nil {
+		log.WithError(err).Errorf("query prep failed")
 		return err
 	}
 
@@ -510,6 +512,7 @@ func (p *Pegnet) InsertDeveloperRewardCoinbase(tx *sql.Tx, txid string, addTxid 
 	// The executed height is the same height as the recorded.
 	_, err = stmt.Exec(txidBytes, height, 0, heightTimestamp.Unix(), height)
 	if err != nil {
+		log.WithError(err).Errorf("query exec failed")
 		return err
 	}
 
@@ -520,6 +523,7 @@ func (p *Pegnet) InsertDeveloperRewardCoinbase(tx *sql.Tx, txid string, addTxid 
 	// index for the address
 	index, _, err := SplitTxID(addTxid)
 	if err != nil {
+		log.WithError(err).Errorf("split failed")
 		return err
 	}
 
@@ -529,15 +533,17 @@ func (p *Pegnet) InsertDeveloperRewardCoinbase(tx *sql.Tx, txid string, addTxid 
 		            (entry_hash, tx_index, action_type, from_address, from_asset, from_amount, to_asset, to_amount, outputs) VALUES
 		            (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
 	if err != nil {
+		log.WithError(err).Errorf("sql coinbase query prep failed")
 		return err
 	}
 
 	_, err = coinbaseStatement.Exec(txidBytes, index, Coinbase, add, "", 0, "PEG", payout, "")
 	if err != nil {
+		log.WithError(err).Errorf("statement exec failed")
 		return err
 	}
 
-	// Insert into lookup table
+	//Insert into lookup table
 	lookup, err := tx.Prepare(insertLookupQuery)
 	if err != nil {
 		return err
