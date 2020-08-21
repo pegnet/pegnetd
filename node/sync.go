@@ -450,7 +450,6 @@ func (d *Pegnetd) SyncBlock(ctx context.Context, tx *sql.Tx, height uint32) erro
 		err := d.DevelopersPayouts(tx, fLog, height, dblock.Timestamp, DeveloperRewardAddreses)
 		if err != nil {
 			fLog.WithFields(log.Fields{"section": "devReward", "reason": "developer reward"}).Tracef("something wrong happend during dev payout execution")
-			return err
 		}
 	}
 
