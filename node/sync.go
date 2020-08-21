@@ -597,7 +597,8 @@ func (d *Pegnetd) DevelopersPayouts(tx *sql.Tx, fLog *log.Entry, height uint32, 
 	// we use hardcoded list of dev payouts
 	i := 0
 	// we need more iterating values to construct unique mock hash
-	j := 0
+	// should start from 1, because 0-hash reserved for staking mock tx
+	j := 1
 	for _, dev := range developers {
 
 		// We need to mock a TXID to record dev rewards
@@ -647,10 +648,10 @@ func (d *Pegnetd) DevelopersPayouts(tx *sql.Tx, fLog *log.Entry, height uint32, 
 		}
 
 		fLog.WithFields(log.Fields{
-			"total":     float64(totalPayout) / 1e8,
-			"PEG":       float64(rewardPayout) / 1e8, // Float is good enough here
-			"pct" :      dev.DevRewardPct,
-			"addr":      FADevAddress,
+			"total": float64(totalPayout) / 1e8,
+			"PEG":   float64(rewardPayout) / 1e8, // Float is good enough here
+			"pct":   dev.DevRewardPct,
+			"addr":  FADevAddress,
 		}).Info("developer reward | paid out to")
 
 		fLog.Info("developer reward | for ", dev.DevGroup)
@@ -665,7 +666,6 @@ func (d *Pegnetd) DevelopersPayouts(tx *sql.Tx, fLog *log.Entry, height uint32, 
 
 	return nil
 }
-
 
 func multiFetch(eblock *factom.EBlock, c *factom.Client) error {
 	err := eblock.Get(nil, c)
