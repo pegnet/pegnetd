@@ -447,7 +447,14 @@ func (d *Pegnetd) SyncBlock(ctx context.Context, tx *sql.Tx, height uint32) erro
 
 	// 6) Apply Developers Rewards
 	if height >= V20HeightActivation && height%pegnet.SnapshotRate == 0 {
-		err := d.DevelopersPayouts(tx, fLog, height, dblock.Timestamp, DeveloperRewardAddreses)
+
+		// init developers list explicitely
+		// and forward to function
+		developersList := DeveloperRewardAddreses
+
+		// we want function to accepts dev list as parameter, so different corner cases
+		// can be assigned
+		err := d.DevelopersPayouts(tx, fLog, height, dblock.Timestamp, developersList)
 		if err != nil {
 			fLog.WithFields(log.Fields{"section": "devReward", "reason": "developer reward"}).Tracef("something wrong happend during dev payout execution")
 		}
@@ -580,18 +587,23 @@ func (d *Pegnetd) SnapshotPayouts(tx *sql.Tx, fLog *log.Entry, rates map[fat2.PT
 // implementation of PIP16 - distributed rewards collected for developers every 24h
 func (d *Pegnetd) DevelopersPayouts(tx *sql.Tx, fLog *log.Entry, height uint32, heightTimestamp time.Time, developers []DevReward) error {
 
-	totalPayout := uint64(conversions.PerBlockDevelopers) * pegnet.SnapshotRate // once a day
+	totalPayout := uint64(conversions.PerBlockDevelopers) * pegnet.SnapshotRate // every day
 	payoutStart := time.Now()
 
 	txid := fmt.Sprintf("%064d", height)
 
+	log.Info("--------------------------------------------------")
+
 	// we use hardcoded list of dev payouts
 	i := 0
-	j := 0 // we need more values for unique hash
+	// we need more iterating values to construct unique mock hash
+	j := 0
 	for _, dev := range developers {
 
 		// We need to mock a TXID to record dev rewards
-		txid = fmt.Sprintf("%064d", height-(uint32(j)))
+		// add more uniqness into hash value by reusing iterating j value in addtion to current height
+		// so it doesn't repeat in 25+ blocks
+		txid = fmt.Sprintf("%02d%062d", j, height)
 
 		// we calculate developers reward from % pre-defined
 		rewardPayout := uint64((conversions.PerBlockDevelopers / 100) * dev.DevRewardPct)
@@ -611,8 +623,9 @@ func (d *Pegnetd) DevelopersPayouts(tx *sql.Tx, fLog *log.Entry, height uint32, 
 		}
 
 		fLog.WithFields(log.Fields{
-			"txid":    txid,
+			//"txid":    txid,
 			"addtxid": addTxid,
+			"prct":    dev.DevRewardPct,
 		}).Info("developer reward | prep")
 
 		// Get dev address as FAAdress
@@ -635,10 +648,12 @@ func (d *Pegnetd) DevelopersPayouts(tx *sql.Tx, fLog *log.Entry, height uint32, 
 
 		fLog.WithFields(log.Fields{
 			"total":     float64(totalPayout) / 1e8,
-			"developer": len(dev.DevAddress),
-			"addr":      FADevAddress,
 			"PEG":       float64(rewardPayout) / 1e8, // Float is good enough here
+			"pct" :      dev.DevRewardPct,
+			"addr":      FADevAddress,
 		}).Info("developer reward | paid out to")
+
+		fLog.Info("developer reward | for ", dev.DevGroup)
 
 	}
 
@@ -650,6 +665,7 @@ func (d *Pegnetd) DevelopersPayouts(tx *sql.Tx, fLog *log.Entry, height uint32, 
 
 	return nil
 }
+
 
 func multiFetch(eblock *factom.EBlock, c *factom.Client) error {
 	err := eblock.Get(nil, c)
