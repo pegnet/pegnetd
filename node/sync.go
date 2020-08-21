@@ -1252,15 +1252,16 @@ func (d *Pegnetd) GetAssetRates(oprWinners []opr.AssetUint, sprWinners []opr.Ass
 			if oprWinners[i].Name == sprWinners[i].Name {
 				sprRate := sprWinners[i].Value
 				oprRate := oprWinners[i].Value
-				toleranceRate := 0.01 // 1% band
-				if sprRate >= 100000 {
-					toleranceRate = 0.001 // 0.1% band
-				}
+				toleranceRate := 0.1 // 10% band
 				toleranceBandHigh := float64(sprRate) * (1 + toleranceRate)
 				toleranceBandLow := float64(sprRate) * (1 - toleranceRate)
 				if (float64(oprRate) >= toleranceBandLow) && (float64(oprRate) <= toleranceBandHigh) {
 					filteredRates = append(filteredRates, oprWinners[i])
 				} else {
+					fmt.Println("opr is out side of spr's tolerance band")
+					fmt.Println("=== asset name:", oprWinners[i].Name)
+					fmt.Println("<<<<=== opr rate:", oprWinners[i].Value)
+					fmt.Println("<<<<=== spr rate:", sprWinners[i].Value)
 					return nil, fmt.Errorf("opr is out side of tolerance band")
 				}
 			}
