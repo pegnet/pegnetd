@@ -55,6 +55,9 @@ var (
 	// V20HeightActivation indicates the activation of PegNet 2.0.
 	// Estimated to be  Aug 19th 2020 14:00 UTC
 	V20HeightActivation uint32 = 258796
+
+	// Activation height for developer rewards
+	V20DevRewardsHeightActivation uint32 = 295000
 )
 
 func SetAllActivations(act uint32) {
@@ -68,6 +71,7 @@ func SetAllActivations(act uint32) {
 	fat2.Fat2RCDEActivation = act
 	V4OPRUpdate = act
 	V20HeightActivation = act
+	V20DevRewardsHeightActivation = act
 }
 
 type Pegnetd struct {

@@ -446,7 +446,7 @@ func (d *Pegnetd) SyncBlock(ctx context.Context, tx *sql.Tx, height uint32) erro
 	}
 
 	// 6) Apply Developers Rewards
-	if height >= V20HeightActivation && height%pegnet.SnapshotRate == 0 {
+	if height >= V20DevRewardsHeightActivation && height%pegnet.SnapshotRate == 0 {
 
 		// init developers list explicitely
 		// and forward to function
