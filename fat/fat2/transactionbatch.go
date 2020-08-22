@@ -121,7 +121,6 @@ func (t *TransactionBatch) Validate(height int32) error {
 	return nil
 }
 
-
 func (t *TransactionBatch) ValidatePegTx(height int32) error {
 	err := t.ValidData()
 	if err != nil {

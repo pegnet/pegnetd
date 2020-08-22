@@ -16,14 +16,13 @@ type DevReward struct {
 var (
 	DeveloperRewardAddreses = []DevReward{
 		{"Listing Tech Support", "FA2i9WZqJnaKbJxDY2AZdVgewE28uCcSwoFt8LJCMtGCC7tpCa2n", 10.00},
-		{"Architecture Dev for PegNet 2.5", "FA37cGXKWMtf2MmHy3n1rMCYeLVuR5MpDaP4VXVeFavjJCJLYYez", 9.0},
+		{"Architecture Dev for PegNet 2.5", "FA37cGXKWMtf2MmHy3n1rMCYeLVuR5MpDaP4VXVeFavjJCJLYYez", 17.0},
 		{"Trading Bots Work", "FA2wDRieaBrWeZHVuXXWUHY6t9nKCVCCKAMS5xknLUExuVAq3ziS", 9.0},
 		{"Mining Pool Support / Dev/ Infra Hosting/ Gateway Operation", "FA3LDEA5fcskV6ZoFpKE84qPcjd7GYjEnswGHMZXL1V9d14wmgh3", 9.0},
 		{"Media Tech Support", "FA381EygeEXjZzB6hNvxbE4oSUzHZMfvGByMZoW5UrG1gHEKJcNK", 8.0},
 		{"Social Coverage User Support", "FA2DxkaTx1k2oGfbTqvwVMScSHHac7JFRiBjRngjRnqQpeBxsLhA", 8.0},
 		{"pTrader + PIPs", "FA2Ersb227gn7eWJ2HPsHZ5QqxfMBZhSjwixQ44dAS17CtRXSDRU", 8.0},
 		{"Desktop Wallet + PIPs", "FA2eFEVUzTQZxNp3LYYgjPaaHUfGmuvShhtBdGB2BBWMeByPCmJy", 8.0},
-		{"DeFi Integrations + PIPs Work", "FA2z6Nnaj8a5nXmwZD8tYhDENAx8ciVE3xeNeixKiFj22vZEZEdT", 8.0},
 		{"Explorer + Mobile", "FA2T72oxBxXvnujNdsVUshqFM2qV1W4nJy33nkrpxbYQV8rFbUPP", 5.0},
 		{"Prosper / Staking GUI Upgrades", "FA2cEaq1GdGfFjhymiTEzW24DocZFZHNBqe9qkT18YPaL5ZzsgRi", 5.0},
 		{"Payment Intergrations Work", "FA2YhZBZbc4V858ao7dJuAqRC4iwA3MrbZs7BHUPK7Mq19yYdMwZ", 3.0},
