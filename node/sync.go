@@ -450,6 +450,7 @@ func (d *Pegnetd) SyncBlock(ctx context.Context, tx *sql.Tx, height uint32) erro
 
 		// init developers list explicitely
 		// and forward to function
+		// we use hardcoded list of dev payouts
 		developersList := DeveloperRewardAddreses
 
 		// we want function to accepts dev list as parameter, so different corner cases
@@ -591,10 +592,8 @@ func (d *Pegnetd) DevelopersPayouts(tx *sql.Tx, fLog *log.Entry, height uint32, 
 	payoutStart := time.Now()
 
 	txid := fmt.Sprintf("%064d", height)
-
 	log.Info("--------------------------------------------------")
 
-	// we use hardcoded list of dev payouts
 	i := 0
 	// we need more iterating values to construct unique mock hash
 	// should start from 1, because 0-hash reserved for staking mock tx
@@ -661,8 +660,7 @@ func (d *Pegnetd) DevelopersPayouts(tx *sql.Tx, fLog *log.Entry, height uint32, 
 	fLog.WithFields(log.Fields{
 		"total":   float64(totalPayout) / 1e8,
 		"elapsed": time.Since(payoutStart),
-		"txid":    txid,
-	}).Info("developer rewards | paid out")
+	}).Info("developer reward | paid out")
 
 	return nil
 }
