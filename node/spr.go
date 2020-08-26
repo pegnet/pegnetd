@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/Factom-Asset-Tokens/factom"
+	"github.com/pegnet/pegnet/common"
 	"github.com/pegnet/pegnet/modules/graderStake"
 )
 
@@ -23,6 +24,9 @@ func (d *Pegnetd) GradeS(ctx context.Context, block *factom.EBlock) (graderStake
 	if block.Height >= V20HeightActivation {
 		ver = 5
 	}
+	if block.Height >= SprSignatureActivation {
+		ver = 6
+	}
 
 	g, err := graderStake.NewGrader(ver, int32(block.Height))
 	if err != nil {
@@ -34,7 +38,13 @@ func (d *Pegnetd) GradeS(ctx context.Context, block *factom.EBlock) (graderStake
 			extids[i] = entry.ExtIDs[i]
 		}
 		// allow only top 100 stake holders submit prices
-		stakerRCD := extids[1]
+		var stakerRCD []byte
+		if block.Height >= V20HeightActivation {
+			stakerRCD = extids[1]
+		}
+		if block.Height >= SprSignatureActivation {
+			stakerRCD = common.ComputeRCDFromPubkey(extids[1])
+		}
 		if d.Pegnet.IsIncludedTopPEGAddress(stakerRCD) {
 			// ignore bad opr errors
 			err = g.AddSPR(entry.Hash[:], extids, entry.Content)
