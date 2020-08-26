@@ -57,11 +57,11 @@ var (
 	V20HeightActivation uint32 = 258796
 
 	// Activation height for developer rewards
-	V20DevRewardsHeightActivation uint32 = 295000
+	V20DevRewardsHeightActivation uint32 = 259968
 
 	// SprSignatureActivation indicates the activation of SPR Signature.
 	// Estimated to be  Aug 19th 2020 14:00 UTC
-	SprSignatureActivation uint32 = 259572
+	SprSignatureActivation uint32 = 259968
 )
 
 func SetAllActivations(act uint32) {
