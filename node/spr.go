@@ -38,7 +38,13 @@ func (d *Pegnetd) GradeS(ctx context.Context, block *factom.EBlock) (graderStake
 			extids[i] = entry.ExtIDs[i]
 		}
 		// allow only top 100 stake holders submit prices
-		stakerRCD := common.ComputeRCDFromPubkey(extids[1])
+		var stakerRCD []byte
+		if block.Height >= V20HeightActivation {
+			stakerRCD = extids[1]
+		}
+		if block.Height >= SprSignatureActivation {
+			stakerRCD = common.ComputeRCDFromPubkey(extids[1])
+		}
 		if d.Pegnet.IsIncludedTopPEGAddress(stakerRCD) {
 			// ignore bad opr errors
 			err = g.AddSPR(entry.Hash[:], extids, entry.Content)
