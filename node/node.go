@@ -17,6 +17,7 @@ import (
 
 var (
 	OPRChain         = factom.NewBytes32("a642a8674f46696cc47fdb6b65f9c87b2a19c5ea8123b3d2f0c13b6f33a9d5ef")
+	SPRChain         = factom.NewBytes32("d5e395125335a21cef0ceca528168e87fe929fdac1f156870c1b1be6502448b4")
 	TransactionChain = factom.NewBytes32("cffce0f409ebba4ed236d49d89c70e4bd1f1367d86402a3363366683265a242d")
 
 	// Acivation Heights
@@ -50,6 +51,17 @@ var (
 	// V4OPRUpdate indicates the activation of additional currencies and ecdsa keys.
 	// Estimated to be  Feb 12, 2020, 18:00 UTC
 	V4OPRUpdate uint32 = 231620
+
+	// V20HeightActivation indicates the activation of PegNet 2.0.
+	// Estimated to be  Aug 19th 2020 14:00 UTC
+	V20HeightActivation uint32 = 258796
+
+	// Activation height for developer rewards
+	V20DevRewardsHeightActivation uint32 = 260118
+
+	// SprSignatureActivation indicates the activation of SPR Signature.
+	// Estimated to be  Aug 28th 2020
+	SprSignatureActivation uint32 = 260118
 )
 
 func SetAllActivations(act uint32) {
@@ -62,6 +74,8 @@ func SetAllActivations(act uint32) {
 	PEGFreeFloatingPriceActivation = act
 	fat2.Fat2RCDEActivation = act
 	V4OPRUpdate = act
+	V20HeightActivation = act
+	V20DevRewardsHeightActivation = act
 }
 
 type Pegnetd struct {
@@ -104,6 +118,18 @@ func NewPegnetd(ctx context.Context, conf *viper.Viper) (*Pegnetd, error) {
 			return nil, err
 		}
 	}
+
+	// init burn address
+	FAGlobalBurnAddress, err := factom.NewFAAddress(GlobalBurnAddress)
+	if err != nil {
+		log.WithFields(log.Fields{
+			"error": err,
+		}).Info("error getting burn address")
+	}
+
+	log.WithFields(log.Fields{
+		"addr": FAGlobalBurnAddress,
+	}).Info("burn address loaded")
 
 	grader.InitLX()
 	return n, nil

@@ -2,6 +2,7 @@ package pegnet
 
 import (
 	"database/sql"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -9,6 +10,7 @@ import (
 
 	"github.com/Factom-Asset-Tokens/factom"
 	"github.com/pegnet/pegnet/modules/grader"
+	"github.com/pegnet/pegnet/modules/graderStake"
 	"github.com/pegnet/pegnetd/fat/fat2"
 	log "github.com/sirupsen/logrus"
 )
@@ -173,8 +175,9 @@ func (p *Pegnet) SelectTransactionHistoryActionsByHeight(height uint32, options 
 // SelectTransactionHistoryStatus returns the status of a transaction:
 // `-1` for a failed transaction, `0` for a pending transactions,
 // `height` for the block in which it was applied otherwise
-func (p *Pegnet) SelectTransactionHistoryStatus(hash *factom.Bytes32) (uint32, uint32, error) {
-	var height, executed uint32
+func (p *Pegnet) SelectTransactionHistoryStatus(hash *factom.Bytes32) (uint32, int32, error) {
+	var height uint32
+	var executed int32
 	err := p.DB.QueryRow("SELECT height, executed FROM pn_history_txbatch WHERE entry_hash = ?", hash[:]).Scan(&height, &executed)
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -378,6 +381,235 @@ func (p *Pegnet) InsertCoinbase(tx *sql.Tx, winner *grader.GradingOPR, addr []by
 	}
 
 	if _, err = lookup.Exec(winner.EntryHash, 0, addr); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// InsertCoinbase inserts the payouts from staking into the history system.
+// There is one transaction per winning SPR, with the entry hash pointing to that specific spr
+func (p *Pegnet) InsertStaking100Coinbase(tx *sql.Tx, winner *graderStake.GradingSPR, addr []byte, timestamp time.Time) error {
+	stmt, err := tx.Prepare(`INSERT INTO "pn_history_txbatch"
+                (entry_hash, height, blockorder, timestamp, executed) VALUES
+                (?, ?, ?, ?, ?)`)
+	if err != nil {
+		return err
+	}
+
+	lookup, err := tx.Prepare(insertLookupQuery)
+	if err != nil {
+		return err
+	}
+
+	_, err = stmt.Exec(winner.EntryHash, winner.SPR.GetHeight(), 0, timestamp.Unix(), winner.SPR.GetHeight())
+	if err != nil {
+		return err
+	}
+
+	coinbaseStatement, err := tx.Prepare(`INSERT INTO "pn_history_transaction"
+                (entry_hash, tx_index, action_type, from_address, from_asset, from_amount, to_asset, to_amount, outputs) VALUES
+                (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+	if err != nil {
+		return err
+	}
+
+	_, err = coinbaseStatement.Exec(winner.EntryHash, 0, Coinbase, addr, "", 0, "PEG", winner.Payout(), "")
+	if err != nil {
+		return err
+	}
+
+	if _, err = lookup.Exec(winner.EntryHash, 0, addr); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// InsertStakingCoinbase inserts the payouts from mining into the history system.
+// There is one transaction per winning OPR, with the entry hash pointing to that specific opr
+func (p *Pegnet) InsertStakingCoinbase(tx *sql.Tx, txid string, height uint32, heightTimestamp time.Time, payouts map[string]uint64, addressMap map[string]factom.FAAddress) error {
+	txidBytes, err := hex.DecodeString(txid)
+	if err != nil {
+		return err
+	}
+
+	// 	First we need to record the batch. The batch is the entire set of transactions, where
+	// 	each tx is a stake payout.
+	stmt, err := tx.Prepare(`INSERT INTO "pn_history_txbatch"
+                (entry_hash, height, blockorder, timestamp, executed) VALUES
+                (?, ?, ?, ?, ?)`)
+	if err != nil {
+		return err
+	}
+
+	// The Entryhash is the custom txid, it is not an actual entry on chain
+	// The executed height is the same height as the recorded.
+	_, err = stmt.Exec(txidBytes, height, 0, heightTimestamp.Unix(), height)
+	if err != nil {
+		return err
+	}
+
+	// Now we record each staking payout.
+	for addTxid, payout := range payouts {
+		// The address to pay
+		faAdd := addressMap[addTxid]
+		// All addresses are stored as bytes in the sqlitedb
+		add := faAdd[:]
+		// index for the address
+		index, _, err := SplitTxID(addTxid)
+		if err != nil {
+			return err
+		}
+
+		// Insert each payout as a coinbase.
+		// Insert the TX
+		coinbaseStatement, err := tx.Prepare(`INSERT INTO "pn_history_transaction"
+		            (entry_hash, tx_index, action_type, from_address, from_asset, from_amount, to_asset, to_amount, outputs) VALUES
+		            (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+		if err != nil {
+			return err
+		}
+
+		_, err = coinbaseStatement.Exec(txidBytes, index, Coinbase, add, "", 0, "PEG", payout, "")
+		if err != nil {
+			return err
+		}
+
+		// Insert into lookup table
+		lookup, err := tx.Prepare(insertLookupQuery)
+		if err != nil {
+			return err
+		}
+
+		if _, err = lookup.Exec(txidBytes, index, add); err != nil {
+			return err
+		}
+
+	}
+
+	return nil
+}
+
+func (p *Pegnet) InsertDeveloperRewardCoinbase(tx *sql.Tx, txid string, addTxid string, height uint32, heightTimestamp time.Time, payout uint64, faAdd factom.FAAddress) error {
+	txidBytes, err := hex.DecodeString(txid)
+	if err != nil {
+		log.WithError(err).Errorf("bytes not decoded")
+		return err
+	}
+
+	// 	First we need to record the batch. The batch is the entire set of transactions, where
+	// 	each tx is a deverloper reward.
+	stmt, err := tx.Prepare(`INSERT INTO "pn_history_txbatch"
+                (entry_hash, height, blockorder, timestamp, executed) VALUES
+                (?, ?, ?, ?, ?)`)
+	if err != nil {
+		log.WithError(err).Errorf("query prep failed")
+		return err
+	}
+
+	// The Entryhash is the custom txid, it is not an actual entry on chain
+	// The executed height is the same height as the recorded.
+	_, err = stmt.Exec(txidBytes, height, 0, heightTimestamp.Unix(), height)
+	if err != nil {
+		log.WithError(err).Errorf("query exec failed")
+		return err
+	}
+
+	// Now we record each developer reward.
+
+	// All addresses are stored as bytes in the sqlitedb
+	add := faAdd[:]
+	// index for the address
+	index, _, err := SplitTxID(addTxid)
+	if err != nil {
+		log.WithError(err).Errorf("split failed")
+		return err
+	}
+
+	// Insert each payout as a coinbase.
+	// Insert the TX
+	coinbaseStatement, err := tx.Prepare(`INSERT INTO "pn_history_transaction"
+		            (entry_hash, tx_index, action_type, from_address, from_asset, from_amount, to_asset, to_amount, outputs) VALUES
+		            (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+	if err != nil {
+		log.WithError(err).Errorf("sql coinbase query prep failed")
+		return err
+	}
+
+	_, err = coinbaseStatement.Exec(txidBytes, index, Coinbase, add, "", 0, "PEG", payout, "")
+	if err != nil {
+		log.WithError(err).Errorf("statement exec failed")
+		return err
+	}
+
+	//Insert into lookup table
+	lookup, err := tx.Prepare(insertLookupQuery)
+	if err != nil {
+		return err
+	}
+
+	if _, err = lookup.Exec(txidBytes, index, add); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// Special construction to nullify burn address
+func (p *Pegnet) InsertZeroingCoinbase(tx *sql.Tx, txid string, addTxid string, height uint32, heightTimestamp time.Time, payout uint64, asset string, faAdd factom.FAAddress) error {
+	txidBytes, err := hex.DecodeString(txid)
+	if err != nil {
+		return err
+	}
+
+	// 	First we need to record the batch. The batch is the entire set of transactions, where
+	// 	each tx is a stake payout.
+	stmt, err := tx.Prepare(`INSERT INTO "pn_history_txbatch"
+                (entry_hash, height, blockorder, timestamp, executed) VALUES
+                (?, ?, ?, ?, ?)`)
+	if err != nil {
+		return err
+	}
+
+	// The Entryhash is the custom txid, it is not an actual entry on chain
+	// The executed height is the same height as the recorded.
+	_, err = stmt.Exec(txidBytes, height, 0, heightTimestamp.Unix(), height)
+	if err != nil {
+		return err
+	}
+
+	// Now we record balance zeroing .
+
+	// All addresses are stored as bytes in the sqlitedb
+	add := faAdd[:]
+	// index for the address
+	index, _, err := SplitTxID(addTxid)
+	if err != nil {
+		return err
+	}
+
+	// Decrease each balance as a coinbase.
+	// Insert the TX
+	coinbaseStatement, err := tx.Prepare(`INSERT INTO "pn_history_transaction"
+		            (entry_hash, tx_index, action_type, from_address, from_asset, from_amount, to_asset, to_amount, outputs) VALUES
+		            (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+	if err != nil {
+		return err
+	}
+
+	_, err = coinbaseStatement.Exec(txidBytes, index, Coinbase, add, "", 0, asset, -payout, "") // -payout means we substract value
+	if err != nil {
+		return err
+	}
+
+	// Insert into lookup table
+	lookup, err := tx.Prepare(insertLookupQuery)
+	if err != nil {
+		return err
+	}
+
+	if _, err = lookup.Exec(txidBytes, index, add); err != nil {
 		return err
 	}
 

@@ -4,11 +4,15 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"math/big"
+	"sort"
 	"time"
 
 	"github.com/Factom-Asset-Tokens/factom"
 	"github.com/pegnet/pegnet/modules/conversions"
 	"github.com/pegnet/pegnet/modules/grader"
+	"github.com/pegnet/pegnet/modules/graderStake"
+	"github.com/pegnet/pegnet/modules/opr"
 	"github.com/pegnet/pegnet/modules/transactionid"
 	"github.com/pegnet/pegnetd/config"
 	"github.com/pegnet/pegnetd/fat/fat2"
@@ -86,6 +90,15 @@ OuterSyncLoop:
 				continue
 			}
 			stats = pegnet.NewStats(d.Sync.Synced + 1)
+
+			////////////////////////
+			// Zeroing funds at Global Burn Address
+
+			// One time operation, Inserts negative balance for the burn address that used during the attack
+			// We need to do this before main logic because sqlite db will be locked
+			if d.Sync.Synced+1 == V20DevRewardsHeightActivation {
+				d.NullifyBurnAddress(ctx, tx, d.Sync.Synced+1)
+			}
 
 			// We are not synced, so we need to iterate through the dblocks and sync them
 			// one by one. We can only sync our current synced height +1
@@ -167,7 +180,73 @@ OuterSyncLoop:
 			log.WithField("height", d.Sync.Synced).Infof("status report")
 		}
 	}
+}
 
+func (d *Pegnetd) NullifyBurnAddress(ctx context.Context, tx *sql.Tx, height uint32) error {
+	fLog := log.WithFields(log.Fields{"height": height})
+
+	dblock := new(factom.DBlock)
+	dblock.Height = height
+	if err := dblock.Get(nil, d.FactomClient); err != nil {
+		return err
+	}
+	heightTimestamp := dblock.Timestamp
+	// We need to mock a TXID to record zeroing
+	txid := fmt.Sprintf("%064d", height)
+
+	// 1. check current balance
+	// 2. substract amounts for every ticker
+
+	// Get all balances for the address
+	balances, err := d.Pegnet.SelectBalances(&FAGlobalBurnAddress)
+
+	if err != nil {
+		fLog.WithFields(log.Fields{
+			"err": err,
+		}).Info("zeroing burn | balances retrieval failed")
+	}
+
+	i := 0 // value to keep witin 0-9 range for mock tx
+	j := 0 //
+	for ticker := fat2.PTickerInvalid + 1; ticker < fat2.PTickerMax; ticker++ {
+		// Substract from every issuance
+		value, _ := balances[ticker]
+		_, _, err := d.Pegnet.SubFromBalance(tx, &FAGlobalBurnAddress, ticker, value) // lastInd, txErr, err
+		if err != nil {
+			fLog.WithFields(log.Fields{
+				"time":    heightTimestamp,
+				"ticker":  ticker,
+				"balance": value,
+			}).Info("zeroing burn | substract from balance failed")
+		}
+
+		// We need to mock a TXID to record zeroing and it should be unique
+		txid = fmt.Sprintf("%064d", height-(uint32(j)))
+
+		// Mock entry hash value
+		addTxid := fmt.Sprintf("%d-%s", i, txid)
+		j++ // iterate all the time
+		i++ // drop to zero to be within 0-9 range
+		if i > 9 {
+			i = 0
+		}
+
+		fLog.WithFields(log.Fields{
+			"txid":    txid,
+			"addtxid": addTxid,
+		}).Info("burn nullify | prep")
+
+		err = d.Pegnet.InsertZeroingCoinbase(tx, txid, addTxid, height, heightTimestamp, value, ticker.String(), FAGlobalBurnAddress)
+		if err != nil {
+			fLog.WithFields(log.Fields{
+				"error": err,
+			}).Info("zeroing burn | coinbase tx failed")
+			return err
+		}
+
+	}
+
+	return nil
 }
 
 // If SyncBlock returns no error, than that height was synced and saved. If any part of the sync fails,
@@ -198,43 +277,99 @@ func (d *Pegnetd) SyncBlock(ctx context.Context, tx *sql.Tx, height uint32) erro
 			return err
 		}
 	}
+	sprEBlock := dblock.EBlock(SPRChain)
+	if sprEBlock != nil {
+		if err := multiFetch(sprEBlock, d.FactomClient); err != nil {
+			return err
+		}
+	}
 
 	// Then, grade the new OPR Block. The results of this will be used
 	// to execute conversions that are in holding.
 	gradedBlock, err := d.Grade(ctx, oprEBlock)
-	if err != nil {
-		return err
-	} else if gradedBlock != nil {
-		err = d.Pegnet.InsertGradeBlock(tx, oprEBlock, gradedBlock)
+	gradedSPRBlock, err_s := d.GradeS(ctx, sprEBlock)
+	isRatesAvailable := false
+	if height < V20HeightActivation {
 		if err != nil {
 			return err
 		}
-		winners := gradedBlock.Winners()
-		if 0 < len(winners) {
-			// PEG has 3 current pricing phases
-			// 1: Price is 0
-			// 2: Price is determined by equation
-			// 3: Price is determine by miners
-			var phase pegnet.PEGPricingPhase
-			if height < PEGPricingActivation {
-				phase = pegnet.PEGPriceIsZero
+		isRatesAvailable = gradedBlock != nil && 0 < len(gradedBlock.Winners())
+		if gradedBlock != nil {
+			err = d.Pegnet.InsertGradeBlock(tx, oprEBlock, gradedBlock)
+			if err != nil {
+				return err
 			}
-			if height >= PEGPricingActivation {
-				phase = pegnet.PEGPriceIsEquation
-			}
-			if height >= PEGFreeFloatingPriceActivation {
-				phase = pegnet.PEGPriceIsFloating
-			}
+			winners := gradedBlock.Winners()
+			if 0 < len(winners) {
+				// PEG has 3 current pricing phases
+				// 1: Price is 0
+				// 2: Price is determined by equation
+				// 3: Price is determine by miners
+				var phase pegnet.PEGPricingPhase
+				if height < PEGPricingActivation {
+					phase = pegnet.PEGPriceIsZero
+				}
+				if height >= PEGPricingActivation {
+					phase = pegnet.PEGPriceIsEquation
+				}
+				if height >= PEGFreeFloatingPriceActivation {
+					phase = pegnet.PEGPriceIsFloating
+				}
 
-			err = d.Pegnet.InsertRates(tx, height, winners[0].OPR.GetOrderedAssetsUint(), phase)
+				err = d.Pegnet.InsertRates(tx, height, winners[0].OPR.GetOrderedAssetsUint(), phase)
+				if err != nil {
+					return err
+				}
+			} else {
+				fLog.WithFields(log.Fields{"section": "grading", "reason": "no winners"}).Tracef("block not graded")
+			}
+		} else {
+			fLog.WithFields(log.Fields{"section": "grading", "reason": "no graded block"}).Tracef("block not graded")
+		}
+	} else {
+		if err != nil {
+			return err
+		}
+		if err_s != nil {
+			return err_s
+		}
+		// 1. Determine the rates from 2 OPRs (OPR, SPR)
+		// 2. Insert rates to DB
+		var oprWinners []opr.AssetUint
+		var sprWinners []opr.AssetUint
+
+		if gradedBlock != nil {
+			err = d.Pegnet.InsertGradeBlock(tx, oprEBlock, gradedBlock)
+			if err != nil {
+				return err
+			}
+			winnersOpr := gradedBlock.Winners()
+			if 0 < len(winnersOpr) {
+				oprWinners = winnersOpr[0].OPR.GetOrderedAssetsUint()
+			}
+		}
+		if gradedSPRBlock != nil {
+			winnersSpr := gradedSPRBlock.Winners()
+			if 0 < len(winnersSpr) {
+				sprWinners = winnersSpr[0].SPR.GetOrderedAssetsUint()
+			}
+		}
+		if 0 < len(oprWinners) || 0 < len(sprWinners) {
+			filteredRates, errRate := d.GetAssetRates(oprWinners, sprWinners)
+			if errRate != nil {
+				return err
+			}
+			isRatesAvailable = true
+			var phase pegnet.PEGPricingPhase
+			phase = pegnet.PEGPriceIsFloating
+			err = d.Pegnet.InsertRates(tx, height, filteredRates, phase)
 			if err != nil {
 				return err
 			}
 		} else {
-			fLog.WithFields(log.Fields{"section": "grading", "reason": "no winners"}).Tracef("block not graded")
+			fLog.WithFields(log.Fields{"section": "grading", "reason": "no winners from OPR & SPR"}).Tracef("block not graded")
+			fmt.Println("no winners from OPR & SPR", ": block not graded")
 		}
-	} else {
-		fLog.WithFields(log.Fields{"section": "grading", "reason": "no graded block"}).Tracef("block not graded")
 	}
 
 	// Only apply transactions if we crossed the activation
@@ -244,10 +379,38 @@ func (d *Pegnetd) SyncBlock(ctx context.Context, tx *sql.Tx, height uint32) erro
 			return err
 		}
 
+		// Before we apply any balance changes, we will snapshot the balances at the START of the block.
+		// This means the balances are the same as the end of the block n-1.
+		// This activation is nested in the activation that has the rates
+		if height >= V20HeightActivation && height%pegnet.SnapshotRate == 0 {
+
+			// check if the height has no rates, what do we do?
+			// check rates from previous height
+			if rates == nil {
+				// We need to handle the no rates case. Miners could avoid mining this last block.
+				// use the last valid rates from last block
+				rates, err = d.Pegnet.SelectPendingRates(ctx, tx, height-1)
+			}
+
+			// If no rates for second time, skip Snapshot logic
+			// otherwise proceed with payout
+			if rates != nil {
+				err := d.SnapshotPayouts(tx, fLog, rates, height, dblock.Timestamp)
+				if err != nil {
+					// something wrong happend during payout execution
+					return err
+				}
+			} else {
+				// We don't return error as it will stop synchronisation
+				// we continue execution but skiping payout for this time
+				fLog.WithFields(log.Fields{"section": "staking", "reason": "no rates"}).Tracef("2 last blocks does not contains rates")
+			}
+		}
+
 		// At this point, we start making updates to the database in a specific order:
 		// TODO: ensure we rollback the tx when needed
 		// 1) Apply transaction batches that are in holding (conversions are always applied here)
-		if gradedBlock != nil && 0 < len(gradedBlock.Winners()) {
+		if isRatesAvailable {
 			// Before conversions can be run, we have to adjust and discover the bank's value.
 			// We also only sync the bank if the block is a pegnet block
 			if err := d.SyncBank(ctx, tx, height); err != nil {
@@ -259,7 +422,7 @@ func (d *Pegnetd) SyncBlock(ctx context.Context, tx *sql.Tx, height uint32) erro
 			}
 		}
 
-		// 2) Sync transactions in current height and apply transactions
+		//2) Sync transactions in current height and apply transactions
 		if transactionsEBlock != nil {
 			if err = d.ApplyTransactionBlock(tx, transactionsEBlock); err != nil {
 				return err
@@ -267,11 +430,14 @@ func (d *Pegnetd) SyncBlock(ctx context.Context, tx *sql.Tx, height uint32) erro
 		}
 	}
 
-	// 3) Apply FCT --> pFCT burns that happened in this block
-	//    These funds will be available for transactions and conversions executed in the next block
-	// TODO: Check the order of operations on this and what block to add burns from.
-	if err := d.ApplyFactoidBlock(ctx, tx, dblock); err != nil {
-		return err
+	// Only apply burn transaction if height does not cross the activation
+	if height < V20HeightActivation {
+		// 3) Apply FCT --> pFCT burns that happened in this block
+		//    These funds will be available for transactions and conversions executed in the next block
+		// TODO: Check the order of operations on this and what block to add burns from.
+		if err := d.ApplyFactoidBlock(ctx, tx, dblock); err != nil {
+			return err
+		}
 	}
 
 	// 4) Apply effects of graded OPR Block (PEG rewards, if any)
@@ -281,6 +447,234 @@ func (d *Pegnetd) SyncBlock(ctx context.Context, tx *sql.Tx, height uint32) erro
 			return err
 		}
 	}
+
+	if height >= V20HeightActivation {
+		// 5) Apply effects of graded SPR Block (PEG rewards, if any)
+		//    These funds will be available for transactions and conversions executed in the next block
+		if gradedSPRBlock != nil {
+			if err := d.ApplyGradedSPRBlock(tx, gradedSPRBlock, dblock.Timestamp); err != nil {
+				return err
+			}
+		}
+	}
+
+	// 6) Apply Developers Rewards
+	if height >= V20DevRewardsHeightActivation && height%pegnet.SnapshotRate == 0 {
+
+		// init developers list explicitely
+		// and forward to function
+		// we use hardcoded list of dev payouts
+		developersList := DeveloperRewardAddreses
+
+		// we want function to accepts dev list as parameter, so different corner cases
+		// can be assigned
+		err := d.DevelopersPayouts(tx, fLog, height, dblock.Timestamp, developersList)
+		if err != nil {
+			fLog.WithFields(log.Fields{"section": "devReward", "reason": "developer reward"}).Tracef("something wrong happend during dev payout execution")
+		}
+	}
+
+	return nil
+}
+
+// SnapshotPayouts moves the current shapshot to the "past", and updates the current snapshot. Then
+// it proceeds to do the snapshot staking payouts.
+func (d *Pegnetd) SnapshotPayouts(tx *sql.Tx, fLog *log.Entry, rates map[fat2.PTicker]uint64, height uint32, heightTimestamp time.Time) error {
+	// Snapshot
+	snapStart := time.Now()
+	err := d.Pegnet.SnapshotCurrent(tx)
+	if err != nil {
+		return err // Snapshot fails stop all progress and block syncing
+	}
+
+	// Payout snapshot
+	balances, err := d.Pegnet.SelectSnapshotBalances(tx)
+	if err != nil {
+		return err // Need to do staking payouts
+	}
+	staked := make(map[factom.FAAddress]*big.Int)
+	for _, bal := range balances {
+		// We want all balances in pUSD
+		total := new(big.Int)
+		for i := fat2.PTicker(1); i < fat2.PTickerMax; i++ {
+			if i == fat2.PTickerPEG {
+				continue // PEG does not count towards stake total
+			}
+			if bal.Balances[i] == 0 { // Ignore 0 balances
+				continue
+			}
+
+			// Convert from pXXX -> pUSD
+			c, err := conversions.Convert(int64(bal.Balances[i]), rates[i], rates[fat2.PTickerUSD])
+			if err != nil {
+				return err
+			}
+
+			// add c to running sum
+			total = total.Add(total, big.NewInt(c))
+		}
+
+		staked[*bal.Address] = total
+	}
+	// We need to mock a TXID for the staked payouts
+	txid := fmt.Sprintf("%064d", height)
+
+	// Sort the staked by highest PUSD
+	type StakedAmount struct {
+		Address factom.FAAddress
+		PUSD    uint64
+	}
+
+	var list []StakedAmount
+	for add, amt := range staked {
+		if !amt.IsUint64() {
+			return fmt.Errorf("%s has balance that is not uint64: %s", add, amt)
+		}
+
+		uAmt := amt.Uint64()
+		if uAmt <= 0 { // Apply a minimum required amount in pUSD
+			continue
+		}
+		// TODO: Check uint64 is safe
+		list = append(list, StakedAmount{Address: add, PUSD: uAmt})
+	}
+
+	if len(list) == 0 {
+		// Abort early since there is no one to pay out
+		fLog.WithFields(log.Fields{
+			"duration": time.Since(snapStart),
+			"eligible": len(list),
+		}).Info("staking | balances snapshotted | not paid, there none eligible")
+		return nil
+	}
+
+	sort.Slice(list, func(i, j int) bool {
+		return list[i].PUSD < list[j].PUSD
+	})
+
+	// Calculate payouts
+	payoutindex := make(map[string]int)
+	addressMap := make(map[string]factom.FAAddress)
+
+	// 4.5K per block allowed
+	// as described in conversions
+	totalPayout := uint64(conversions.PerBlockAssetHolders) * pegnet.SnapshotRate
+	set := conversions.NewConversionSupply(totalPayout)
+	for i, stake := range list {
+		addTxid := fmt.Sprintf("%d-%s", i, txid)
+		payoutindex[addTxid] = i
+		addressMap[addTxid] = stake.Address
+		err := set.AddConversion(addTxid, stake.PUSD)
+		if err != nil {
+			return err
+		}
+	}
+
+	// ---- Database Payouts ----
+	// Inserts tx into the db
+	err = d.Pegnet.InsertStakingCoinbase(tx, txid, height, heightTimestamp, set.Payouts(), addressMap)
+	if err != nil {
+		return err
+	}
+
+	// Increase balances
+	for addTxid, payout := range set.Payouts() {
+		add := addressMap[addTxid] // The address to pay
+
+		_, err = d.Pegnet.AddToBalance(tx, &add, fat2.PTickerPEG, payout)
+		if err != nil {
+			return err
+		}
+	}
+
+	// -- End staking calculations
+	fLog.WithFields(log.Fields{
+		"duration": time.Since(snapStart),
+		"eligible": len(list),
+		"PEG":      float64(totalPayout) / 1e8, // Float is good enough here,
+		"txid":     txid,
+	}).Info("staking | balances snapshotted | paid to eligible")
+	return nil
+}
+
+// Developers Reward Payouts
+// implementation of PIP16 - distributed rewards collected for developers every 24h
+func (d *Pegnetd) DevelopersPayouts(tx *sql.Tx, fLog *log.Entry, height uint32, heightTimestamp time.Time, developers []DevReward) error {
+
+	totalPayout := uint64(conversions.PerBlockDevelopers) * pegnet.SnapshotRate // every day
+	payoutStart := time.Now()
+
+	txid := fmt.Sprintf("%064d", height)
+	log.Info("--------------------------------------------------")
+
+	i := 0
+	// we need more iterating values to construct unique mock hash
+	// should start from 1, because 0-hash reserved for staking mock tx
+	j := 1
+	for _, dev := range developers {
+
+		// We need to mock a TXID to record dev rewards
+		// add more uniqness into hash value by reusing iterating j value in addtion to current height
+		// so it doesn't repeat in 25+ blocks
+		txid = fmt.Sprintf("%02d%062d", j, height)
+
+		// we calculate developers reward from % pre-defined
+		rewardPayout := uint64((conversions.PerBlockDevelopers / 100) * dev.DevRewardPct)
+		addr, err := factom.NewFAAddress(dev.DevAddress)
+
+		_, err = d.Pegnet.AddToBalance(tx, &addr, fat2.PTickerPEG, rewardPayout)
+		if err != nil {
+			return err
+		}
+
+		// Mock entry hash value
+		addTxid := fmt.Sprintf("%d-%s", i, txid)
+		j++ // iterate all the time to build unique hash
+		i++
+		if i > 9 {
+			i = 0
+		}
+
+		fLog.WithFields(log.Fields{
+			//"txid":    txid,
+			"addtxid": addTxid,
+			"prct":    dev.DevRewardPct,
+		}).Info("developer reward | prep")
+
+		// Get dev address as FAAdress
+		FADevAddress, err := factom.NewFAAddress(dev.DevAddress)
+		if err != nil {
+			log.WithFields(log.Fields{
+				"error": err,
+				"addr":  dev.DevAddress,
+			}).Info("error getting developer address")
+			return err
+		}
+
+		// ---- Database Payouts ----
+		// Inserts tx into the db
+		err = d.Pegnet.InsertDeveloperRewardCoinbase(tx, txid, addTxid, height, heightTimestamp, rewardPayout, FADevAddress)
+		if err != nil {
+			log.Info("dev insertion error")
+			return err
+		}
+
+		fLog.WithFields(log.Fields{
+			"total": float64(totalPayout) / 1e8,
+			"PEG":   float64(rewardPayout) / 1e8, // Float is good enough here
+			"pct":   dev.DevRewardPct,
+			"addr":  FADevAddress,
+		}).Info("developer reward | paid out to")
+
+		fLog.Info("developer reward | for ", dev.DevGroup)
+
+	}
+
+	fLog.WithFields(log.Fields{
+		"total":   float64(totalPayout) / 1e8,
+		"elapsed": time.Since(payoutStart),
+	}).Info("developer reward | paid out")
+
 	return nil
 }
 
@@ -333,7 +727,7 @@ func multiFetch(eblock *factom.EBlock, c *factom.Client) error {
 // The bank table helps track the demand for peg at a given height.
 // The bank is the total amount of PEG allowed to be issued for any given height.
 func (d *Pegnetd) SyncBank(ctx context.Context, sqlTx *sql.Tx, currentHeight uint32) error {
-	if currentHeight >= V4OPRUpdate { // V4 forward tracks this
+	if (currentHeight >= V4OPRUpdate) && (currentHeight < V20HeightActivation) { // V4 forward tracks this
 		err := d.Pegnet.InsertBankAmount(sqlTx, int32(currentHeight), int64(pegnet.BankBaseAmount))
 		if err != nil {
 			return err
@@ -367,6 +761,14 @@ func (d *Pegnetd) ApplyTransactionBatchesInHolding(ctx context.Context, sqlTx *s
 		// on a proportional basis.
 		for i, txBatch := range txBatches {
 			// Re-validate transaction batch because timestamp might not be valid anymore
+
+			if currentHeight >= V20HeightActivation {
+				if err := txBatch.ValidatePegTx(int32(currentHeight)); err != nil {
+					d.Pegnet.SetTransactionHistoryExecuted(sqlTx, txBatch, -2)
+					continue
+				}
+			}
+
 			if err := txBatch.Validate(int32(currentHeight)); err != nil {
 				d.Pegnet.SetTransactionHistoryExecuted(sqlTx, txBatch, -2)
 				continue
@@ -391,11 +793,13 @@ func (d *Pegnetd) ApplyTransactionBatchesInHolding(ctx context.Context, sqlTx *s
 			} else if rejectCode < 0 { // Tx rejected
 				d.Pegnet.SetTransactionHistoryExecuted(sqlTx, txBatch, rejectCode)
 			} else if err == nil { // Tx accepted
-				// If PegnetConversion limits are on, we process conversions to
-				// peg in a second pass.
-				if currentHeight >= PegnetConversionLimitActivation && txBatch.HasPEGRequest() {
-					// Batch applied, we need to do the PEG conversions at the end
-					pegConversions = append(pegConversions, txBatches[i])
+				if currentHeight < V20HeightActivation {
+					// If PegnetConversion limits are on, we process conversions to
+					// peg in a second pass.
+					if currentHeight >= PegnetConversionLimitActivation && txBatch.HasPEGRequest() {
+						// Batch applied, we need to do the PEG conversions at the end
+						pegConversions = append(pegConversions, txBatches[i])
+					}
 				}
 			}
 		}
@@ -420,7 +824,7 @@ func (d *Pegnetd) ApplyTransactionBatchesInHolding(ctx context.Context, sqlTx *s
 	}
 
 	// Process all pending using the same bank
-	if currentHeight >= V4OPRUpdate {
+	if (currentHeight >= V4OPRUpdate) && (currentHeight < V20HeightActivation) {
 		// The bank entry should be here from the sync banks called before this function.
 		bentry, err := d.Pegnet.SelectBankEntry(sqlTx, int32(currentHeight))
 		if err != nil {
@@ -431,6 +835,7 @@ func (d *Pegnetd) ApplyTransactionBatchesInHolding(ctx context.Context, sqlTx *s
 			return err
 		}
 	}
+
 	return nil
 }
 
@@ -602,7 +1007,8 @@ func (d *Pegnetd) recordBatch(sqlTx *sql.Tx, txBatch *fat2.TransactionBatch, rat
 		}
 
 		// Outputs
-		if tx.IsConversion() { // Conv Output
+		if tx.IsConversion() {
+			// Conversions Output
 			outputAmount, err := conversions.Convert(int64(tx.Input.Amount), rates[tx.Input.Type], rates[tx.Conversion])
 			if err != nil {
 				return err
@@ -630,13 +1036,16 @@ func (d *Pegnetd) recordBatch(sqlTx *sql.Tx, txBatch *fat2.TransactionBatch, rat
 			stats.Volume[tx.Input.Type.String()] += tx.Input.Amount
 			stats.VolumeTx[tx.Input.Type.String()] += tx.Input.Amount
 			for _, transfer := range tx.Transfers {
-				_, err = d.Pegnet.AddToBalance(sqlTx, &transfer.Address, tx.Input.Type, transfer.Amount)
-				if err != nil {
-					return err
-				}
-				_, err = d.Pegnet.InsertTransactionRelation(sqlTx, transfer.Address, txBatch.Entry.Hash, uint64(txIndex), true, false)
-				if err != nil {
-					return err
+				// if transfer to Burn address do nothing, otherwise add balances
+				if transfer.Address != FAGlobalBurnAddress {
+					_, err = d.Pegnet.AddToBalance(sqlTx, &transfer.Address, tx.Input.Type, transfer.Amount)
+					if err != nil {
+						return err
+					}
+					_, err = d.Pegnet.InsertTransactionRelation(sqlTx, transfer.Address, txBatch.Entry.Hash, uint64(txIndex), true, false)
+					if err != nil {
+						return err
+					}
 				}
 			}
 		}
@@ -834,6 +1243,34 @@ func (d *Pegnetd) ApplyGradedOPRBlock(tx *sql.Tx, gradedBlock grader.GradedBlock
 	return nil
 }
 
+// ApplyGradedOPRBlock pays out PEG to the winners of the given GradedBlock.
+// If an error is returned, the sql.Tx should be rolled back by the caller.
+func (d *Pegnetd) ApplyGradedSPRBlock(tx *sql.Tx, gradedSPRBlock graderStake.GradedBlock, timestamp time.Time) error {
+	winners := gradedSPRBlock.Winners()
+	for i := range winners {
+		addr, err := factom.NewFAAddress(winners[i].SPR.GetAddress())
+		if err != nil {
+			// TODO: This is kinda an odd case. I think we should just drop the rewards
+			// 		for an invalid address. We can always add back the rewards and they will have
+			//		a higher balance after a change.
+			log.WithError(err).WithFields(log.Fields{
+				"height": winners[i].SPR.GetHeight(),
+				"ehash":  fmt.Sprintf("%x", winners[i].EntryHash),
+			}).Warnf("failed to reward")
+			continue
+		}
+
+		if _, err := d.Pegnet.AddToBalance(tx, &addr, fat2.PTickerPEG, uint64(winners[i].Payout())); err != nil {
+			return err
+		}
+
+		if err := d.Pegnet.InsertStaking100Coinbase(tx, winners[i], addr[:], timestamp); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func isDone(ctx context.Context) bool {
 	select {
 	case <-ctx.Done():
@@ -841,4 +1278,42 @@ func isDone(ctx context.Context) bool {
 	default:
 		return false
 	}
+}
+
+func (d *Pegnetd) GetAssetRates(oprWinners []opr.AssetUint, sprWinners []opr.AssetUint) ([]opr.AssetUint, error) {
+	if oprWinners != nil && sprWinners == nil {
+		return oprWinners, nil
+	}
+	if oprWinners == nil && sprWinners != nil {
+		return sprWinners, nil
+	}
+	if oprWinners != nil && sprWinners != nil {
+		// 1) sprWinners determine tolerance range
+		// 2) oprWinners set the real rates
+		if len(oprWinners) != len(sprWinners) {
+			return nil, fmt.Errorf("SPR & OPR use different assets version")
+		}
+
+		var filteredRates []opr.AssetUint
+		for i := range oprWinners {
+			if oprWinners[i].Name == sprWinners[i].Name {
+				sprRate := sprWinners[i].Value
+				oprRate := oprWinners[i].Value
+				toleranceRate := 0.1 // 10% band
+				toleranceBandHigh := float64(sprRate) * (1 + toleranceRate)
+				toleranceBandLow := float64(sprRate) * (1 - toleranceRate)
+				if (float64(oprRate) >= toleranceBandLow) && (float64(oprRate) <= toleranceBandHigh) {
+					filteredRates = append(filteredRates, oprWinners[i])
+				} else {
+					fmt.Println("opr is out side of spr's tolerance band")
+					fmt.Println("=== asset name:", oprWinners[i].Name)
+					fmt.Println("<<<<=== opr rate:", oprWinners[i].Value)
+					fmt.Println("<<<<=== spr rate:", sprWinners[i].Value)
+					return nil, fmt.Errorf("opr is out side of tolerance band")
+				}
+			}
+		}
+		return filteredRates, nil
+	}
+	return nil, fmt.Errorf("no winners")
 }
