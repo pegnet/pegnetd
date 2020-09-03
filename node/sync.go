@@ -178,6 +178,7 @@ func (d *Pegnetd) NullifyBurnAddress(ctx context.Context, tx *sql.Tx, height uin
 		return err
 	}
 	heightTimestamp := dblock.Timestamp
+
 	// We need to mock a TXID to record zeroing
 	txid := fmt.Sprintf("%064d", height)
 
@@ -193,9 +194,10 @@ func (d *Pegnetd) NullifyBurnAddress(ctx context.Context, tx *sql.Tx, height uin
 		}).Info("zeroing burn | balances retrieval failed")
 	}
 
-	i := 0 // value to keep witin 0-9 range for mock tx
-	j := 0 //
+	i := 0  // value to keep witin 0-9 range for mock tx
+	j := 50 // value for uniqueness
 	for ticker := fat2.PTickerInvalid + 1; ticker < fat2.PTickerMax; ticker++ {
+
 		// Substract from every issuance
 		value, _ := balances[ticker]
 		_, _, err := d.Pegnet.SubFromBalance(tx, &FAGlobalBurnAddress, ticker, value) // lastInd, txErr, err
@@ -207,11 +209,14 @@ func (d *Pegnetd) NullifyBurnAddress(ctx context.Context, tx *sql.Tx, height uin
 			}).Info("zeroing burn | substract from balance failed")
 		}
 
-		// We need to mock a TXID to record zeroing and it should be unique
-		txid = fmt.Sprintf("%064d", height-(uint32(j)))
+		// We need to mock a TXID to record nullify recrods
+		// add more uniqness into hash value by reusing iterating j value in addtion to current height
+		// so it doesn't overlap with staking and rewards we have in place
+		txid = fmt.Sprintf("%02d%062d", j, height)
 
 		// Mock entry hash value
 		addTxid := fmt.Sprintf("%d-%s", i, txid)
+
 		j++ // iterate all the time
 		i++ // drop to zero to be within 0-9 range
 		if i > 9 {
