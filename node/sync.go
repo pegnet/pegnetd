@@ -212,7 +212,7 @@ func (d *Pegnetd) NullifyBurnAddress(ctx context.Context, tx *sql.Tx, height uin
 		// We need to mock a TXID to record nullify recrods
 		// add more uniqness into hash value by reusing iterating j value in addtion to current height
 		// so it doesn't overlap with staking and rewards we have in place
-		txid = fmt.Sprintf("%02d%062d", j, height)
+		txid = fmt.Sprintf("%03d%061d", j, height)
 
 		// Mock entry hash value
 		addTxid := fmt.Sprintf("%d-%s", i, txid)
