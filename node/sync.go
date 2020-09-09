@@ -912,7 +912,7 @@ func (d *Pegnetd) applyTransactionBatch(sqlTx *sql.Tx, txBatch *fat2.Transaction
 				return pegnet.PFCTOneWayError
 			}
 
-			if rates[tx.Input.Type] > 0 {
+			if rates[tx.Input.Type] > 0 && rates[tx.Conversion] > 0 {
 				// TODO: For now any bogus amounts will be tossed. Someone can fake an overflow for example,
 				// 		and hold us up forever.
 				_, err := conversions.Convert(int64(tx.Input.Amount), rates[tx.Input.Type], rates[tx.Conversion])
