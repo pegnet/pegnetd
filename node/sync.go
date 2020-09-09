@@ -912,11 +912,13 @@ func (d *Pegnetd) applyTransactionBatch(sqlTx *sql.Tx, txBatch *fat2.Transaction
 				return pegnet.PFCTOneWayError
 			}
 
-			// TODO: For now any bogus amounts will be tossed. Someone can fake an overflow for example,
-			// 		and hold us up forever.
-			_, err := conversions.Convert(int64(tx.Input.Amount), rates[tx.Input.Type], rates[tx.Conversion])
-			if err != nil {
-				return nil
+			if rates[tx.Input.Type] > 0 {
+				// TODO: For now any bogus amounts will be tossed. Someone can fake an overflow for example,
+				// 		and hold us up forever.
+				_, err := conversions.Convert(int64(tx.Input.Amount), rates[tx.Input.Type], rates[tx.Conversion])
+				if err != nil {
+					return nil
+				}
 			}
 		} else {
 			// There are no additional transfer checks
@@ -932,11 +934,13 @@ func (d *Pegnetd) applyTransactionBatch(sqlTx *sql.Tx, txBatch *fat2.Transaction
 		balances[tx.Input.Address][tx.Input.Type] -= tx.Input.Amount
 
 		if tx.IsConversion() {
-			outputAmount, err := conversions.Convert(int64(tx.Input.Amount), rates[tx.Input.Type], rates[tx.Conversion])
-			if err != nil {
-				return err
+			if rates[tx.Input.Type] > 0 {
+				outputAmount, err := conversions.Convert(int64(tx.Input.Amount), rates[tx.Input.Type], rates[tx.Conversion])
+				if err != nil {
+					return err
+				}
+				balances[tx.Input.Address][tx.Conversion] += uint64(outputAmount)
 			}
-			balances[tx.Input.Address][tx.Conversion] += uint64(outputAmount)
 		} else {
 			for _, transfer := range tx.Transfers {
 				// If it is one of our inputs
@@ -985,31 +989,34 @@ func (d *Pegnetd) recordBatch(sqlTx *sql.Tx, txBatch *fat2.TransactionBatch, rat
 		// All conversions to PEG after the activation height have their
 		// outputs processed later. We only subtract their inputs right now.
 		if currentHeight >= PegnetConversionLimitActivation && tx.IsPEGRequest() {
-			// Ensure the output is valid, as we will process it later
-			_, err := conversions.Convert(int64(tx.Input.Amount), rates[tx.Input.Type], rates[tx.Conversion])
-			if err != nil {
-				return err
+			if rates[tx.Input.Type] > 0 && rates[tx.Conversion] > 0 {
+				// Ensure the output is valid, as we will process it later
+				_, err := conversions.Convert(int64(tx.Input.Amount), rates[tx.Input.Type], rates[tx.Conversion])
+				if err != nil {
+					return err
+				}
 			}
 			continue // PEG Outputs are handled elsewhere
 		}
 
 		// Outputs
 		if tx.IsConversion() {
-			// Conversions Output
-			outputAmount, err := conversions.Convert(int64(tx.Input.Amount), rates[tx.Input.Type], rates[tx.Conversion])
-			if err != nil {
-				return err
-			}
+			if rates[tx.Input.Type] > 0 && rates[tx.Conversion] > 0 {
+				// Conversions Output
+				outputAmount, err := conversions.Convert(int64(tx.Input.Amount), rates[tx.Input.Type], rates[tx.Conversion])
+				if err != nil {
+					return err
+				}
 
-			if err = d.Pegnet.SetTransactionHistoryConvertedAmount(sqlTx, txBatch, txIndex, outputAmount); err != nil {
-				return err
-			}
+				if err = d.Pegnet.SetTransactionHistoryConvertedAmount(sqlTx, txBatch, txIndex, outputAmount); err != nil {
+					return err
+				}
 
-			_, err = d.Pegnet.AddToBalance(sqlTx, &tx.Input.Address, tx.Conversion, uint64(outputAmount))
-			if err != nil {
-				return err
+				_, err = d.Pegnet.AddToBalance(sqlTx, &tx.Input.Address, tx.Conversion, uint64(outputAmount))
+				if err != nil {
+					return err
+				}
 			}
-
 		} else {
 			// Transfer Outputs
 
@@ -1272,11 +1279,9 @@ func (d *Pegnetd) GetAssetRates(oprWinners []opr.AssetUint, sprWinners []opr.Ass
 				if (float64(oprRate) >= toleranceBandLow) && (float64(oprRate) <= toleranceBandHigh) {
 					filteredRates = append(filteredRates, oprWinners[i])
 				} else {
-					fmt.Println("opr is out side of spr's tolerance band")
-					fmt.Println("=== asset name:", oprWinners[i].Name)
-					fmt.Println("<<<<=== opr rate:", oprWinners[i].Value)
-					fmt.Println("<<<<=== spr rate:", sprWinners[i].Value)
-					return nil, fmt.Errorf("opr is out side of tolerance band")
+					zeroWinner := oprWinners[i]
+					zeroWinner.Value = 0
+					filteredRates = append(filteredRates, zeroWinner)
 				}
 			}
 		}
