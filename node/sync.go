@@ -934,7 +934,7 @@ func (d *Pegnetd) applyTransactionBatch(sqlTx *sql.Tx, txBatch *fat2.Transaction
 		balances[tx.Input.Address][tx.Input.Type] -= tx.Input.Amount
 
 		if tx.IsConversion() {
-			if rates[tx.Input.Type] > 0 {
+			if rates[tx.Input.Type] > 0 && rates[tx.Conversion] > 0 {
 				outputAmount, err := conversions.Convert(int64(tx.Input.Amount), rates[tx.Input.Type], rates[tx.Conversion])
 				if err != nil {
 					return err
