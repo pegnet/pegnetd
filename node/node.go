@@ -62,6 +62,10 @@ var (
 	// SprSignatureActivation indicates the activation of SPR Signature.
 	// Estimated to be  Aug 28th 2020
 	SprSignatureActivation uint32 = 260118
+
+	// V202EnhanceActivation indicates the activation of PegNet 2.0.2.
+	// Estimated to be  XXXXX XXX XXX
+	V202EnhanceActivation uint32 = 999999
 )
 
 func SetAllActivations(act uint32) {
@@ -76,6 +80,8 @@ func SetAllActivations(act uint32) {
 	V4OPRUpdate = act
 	V20HeightActivation = act
 	V20DevRewardsHeightActivation = act
+	SprSignatureActivation = act
+	V202EnhanceActivation = act
 }
 
 type Pegnetd struct {
