@@ -1276,7 +1276,10 @@ func (d *Pegnetd) GetAssetRates(oprWinners []opr.AssetUint, sprWinners []opr.Ass
 					fmt.Println("=== asset name:", oprWinners[i].Name)
 					fmt.Println("<<<<=== opr rate:", oprWinners[i].Value)
 					fmt.Println("<<<<=== spr rate:", sprWinners[i].Value)
-					return nil, fmt.Errorf("opr is out side of tolerance band")
+					fmt.Println(oprWinners[i].Name, " will be paused in next block")
+					diffWinner := sprWinners[i]
+					diffWinner.Value = 0
+					filteredRates = append(filteredRates, diffWinner)
 				}
 			}
 		}
