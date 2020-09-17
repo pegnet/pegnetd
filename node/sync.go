@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"math"
 	"math/big"
 	"sort"
 	"time"
@@ -490,6 +491,9 @@ func (d *Pegnetd) SnapshotPayouts(tx *sql.Tx, fLog *log.Entry, rates map[fat2.PT
 			if bal.Balances[i] == 0 { // Ignore 0 balances
 				continue
 			}
+			if rates[i] == math.MaxUint64 || rates[fat2.PTickerUSD] == math.MaxUint64 {
+				continue
+			}
 
 			// Convert from pXXX -> pUSD
 			c, err := conversions.Convert(int64(bal.Balances[i]), rates[i], rates[fat2.PTickerUSD])
@@ -883,6 +887,9 @@ func (d *Pegnetd) applyTransactionBatch(sqlTx *sql.Tx, txBatch *fat2.Transaction
 
 	// We need to do all checks up front, then apply the tx
 	for _, tx := range txBatch.Transactions {
+		if rates[tx.Input.Type] == math.MaxUint64 || rates[tx.Conversion] == math.MaxUint64 {
+			continue
+		}
 		// First check the input address has the funds
 		bals, err := d.Pegnet.SelectPendingBalances(sqlTx, &tx.Input.Address)
 		if err != nil {
@@ -929,15 +936,19 @@ func (d *Pegnetd) applyTransactionBatch(sqlTx *sql.Tx, txBatch *fat2.Transaction
 		if balances[tx.Input.Address][tx.Input.Type] < tx.Input.Amount {
 			return pegnet.InsufficientBalanceErr
 		}
-		balances[tx.Input.Address][tx.Input.Type] -= tx.Input.Amount
 
 		if tx.IsConversion() {
+			if rates[tx.Input.Type] == math.MaxUint64 || rates[tx.Conversion] == math.MaxUint64 {
+				continue
+			}
+			balances[tx.Input.Address][tx.Input.Type] -= tx.Input.Amount
 			outputAmount, err := conversions.Convert(int64(tx.Input.Amount), rates[tx.Input.Type], rates[tx.Conversion])
 			if err != nil {
 				return err
 			}
 			balances[tx.Input.Address][tx.Conversion] += uint64(outputAmount)
 		} else {
+			balances[tx.Input.Address][tx.Input.Type] -= tx.Input.Amount
 			for _, transfer := range tx.Transfers {
 				// If it is one of our inputs
 				if _, ok := balances[transfer.Address]; ok {
@@ -966,6 +977,9 @@ func (d *Pegnetd) applyTransactionBatch(sqlTx *sql.Tx, txBatch *fat2.Transaction
 // valid at this point.
 func (d *Pegnetd) recordBatch(sqlTx *sql.Tx, txBatch *fat2.TransactionBatch, rates map[fat2.PTicker]uint64, currentHeight uint32) error {
 	for txIndex, tx := range txBatch.Transactions {
+		if rates[tx.Input.Type] == math.MaxUint64 || rates[tx.Conversion] == math.MaxUint64 {
+			continue
+		}
 		_, txErr, err := d.Pegnet.SubFromBalance(sqlTx, &tx.Input.Address, tx.Input.Type, tx.Input.Amount)
 		if err != nil {
 			return err
@@ -1048,6 +1062,9 @@ func (d *Pegnetd) recordPegnetRequests(sqlTx *sql.Tx, txBatchs []*fat2.Transacti
 		for j := range txBatchs[i].Transactions {
 			// Retrieve each tx individually.
 			tx := txBatchs[i].Transactions[j]
+			if rates[tx.Input.Type] == math.MaxUint64 || rates[tx.Conversion] == math.MaxUint64 {
+				continue
+			}
 			// The txid helps determine the order when deciding who
 			// gets the dust
 			txid := transactionid.FormatTxID(j, txBatchs[i].Entry.Hash.String())
@@ -1076,6 +1093,9 @@ func (d *Pegnetd) recordPegnetRequests(sqlTx *sql.Tx, txBatchs []*fat2.Transacti
 		totalPaid += int64(pegYield)
 		tx := txData[txid].Batch.Transactions[txData[txid].TxIndex]
 
+		if rates[tx.Input.Type] == math.MaxUint64 || rates[tx.Conversion] == math.MaxUint64 {
+			continue
+		}
 		refundAmt := conversions.Refund(int64(tx.Input.Amount), int64(pegYield), rates[tx.Input.Type], rates[tx.Conversion])
 
 		log.WithFields(log.Fields{
@@ -1278,7 +1298,7 @@ func (d *Pegnetd) GetAssetRates(oprWinners []opr.AssetUint, sprWinners []opr.Ass
 					fmt.Println("<<<<=== spr rate:", sprWinners[i].Value)
 					fmt.Println(oprWinners[i].Name, " will be paused in next block")
 					diffWinner := sprWinners[i]
-					diffWinner.Value = 0
+					diffWinner.Value = math.MaxUint64
 					filteredRates = append(filteredRates, diffWinner)
 				}
 			}
