@@ -24,6 +24,7 @@ import (
 
 func init() {
 	rootCmd.PersistentFlags().String("log", "info", "Change the logging level. Can choose from 'trace', 'debug', 'info', 'warn', 'error', or 'fatal'")
+	rootCmd.PersistentFlags().StringP("network", "", "", "The network for PegNetD")
 	rootCmd.PersistentFlags().StringP("server", "s", "http://localhost:8088/v2", "The url to the factomd endpoint without a trailing slash")
 	rootCmd.PersistentFlags().StringP("wallet", "w", "http://localhost:8089/v2", "The url to the factomd-wallet endpoint without a trailing slash")
 	rootCmd.PersistentFlags().String("walletuser", "", "The username for Wallet RPC")
@@ -174,6 +175,7 @@ func always(cmd *cobra.Command, args []string) {
 	// Setup global command line flag overrides
 	// This gets run before any command executes. It will init global flags to the config
 	_ = viper.BindPFlag(config.LoggingLevel, cmd.Flags().Lookup("log"))
+	_ = viper.BindPFlag(config.Network, cmd.Flags().Lookup("network"))
 	_ = viper.BindPFlag(config.Server, cmd.Flags().Lookup("server"))
 	_ = viper.BindPFlag(config.Wallet, cmd.Flags().Lookup("wallet"))
 	_ = viper.BindPFlag(config.WalletUser, cmd.Flags().Lookup("walletuser"))

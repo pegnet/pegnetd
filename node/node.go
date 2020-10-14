@@ -87,6 +87,9 @@ type Pegnetd struct {
 }
 
 func NewPegnetd(ctx context.Context, conf *viper.Viper) (*Pegnetd, error) {
+	// init chainIds
+	InitChainsFromConfig(conf)
+
 	// TODO : Update emyrk's factom library
 	n := new(Pegnetd)
 	n.FactomClient = FactomClientFromConfig(conf)
@@ -146,4 +149,17 @@ func FactomClientFromConfig(conf *viper.Viper) *factom.Client {
 	}
 
 	return cl
+}
+
+func InitChainsFromConfig(conf *viper.Viper) {
+	network := conf.GetString(config.Network)
+	if network == "MainNet" {
+		OPRChain = factom.NewBytes32("a642a8674f46696cc47fdb6b65f9c87b2a19c5ea8123b3d2f0c13b6f33a9d5ef")
+		SPRChain = factom.NewBytes32("d5e395125335a21cef0ceca528168e87fe929fdac1f156870c1b1be6502448b4")
+		TransactionChain = factom.NewBytes32("cffce0f409ebba4ed236d49d89c70e4bd1f1367d86402a3363366683265a242d")
+	} else if network == "TestNet" {
+		OPRChain = factom.NewBytes32("bf88abd3d8e4b5b87a8a41405b9a1cdd3084ace29a05d6f9e5ead4057eed1470")
+		SPRChain = factom.NewBytes32("7a73b7fc1b91b643d338b94e76d28ff0972f0b7391a7faa49004664d6cabb716")
+		TransactionChain = factom.NewBytes32("8ab0ccbf9a2544a4098f1823b101d7dc63df91c2b60e9e977513521fd0cb090d")
+	}
 }
