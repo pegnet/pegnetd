@@ -158,8 +158,8 @@ func InitChainsFromConfig(conf *viper.Viper) {
 		SPRChain = factom.NewBytes32("d5e395125335a21cef0ceca528168e87fe929fdac1f156870c1b1be6502448b4")
 		TransactionChain = factom.NewBytes32("cffce0f409ebba4ed236d49d89c70e4bd1f1367d86402a3363366683265a242d")
 	} else if network == "TestNet" {
-		OPRChain = factom.NewBytes32("bf88abd3d8e4b5b87a8a41405b9a1cdd3084ace29a05d6f9e5ead4057eed1470")
-		SPRChain = factom.NewBytes32("7a73b7fc1b91b643d338b94e76d28ff0972f0b7391a7faa49004664d6cabb716")
-		TransactionChain = factom.NewBytes32("8ab0ccbf9a2544a4098f1823b101d7dc63df91c2b60e9e977513521fd0cb090d")
+		OPRChain = factom.NewBytes32("ad98d39f002d4cae9ed07a8f5689cb029a83ad3b4bd8d23c49345d4ca7ca4393")
+		SPRChain = factom.NewBytes32("e3b1668158026b2450d123ba993aca5367a8b96c6018f63640101a28b8ab5bc7")
+		TransactionChain = factom.NewBytes32("2ac925fe946543a83d4c232d788dd589177611c0dbe970172c21b42039682a8a")
 	}
 }
