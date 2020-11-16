@@ -62,6 +62,12 @@ var (
 	// SprSignatureActivation indicates the activation of SPR Signature.
 	// Estimated to be  Aug 28th 2020
 	SprSignatureActivation uint32 = 260118
+
+	// OneWaypAssetsConversions makes some pAssets a 1 way conversion.
+	// pDCR, pDGB, pDOGE, pHBAR, pONT, pRVN, pBAT, pALGO, pBIF, pETB, pKES, pNGN, pRWF, pTZS, pUGX
+	// These pAssets have got small marketcap, and these will be disabled for conversion.
+	// Estimated to be XXXXXXXX
+	OneWaySmallAssetsConversions uint32 = 999999
 )
 
 func SetAllActivations(act uint32) {
@@ -76,6 +82,7 @@ func SetAllActivations(act uint32) {
 	V4OPRUpdate = act
 	V20HeightActivation = act
 	V20DevRewardsHeightActivation = act
+	OneWaySmallAssetsConversions = act
 }
 
 type Pegnetd struct {

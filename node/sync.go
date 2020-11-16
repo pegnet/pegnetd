@@ -912,6 +912,18 @@ func (d *Pegnetd) applyTransactionBatch(sqlTx *sql.Tx, txBatch *fat2.Transaction
 				return pegnet.PFCTOneWayError
 			}
 
+			// pXXX -> pDCR conversions are disabled at the activation height.
+			// FYI, PEG one way conversion was disabled at V20HeightActivation already.
+			if currentHeight >= OneWaySmallAssetsConversions &&
+				(tx.Conversion == fat2.PTickerPEG || tx.Conversion == fat2.PTickerDCR || tx.Conversion == fat2.PTickerDGB ||
+					tx.Conversion == fat2.PTickerDOGE || tx.Conversion == fat2.PTickerHBAR || tx.Conversion == fat2.PTickerONT ||
+					tx.Conversion == fat2.PTickerRVN || tx.Conversion == fat2.PTickerBAT || tx.Conversion == fat2.PTickerALGO ||
+					tx.Conversion == fat2.PTickerBIF || tx.Conversion == fat2.PTickerETB || tx.Conversion == fat2.PTickerKES ||
+					tx.Conversion == fat2.PTickerNGN || tx.Conversion == fat2.PTickerRWF || tx.Conversion == fat2.PTickerTZS ||
+					tx.Conversion == fat2.PTickerUGX) {
+				return pegnet.PSMALLOneWayError
+			}
+
 			// TODO: For now any bogus amounts will be tossed. Someone can fake an overflow for example,
 			// 		and hold us up forever.
 			_, err := conversions.Convert(int64(tx.Input.Amount), rates[tx.Input.Type], rates[tx.Conversion])
