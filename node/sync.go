@@ -1266,7 +1266,7 @@ func (d *Pegnetd) GetAssetRates(oprWinners []opr.AssetUint, sprWinners []opr.Ass
 			if oprWinners[i].Name == sprWinners[i].Name {
 				sprRate := sprWinners[i].Value
 				oprRate := oprWinners[i].Value
-				toleranceRate := 0.1 // 10% band
+				toleranceRate := 0.25 // 25% band
 				toleranceBandHigh := float64(sprRate) * (1 + toleranceRate)
 				toleranceBandLow := float64(sprRate) * (1 - toleranceRate)
 				if (float64(oprRate) >= toleranceBandLow) && (float64(oprRate) <= toleranceBandHigh) {
