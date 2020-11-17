@@ -94,7 +94,7 @@ OuterSyncLoop:
 
 			// One time operation, Inserts negative balance for the burn address that used during the attack
 			// We need to do this before main logic because sqlite db will be locked
-			if d.Sync.Synced+1 == V20DevRewardsHeightActivation {
+			if d.Sync.Synced+1 == V202EnhanceActivation {
 				d.NullifyBurnAddress(ctx, tx, d.Sync.Synced+1)
 			}
 
@@ -172,6 +172,13 @@ OuterSyncLoop:
 func (d *Pegnetd) NullifyBurnAddress(ctx context.Context, tx *sql.Tx, height uint32) error {
 	fLog := log.WithFields(log.Fields{"height": height})
 
+	FAGlobalBurnAddress, err := factom.NewFAAddress(GlobalBurnAddress)
+	if err != nil {
+		log.WithFields(log.Fields{
+			"error": err,
+		}).Info("error getting burn address")
+	}
+
 	dblock := new(factom.DBlock)
 	dblock.Height = height
 	if err := dblock.Get(nil, d.FactomClient); err != nil {
@@ -227,15 +234,6 @@ func (d *Pegnetd) NullifyBurnAddress(ctx context.Context, tx *sql.Tx, height uin
 			"txid":    txid,
 			"addtxid": addTxid,
 		}).Info("burn nullify | prep")
-
-		err = d.Pegnet.InsertZeroingCoinbase(tx, txid, addTxid, height, heightTimestamp, value, ticker.String(), FAGlobalBurnAddress)
-		if err != nil {
-			fLog.WithFields(log.Fields{
-				"error": err,
-			}).Info("zeroing burn | coinbase tx failed")
-			return err
-		}
-
 	}
 
 	return nil
@@ -982,6 +980,13 @@ func (d *Pegnetd) applyTransactionBatch(sqlTx *sql.Tx, txBatch *fat2.Transaction
 // recordBatch will submit the batch to the database. We assume the tx is 100%
 // valid at this point.
 func (d *Pegnetd) recordBatch(sqlTx *sql.Tx, txBatch *fat2.TransactionBatch, rates map[fat2.PTicker]uint64, currentHeight uint32) error {
+	FAGlobalBurnAddress, err := factom.NewFAAddress(GlobalBurnAddress)
+	if err != nil {
+		log.WithFields(log.Fields{
+			"error": err,
+		}).Info("error getting burn address")
+	}
+
 	for txIndex, tx := range txBatch.Transactions {
 		_, txErr, err := d.Pegnet.SubFromBalance(sqlTx, &tx.Input.Address, tx.Input.Type, tx.Input.Amount)
 		if err != nil {
