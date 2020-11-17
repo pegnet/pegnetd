@@ -234,15 +234,6 @@ func (d *Pegnetd) NullifyBurnAddress(ctx context.Context, tx *sql.Tx, height uin
 			"txid":    txid,
 			"addtxid": addTxid,
 		}).Info("burn nullify | prep")
-
-		err = d.Pegnet.InsertZeroingCoinbase(tx, txid, addTxid, height, heightTimestamp, value, ticker.String(), FAGlobalBurnAddress)
-		if err != nil {
-			fLog.WithFields(log.Fields{
-				"error": err,
-			}).Info("zeroing burn | coinbase tx failed")
-			return err
-		}
-
 	}
 
 	return nil
