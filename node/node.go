@@ -129,18 +129,6 @@ func NewPegnetd(ctx context.Context, conf *viper.Viper) (*Pegnetd, error) {
 		}
 	}
 
-	// init burn address
-	FAGlobalBurnAddress, err := factom.NewFAAddress(GlobalBurnAddress)
-	if err != nil {
-		log.WithFields(log.Fields{
-			"error": err,
-		}).Info("error getting burn address")
-	}
-
-	log.WithFields(log.Fields{
-		"addr": FAGlobalBurnAddress,
-	}).Info("burn address loaded")
-
 	grader.InitLX()
 	return n, nil
 }
