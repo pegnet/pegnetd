@@ -68,6 +68,10 @@ var (
 	// These pAssets have got small marketcap, and these will be disabled for conversion.
 	// Estimated to be XXXXXXXX
 	OneWaySmallAssetsConversions uint32 = 999999
+
+	// V202EnhanceActivation indicates the activation of PegNet 2.0.2.
+	// Estimated to be  XXXXX XXX XXX
+	V202EnhanceActivation uint32 = 999999
 )
 
 func SetAllActivations(act uint32) {
@@ -83,6 +87,8 @@ func SetAllActivations(act uint32) {
 	V20HeightActivation = act
 	V20DevRewardsHeightActivation = act
 	OneWaySmallAssetsConversions = act
+	SprSignatureActivation = act
+	V202EnhanceActivation = act
 }
 
 type Pegnetd struct {
