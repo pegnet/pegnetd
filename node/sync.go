@@ -606,7 +606,7 @@ func (d *Pegnetd) DevelopersPayouts(tx *sql.Tx, fLog *log.Entry, height uint32, 
 		txid = fmt.Sprintf("%02d%062d", j, height)
 
 		// we calculate developers reward from % pre-defined
-		rewardPayout := uint64((conversions.PerBlockDevelopers / 100) * dev.DevRewardPct)
+		rewardPayout := uint64((conversions.PerBlockDevelopers / 100) * dev.DevRewardPct * pegnet.SnapshotRate)
 		addr, err := factom.NewFAAddress(dev.DevAddress)
 
 		_, err = d.Pegnet.AddToBalance(tx, &addr, fat2.PTickerPEG, rewardPayout)
