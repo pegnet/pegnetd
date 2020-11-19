@@ -354,6 +354,16 @@ var conv = &cobra.Command{
 			os.Exit(1)
 		}
 
+		// Let's check the pXXX -> pSmallAssets
+		// pSmallAssets means the 16 pAssets which have got small market cap.
+		if (destAsset == "PEG" || destAsset == "pDCR" || destAsset == "pDGB" || destAsset == "pDOGE" || destAsset == "pHBAR" ||
+			destAsset == "pONT" || destAsset == "pRVN" || destAsset == "pBAT" || destAsset == "pALGO" || destAsset == "pBIF" ||
+			destAsset == "pETB" || destAsset == "pKES" || destAsset == "pNGN" || destAsset == "pRWF" || destAsset == "pTZS" ||
+			destAsset == "pUGX") && uint32(status.Current) >= node.OneWaySmallAssetsConversions {
+			cmd.PrintErrln(fmt.Sprintf("pXXX -> pSmallAssets conversions are not allowed since block height %d.", node.OneWaySmallAssetsConversions))
+			os.Exit(1)
+		}
+
 		// Build the transaction from the args
 		var trans fat2.Transaction
 		if err := setTransactionInput(&trans, cl, originalSource, srcAsset, amt); err != nil {

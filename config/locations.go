@@ -12,6 +12,7 @@ const (
 	CustomSQLDBMode = "db.mode"
 	SQLDBWalMode    = "db.wal"
 
+	Network              = "app.Network"
 	Server               = "app.Server"
 	Wallet               = "app.Wallet"
 	WalletUser           = "app.WalletUser"

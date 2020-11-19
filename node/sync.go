@@ -95,7 +95,7 @@ OuterSyncLoop:
 
 			// One time operation, Inserts negative balance for the burn address that used during the attack
 			// We need to do this before main logic because sqlite db will be locked
-			if d.Sync.Synced+1 == V20DevRewardsHeightActivation {
+			if d.Sync.Synced+1 == V202EnhanceActivation {
 				d.NullifyBurnAddress(ctx, tx, d.Sync.Synced+1)
 			}
 
@@ -173,12 +173,20 @@ OuterSyncLoop:
 func (d *Pegnetd) NullifyBurnAddress(ctx context.Context, tx *sql.Tx, height uint32) error {
 	fLog := log.WithFields(log.Fields{"height": height})
 
+	FAGlobalBurnAddress, err := factom.NewFAAddress(GlobalBurnAddress)
+	if err != nil {
+		log.WithFields(log.Fields{
+			"error": err,
+		}).Info("error getting burn address")
+	}
+
 	dblock := new(factom.DBlock)
 	dblock.Height = height
 	if err := dblock.Get(nil, d.FactomClient); err != nil {
 		return err
 	}
 	heightTimestamp := dblock.Timestamp
+
 	// We need to mock a TXID to record zeroing
 	txid := fmt.Sprintf("%064d", height)
 
@@ -194,9 +202,10 @@ func (d *Pegnetd) NullifyBurnAddress(ctx context.Context, tx *sql.Tx, height uin
 		}).Info("zeroing burn | balances retrieval failed")
 	}
 
-	i := 0 // value to keep witin 0-9 range for mock tx
-	j := 0 //
+	i := 0  // value to keep witin 0-9 range for mock tx
+	j := 50 // value for uniqueness
 	for ticker := fat2.PTickerInvalid + 1; ticker < fat2.PTickerMax; ticker++ {
+
 		// Substract from every issuance
 		value, _ := balances[ticker]
 		_, _, err := d.Pegnet.SubFromBalance(tx, &FAGlobalBurnAddress, ticker, value) // lastInd, txErr, err
@@ -208,11 +217,14 @@ func (d *Pegnetd) NullifyBurnAddress(ctx context.Context, tx *sql.Tx, height uin
 			}).Info("zeroing burn | substract from balance failed")
 		}
 
-		// We need to mock a TXID to record zeroing and it should be unique
-		txid = fmt.Sprintf("%064d", height-(uint32(j)))
+		// We need to mock a TXID to record nullify recrods
+		// add more uniqness into hash value by reusing iterating j value in addtion to current height
+		// so it doesn't overlap with staking and rewards we have in place
+		txid = fmt.Sprintf("%03d%061d", j, height)
 
 		// Mock entry hash value
 		addTxid := fmt.Sprintf("%d-%s", i, txid)
+
 		j++ // iterate all the time
 		i++ // drop to zero to be within 0-9 range
 		if i > 9 {
@@ -223,15 +235,6 @@ func (d *Pegnetd) NullifyBurnAddress(ctx context.Context, tx *sql.Tx, height uin
 			"txid":    txid,
 			"addtxid": addTxid,
 		}).Info("burn nullify | prep")
-
-		err = d.Pegnet.InsertZeroingCoinbase(tx, txid, addTxid, height, heightTimestamp, value, ticker.String(), FAGlobalBurnAddress)
-		if err != nil {
-			fLog.WithFields(log.Fields{
-				"error": err,
-			}).Info("zeroing burn | coinbase tx failed")
-			return err
-		}
-
 	}
 
 	return nil
@@ -610,7 +613,7 @@ func (d *Pegnetd) DevelopersPayouts(tx *sql.Tx, fLog *log.Entry, height uint32, 
 		txid = fmt.Sprintf("%02d%062d", j, height)
 
 		// we calculate developers reward from % pre-defined
-		rewardPayout := uint64((conversions.PerBlockDevelopers / 100) * dev.DevRewardPct)
+		rewardPayout := uint64((conversions.PerBlockDevelopers / 100) * dev.DevRewardPct * pegnet.SnapshotRate)
 		addr, err := factom.NewFAAddress(dev.DevAddress)
 
 		_, err = d.Pegnet.AddToBalance(tx, &addr, fat2.PTickerPEG, rewardPayout)
@@ -919,6 +922,18 @@ func (d *Pegnetd) applyTransactionBatch(sqlTx *sql.Tx, txBatch *fat2.Transaction
 				return pegnet.PFCTOneWayError
 			}
 
+			// pXXX -> pDCR conversions are disabled at the activation height.
+			// FYI, PEG one way conversion was disabled at V20HeightActivation already.
+			if currentHeight >= OneWaySmallAssetsConversions &&
+				(tx.Conversion == fat2.PTickerPEG || tx.Conversion == fat2.PTickerDCR || tx.Conversion == fat2.PTickerDGB ||
+					tx.Conversion == fat2.PTickerDOGE || tx.Conversion == fat2.PTickerHBAR || tx.Conversion == fat2.PTickerONT ||
+					tx.Conversion == fat2.PTickerRVN || tx.Conversion == fat2.PTickerBAT || tx.Conversion == fat2.PTickerALGO ||
+					tx.Conversion == fat2.PTickerBIF || tx.Conversion == fat2.PTickerETB || tx.Conversion == fat2.PTickerKES ||
+					tx.Conversion == fat2.PTickerNGN || tx.Conversion == fat2.PTickerRWF || tx.Conversion == fat2.PTickerTZS ||
+					tx.Conversion == fat2.PTickerUGX) {
+				return pegnet.PSMALLOneWayError
+			}
+
 			// TODO: For now any bogus amounts will be tossed. Someone can fake an overflow for example,
 			// 		and hold us up forever.
 			_, err := conversions.Convert(int64(tx.Input.Amount), rates[tx.Input.Type], rates[tx.Conversion])
@@ -976,6 +991,13 @@ func (d *Pegnetd) applyTransactionBatch(sqlTx *sql.Tx, txBatch *fat2.Transaction
 // recordBatch will submit the batch to the database. We assume the tx is 100%
 // valid at this point.
 func (d *Pegnetd) recordBatch(sqlTx *sql.Tx, txBatch *fat2.TransactionBatch, rates map[fat2.PTicker]uint64, currentHeight uint32) error {
+	FAGlobalBurnAddress, err := factom.NewFAAddress(GlobalBurnAddress)
+	if err != nil {
+		log.WithFields(log.Fields{
+			"error": err,
+		}).Info("error getting burn address")
+	}
+
 	for txIndex, tx := range txBatch.Transactions {
 		if rates[tx.Input.Type] == math.MaxUint64 || rates[tx.Conversion] == math.MaxUint64 {
 			continue
@@ -1286,7 +1308,7 @@ func (d *Pegnetd) GetAssetRates(oprWinners []opr.AssetUint, sprWinners []opr.Ass
 			if oprWinners[i].Name == sprWinners[i].Name {
 				sprRate := sprWinners[i].Value
 				oprRate := oprWinners[i].Value
-				toleranceRate := 0.1 // 10% band
+				toleranceRate := 0.25 // 25% band
 				toleranceBandHigh := float64(sprRate) * (1 + toleranceRate)
 				toleranceBandLow := float64(sprRate) * (1 - toleranceRate)
 				if (float64(oprRate) >= toleranceBandLow) && (float64(oprRate) <= toleranceBandHigh) {

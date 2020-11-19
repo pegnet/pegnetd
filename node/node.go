@@ -16,9 +16,9 @@ import (
 )
 
 var (
-	OPRChain         = factom.NewBytes32("a642a8674f46696cc47fdb6b65f9c87b2a19c5ea8123b3d2f0c13b6f33a9d5ef")
-	SPRChain         = factom.NewBytes32("d5e395125335a21cef0ceca528168e87fe929fdac1f156870c1b1be6502448b4")
-	TransactionChain = factom.NewBytes32("cffce0f409ebba4ed236d49d89c70e4bd1f1367d86402a3363366683265a242d")
+	OPRChain         = factom.NewBytes32("ad98d39f002d4cae9ed07a8f5689cb029a83ad3b4bd8d23c49345d4ca7ca4393")
+	SPRChain         = factom.NewBytes32("e3b1668158026b2450d123ba993aca5367a8b96c6018f63640101a28b8ab5bc7")
+	TransactionChain = factom.NewBytes32("2ac925fe946543a83d4c232d788dd589177611c0dbe970172c21b42039682a8a")
 
 	// Acivation Heights
 
@@ -62,6 +62,16 @@ var (
 	// SprSignatureActivation indicates the activation of SPR Signature.
 	// Estimated to be  Aug 28th 2020
 	SprSignatureActivation uint32 = 260118
+
+	// OneWaypAssetsConversions makes some pAssets a 1 way conversion.
+	// pDCR, pDGB, pDOGE, pHBAR, pONT, pRVN, pBAT, pALGO, pBIF, pETB, pKES, pNGN, pRWF, pTZS, pUGX
+	// These pAssets have got small marketcap, and these will be disabled for conversion.
+	// Estimated to be XXXXXXXX
+	OneWaySmallAssetsConversions uint32 = 999999
+
+	// V202EnhanceActivation indicates the activation of PegNet 2.0.2.
+	// Estimated to be  XXXXX XXX XXX
+	V202EnhanceActivation uint32 = 999999
 )
 
 func SetAllActivations(act uint32) {
@@ -76,6 +86,9 @@ func SetAllActivations(act uint32) {
 	V4OPRUpdate = act
 	V20HeightActivation = act
 	V20DevRewardsHeightActivation = act
+	OneWaySmallAssetsConversions = act
+	SprSignatureActivation = act
+	V202EnhanceActivation = act
 }
 
 type Pegnetd struct {
@@ -87,6 +100,9 @@ type Pegnetd struct {
 }
 
 func NewPegnetd(ctx context.Context, conf *viper.Viper) (*Pegnetd, error) {
+	// init chainIds
+	InitChainsFromConfig(conf)
+
 	// TODO : Update emyrk's factom library
 	n := new(Pegnetd)
 	n.FactomClient = FactomClientFromConfig(conf)
@@ -119,18 +135,6 @@ func NewPegnetd(ctx context.Context, conf *viper.Viper) (*Pegnetd, error) {
 		}
 	}
 
-	// init burn address
-	FAGlobalBurnAddress, err := factom.NewFAAddress(GlobalBurnAddress)
-	if err != nil {
-		log.WithFields(log.Fields{
-			"error": err,
-		}).Info("error getting burn address")
-	}
-
-	log.WithFields(log.Fields{
-		"addr": FAGlobalBurnAddress,
-	}).Info("burn address loaded")
-
 	grader.InitLX()
 	return n, nil
 }
@@ -146,4 +150,17 @@ func FactomClientFromConfig(conf *viper.Viper) *factom.Client {
 	}
 
 	return cl
+}
+
+func InitChainsFromConfig(conf *viper.Viper) {
+	network := conf.GetString(config.Network)
+	if network == "MainNet" {
+		OPRChain = factom.NewBytes32("a642a8674f46696cc47fdb6b65f9c87b2a19c5ea8123b3d2f0c13b6f33a9d5ef")
+		SPRChain = factom.NewBytes32("d5e395125335a21cef0ceca528168e87fe929fdac1f156870c1b1be6502448b4")
+		TransactionChain = factom.NewBytes32("cffce0f409ebba4ed236d49d89c70e4bd1f1367d86402a3363366683265a242d")
+	} else if network == "TestNet" {
+		OPRChain = factom.NewBytes32("ad98d39f002d4cae9ed07a8f5689cb029a83ad3b4bd8d23c49345d4ca7ca4393")
+		SPRChain = factom.NewBytes32("e3b1668158026b2450d123ba993aca5367a8b96c6018f63640101a28b8ab5bc7")
+		TransactionChain = factom.NewBytes32("2ac925fe946543a83d4c232d788dd589177611c0dbe970172c21b42039682a8a")
+	}
 }
