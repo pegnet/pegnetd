@@ -70,6 +70,7 @@ github.com/FactomProject/gocoding v0.0.0-20150814232539-59666ce39524 h1:394GwlJF
 github.com/FactomProject/gocoding v0.0.0-20150814232539-59666ce39524/go.mod h1:AtAVT8Uf+wlS9h/RK79oum1xym2r9UR5nb67zVEkq6Y=
 github.com/FactomProject/goleveldb v0.2.1 h1:aKHpwSwVKEm/JQ97aLN+O7/xjSXjzof71gpPCukM+Ac=
 github.com/FactomProject/goleveldb v0.2.1/go.mod h1:35UcJZvsGJAgxqegkfDb5S78gTlx/Pypzy4rZfM1pQA=
+github.com/FactomProject/goleveldb v0.2.2-0.20170418171130-e7800c6976c5 h1:GIdre1zKgtyuc3VqjfyHZQNBj3yMO6HgWAvpO190LKg=
 github.com/FactomProject/goleveldb v0.2.2-0.20170418171130-e7800c6976c5/go.mod h1:35UcJZvsGJAgxqegkfDb5S78gTlx/Pypzy4rZfM1pQA=
 github.com/FactomProject/logrustash v0.0.0-20171005151533-9c7278ede46e h1:D/yNSYLSqUwukUw3115uW4RR+r0ftMUJFlcTC2e79pI=
 github.com/FactomProject/logrustash v0.0.0-20171005151533-9c7278ede46e/go.mod h1:ah6QOMU70BGkGZRLG1Irc7f+j6eDU11tzHCI+rdLcoA=
@@ -274,6 +275,8 @@ github.com/pegnet/pegnet v0.5.1-0.20200828161600-edf138a7971f h1:yukWrl9DXaByX4/
 github.com/pegnet/pegnet v0.5.1-0.20200828161600-edf138a7971f/go.mod h1:NxKKJ9wnx/EvzfHk0p6XPlQqXIJg0iA4po0vzsdNx0o=
 github.com/pegnet/pegnet v0.5.1-0.20201116162515-0f9c58ed3bc7 h1:XtO6k4BpvMITFwT/JgoEi8aeYugW2vWiCGM25CD/Hqw=
 github.com/pegnet/pegnet v0.5.1-0.20201116162515-0f9c58ed3bc7/go.mod h1:NxKKJ9wnx/EvzfHk0p6XPlQqXIJg0iA4po0vzsdNx0o=
+github.com/pegnet/pegnet v0.5.1-0.20201119175358-0112a2ffea41 h1:ze3qZ1/AEbYdhpGmfJqFI/TmO6MMFeEAHNNknyvUzS0=
+github.com/pegnet/pegnet v0.5.1-0.20201119175358-0112a2ffea41/go.mod h1:NxKKJ9wnx/EvzfHk0p6XPlQqXIJg0iA4po0vzsdNx0o=
 github.com/pelletier/go-toml v1.2.0 h1:T5zMGML61Wp+FlcbWjRDT7yAxhJNAiPPLOFECq181zc=
 github.com/pelletier/go-toml v1.2.0/go.mod h1:5z9KED0ma1S8pY6P1sdut58dfprrGBbd/94hg7ilaic=
 github.com/peterh/liner v1.1.1-0.20190123174540-a2c9a5303de7/go.mod h1:CRroGNssyjTd/qIG2FyxByd2S8JEAZXBl4qUrZf8GS0=
