@@ -346,7 +346,7 @@ func (d *Pegnetd) SyncBlock(ctx context.Context, tx *sql.Tx, height uint32) erro
 			}
 		}
 		if 0 < len(oprWinners) || 0 < len(sprWinners) {
-			filteredRates, errRate := d.GetAssetRates(oprWinners, sprWinners)
+			filteredRates, errRate := d.GetAssetRates(oprWinners, sprWinners, height)
 			if errRate != nil {
 				return err
 			}
@@ -494,7 +494,7 @@ func (d *Pegnetd) SnapshotPayouts(tx *sql.Tx, fLog *log.Entry, rates map[fat2.PT
 			if bal.Balances[i] == 0 { // Ignore 0 balances
 				continue
 			}
-			if rates[i] == math.MaxUint64 || rates[fat2.PTickerUSD] == math.MaxUint64 {
+			if (rates[i] == math.MaxUint64 || rates[fat2.PTickerUSD] == math.MaxUint64) && height > V202EnhanceActivation {
 				continue
 			}
 
@@ -890,7 +890,7 @@ func (d *Pegnetd) applyTransactionBatch(sqlTx *sql.Tx, txBatch *fat2.Transaction
 
 	// We need to do all checks up front, then apply the tx
 	for _, tx := range txBatch.Transactions {
-		if rates[tx.Input.Type] == math.MaxUint64 || rates[tx.Conversion] == math.MaxUint64 {
+		if (rates[tx.Input.Type] == math.MaxUint64 || rates[tx.Conversion] == math.MaxUint64) && currentHeight > V202EnhanceActivation {
 			continue
 		}
 		// First check the input address has the funds
@@ -953,7 +953,7 @@ func (d *Pegnetd) applyTransactionBatch(sqlTx *sql.Tx, txBatch *fat2.Transaction
 		}
 
 		if tx.IsConversion() {
-			if rates[tx.Input.Type] == math.MaxUint64 || rates[tx.Conversion] == math.MaxUint64 {
+			if (rates[tx.Input.Type] == math.MaxUint64 || rates[tx.Conversion] == math.MaxUint64) && currentHeight > V202EnhanceActivation {
 				continue
 			}
 			balances[tx.Input.Address][tx.Input.Type] -= tx.Input.Amount
@@ -999,7 +999,7 @@ func (d *Pegnetd) recordBatch(sqlTx *sql.Tx, txBatch *fat2.TransactionBatch, rat
 	}
 
 	for txIndex, tx := range txBatch.Transactions {
-		if rates[tx.Input.Type] == math.MaxUint64 || rates[tx.Conversion] == math.MaxUint64 {
+		if (rates[tx.Input.Type] == math.MaxUint64 || rates[tx.Conversion] == math.MaxUint64) && currentHeight > V202EnhanceActivation {
 			continue
 		}
 		_, txErr, err := d.Pegnet.SubFromBalance(sqlTx, &tx.Input.Address, tx.Input.Type, tx.Input.Amount)
@@ -1289,7 +1289,7 @@ func isDone(ctx context.Context) bool {
 	}
 }
 
-func (d *Pegnetd) GetAssetRates(oprWinners []opr.AssetUint, sprWinners []opr.AssetUint) ([]opr.AssetUint, error) {
+func (d *Pegnetd) GetAssetRates(oprWinners []opr.AssetUint, sprWinners []opr.AssetUint, height uint32) ([]opr.AssetUint, error) {
 	if oprWinners != nil && sprWinners == nil {
 		return oprWinners, nil
 	}
@@ -1318,7 +1318,9 @@ func (d *Pegnetd) GetAssetRates(oprWinners []opr.AssetUint, sprWinners []opr.Ass
 					fmt.Println("=== asset name:", oprWinners[i].Name)
 					fmt.Println("<<<<=== opr rate:", oprWinners[i].Value)
 					fmt.Println("<<<<=== spr rate:", sprWinners[i].Value)
-					fmt.Println(oprWinners[i].Name, " will be paused in next block")
+					if height < V202EnhanceActivation {
+						return nil, fmt.Errorf("opr is out side of tolerance band")
+					}
 					diffWinner := sprWinners[i]
 					diffWinner.Value = math.MaxUint64
 					filteredRates = append(filteredRates, diffWinner)
