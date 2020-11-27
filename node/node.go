@@ -67,11 +67,11 @@ var (
 	// pDCR, pDGB, pDOGE, pHBAR, pONT, pRVN, pBAT, pALGO, pBIF, pETB, pKES, pNGN, pRWF, pTZS, pUGX
 	// These pAssets have got small marketcap, and these will be disabled for conversion.
 	// Estimated to be XXXXXXXX
-	OneWaySmallAssetsConversions uint32 = 999999
+	OneWaySmallAssetsConversions uint32 = 274036
 
 	// V202EnhanceActivation indicates the activation of PegNet 2.0.2.
 	// Estimated to be  XXXXX XXX XXX
-	V202EnhanceActivation uint32 = 999999
+	V202EnhanceActivation uint32 = 274036
 )
 
 func SetAllActivations(act uint32) {
