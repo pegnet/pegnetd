@@ -383,7 +383,7 @@ func (d *Pegnetd) SyncBlock(ctx context.Context, tx *sql.Tx, height uint32) erro
 				rates, err = d.Pegnet.SelectPendingRates(ctx, tx, height-1)
 			}
 
-			if rates == nil && height >= V202EnhanceActivation {
+			if (rates == nil || len(rates) == 0) && height >= V202EnhanceActivation {
 				rates, _, err = d.Pegnet.SelectMostRecentRatesBeforeHeight(ctx, tx, height)
 			}
 
