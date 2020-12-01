@@ -19,5 +19,3 @@ replace github.com/Factom-Asset-Tokens/factom => github.com/Emyrk/factom v0.0.0-
 replace crawshaw.io/sqlite => github.com/AdamSLevy/sqlite v0.1.3-0.20191014215059-b98bb18889de
 
 replace github.com/spf13/pflag v1.0.3 => github.com/AdamSLevy/pflag v1.0.4
-
-replace github.com/pegnet/pegnet => /Volumes/Projects/NewProject/Peg_Core/Alex_v2/pegnet
