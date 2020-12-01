@@ -4,8 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"github.com/sirupsen/logrus"
-
 	"github.com/Factom-Asset-Tokens/factom"
 	"github.com/pegnet/pegnet/modules/grader"
 )
@@ -59,7 +57,7 @@ func (d *Pegnetd) Grade(ctx context.Context, block *factom.EBlock) (grader.Grade
 		err = g.AddOPR(entry.Hash[:], extids, entry.Content)
 		if err != nil {
 			// This is a noisy debug print
-			logrus.WithError(err).WithFields(logrus.Fields{"hash": entry.Hash.String()}).Debug("failed to add opr")
+			//logrus.WithError(err).WithFields(logrus.Fields{"hash": entry.Hash.String()}).Debug("failed to add opr")
 		}
 	}
 
