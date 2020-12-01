@@ -1,5 +1,8 @@
 # Pegnetd config file
 [app]
+  # MainNet/TestNet
+  network = "MainNet"
+
   loglevel = "info"
   apilisten = "8070"
   # Hardcoding the mainnet path, but allowing for future net support
@@ -10,6 +13,5 @@
   wallet = "http://localhost:8089/v2"
   walletUser = ""
   walletPass = ""
-
 [dblocksync]
   retry = "5s"
