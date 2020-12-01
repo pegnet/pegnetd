@@ -281,6 +281,8 @@ github.com/pegnet/pegnet v0.5.1-0.20201201100024-3727fcd665ee h1:myHT9uYoClXjo4P
 github.com/pegnet/pegnet v0.5.1-0.20201201100024-3727fcd665ee/go.mod h1:NxKKJ9wnx/EvzfHk0p6XPlQqXIJg0iA4po0vzsdNx0o=
 github.com/pegnet/pegnet v0.5.1-0.20201201103444-dd2dfbb347b0 h1:PC25ljPWv6pUnSN56u3PZxmtVxtAU5kfcKAP94Nvoms=
 github.com/pegnet/pegnet v0.5.1-0.20201201103444-dd2dfbb347b0/go.mod h1:NxKKJ9wnx/EvzfHk0p6XPlQqXIJg0iA4po0vzsdNx0o=
+github.com/pegnet/pegnet v0.5.1-0.20201201124832-35496e177fd4 h1:CRKVQN1O7VgqScBa6D3Oa1ncZkXbU9t8amhK8eLaZNo=
+github.com/pegnet/pegnet v0.5.1-0.20201201124832-35496e177fd4/go.mod h1:NxKKJ9wnx/EvzfHk0p6XPlQqXIJg0iA4po0vzsdNx0o=
 github.com/pelletier/go-toml v1.2.0 h1:T5zMGML61Wp+FlcbWjRDT7yAxhJNAiPPLOFECq181zc=
 github.com/pelletier/go-toml v1.2.0/go.mod h1:5z9KED0ma1S8pY6P1sdut58dfprrGBbd/94hg7ilaic=
 github.com/peterh/liner v1.1.1-0.20190123174540-a2c9a5303de7/go.mod h1:CRroGNssyjTd/qIG2FyxByd2S8JEAZXBl4qUrZf8GS0=
