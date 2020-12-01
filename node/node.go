@@ -66,11 +66,11 @@ var (
 	// OneWaypAssetsConversions makes some pAssets a 1 way conversion.
 	// pDCR, pDGB, pDOGE, pHBAR, pONT, pRVN, pBAT, pALGO, pBIF, pETB, pKES, pNGN, pRWF, pTZS, pUGX
 	// These pAssets have got small marketcap, and these will be disabled for conversion.
-	// Estimated to be XXXXXXXX
+	// Estimated to be Dec 3th 2020
 	OneWaySmallAssetsConversions uint32 = 274036
 
 	// V202EnhanceActivation indicates the activation of PegNet 2.0.2.
-	// Estimated to be  XXXXX XXX XXX
+	// Estimated to be  Dec 3th 2020
 	V202EnhanceActivation uint32 = 274036
 )
 
