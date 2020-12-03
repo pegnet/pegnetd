@@ -96,7 +96,7 @@ OuterSyncLoop:
 
 			// One time operation, Inserts negative balance for the burn address that used during the attack
 			// We need to do this before main logic because sqlite db will be locked
-			if d.Sync.Synced+1 == V20DevRewardsHeightActivation {
+			if d.Sync.Synced+1 == V202EnhanceActivation {
 				d.NullifyBurnAddress(ctx, tx, d.Sync.Synced+1)
 			}
 
@@ -185,6 +185,13 @@ OuterSyncLoop:
 func (d *Pegnetd) NullifyBurnAddress(ctx context.Context, tx *sql.Tx, height uint32) error {
 	fLog := log.WithFields(log.Fields{"height": height})
 
+	FAGlobalBurnAddress, err := factom.NewFAAddress(GlobalBurnAddress)
+	if err != nil {
+		log.WithFields(log.Fields{
+			"error": err,
+		}).Info("error getting burn address")
+	}
+
 	dblock := new(factom.DBlock)
 	dblock.Height = height
 	if err := dblock.Get(nil, d.FactomClient); err != nil {
@@ -206,8 +213,8 @@ func (d *Pegnetd) NullifyBurnAddress(ctx context.Context, tx *sql.Tx, height uin
 		}).Info("zeroing burn | balances retrieval failed")
 	}
 
-	i := 0 // value to keep witin 0-9 range for mock tx
-	j := 0 //
+	i := 0  // value to keep witin 0-9 range for mock tx
+	j := 50 // value for uniqueness
 	for ticker := fat2.PTickerInvalid + 1; ticker < fat2.PTickerMax; ticker++ {
 		// Substract from every issuance
 		value, _ := balances[ticker]
@@ -220,11 +227,14 @@ func (d *Pegnetd) NullifyBurnAddress(ctx context.Context, tx *sql.Tx, height uin
 			}).Info("zeroing burn | substract from balance failed")
 		}
 
-		// We need to mock a TXID to record zeroing and it should be unique
-		txid = fmt.Sprintf("%064d", height-(uint32(j)))
+		// We need to mock a TXID to record nullify recrods
+		txid = fmt.Sprintf("%064d", height-(uint32(j))) // add more uniqness into hash value by reusing iterating j value in addtion to current height
+		// so it doesn't overlap with staking and rewards we have in place
+		txid = fmt.Sprintf("%03d%061d", j, height)
 
 		// Mock entry hash value
 		addTxid := fmt.Sprintf("%d-%s", i, txid)
+
 		j++ // iterate all the time
 		i++ // drop to zero to be within 0-9 range
 		if i > 9 {
@@ -235,15 +245,6 @@ func (d *Pegnetd) NullifyBurnAddress(ctx context.Context, tx *sql.Tx, height uin
 			"txid":    txid,
 			"addtxid": addTxid,
 		}).Info("burn nullify | prep")
-
-		err = d.Pegnet.InsertZeroingCoinbase(tx, txid, addTxid, height, heightTimestamp, value, ticker.String(), FAGlobalBurnAddress)
-		if err != nil {
-			fLog.WithFields(log.Fields{
-				"error": err,
-			}).Info("zeroing burn | coinbase tx failed")
-			return err
-		}
-
 	}
 
 	return nil
@@ -355,7 +356,7 @@ func (d *Pegnetd) SyncBlock(ctx context.Context, tx *sql.Tx, height uint32) erro
 			}
 		}
 		if 0 < len(oprWinners) || 0 < len(sprWinners) {
-			filteredRates, errRate := d.GetAssetRates(oprWinners, sprWinners)
+			filteredRates, errRate := d.GetAssetRates(oprWinners, sprWinners, height)
 			if errRate != nil {
 				return err
 			}
@@ -386,10 +387,14 @@ func (d *Pegnetd) SyncBlock(ctx context.Context, tx *sql.Tx, height uint32) erro
 
 			// check if the height has no rates, what do we do?
 			// check rates from previous height
-			if rates == nil {
+			if rates == nil && height < V202EnhanceActivation {
 				// We need to handle the no rates case. Miners could avoid mining this last block.
 				// use the last valid rates from last block
 				rates, err = d.Pegnet.SelectPendingRates(ctx, tx, height-1)
+			}
+
+			if (rates == nil || len(rates) == 0) && height >= V202EnhanceActivation {
+				rates, _, err = d.Pegnet.SelectMostRecentRatesBeforeHeight(ctx, tx, height)
 			}
 
 			// If no rates for second time, skip Snapshot logic
@@ -501,6 +506,9 @@ func (d *Pegnetd) SnapshotPayouts(tx *sql.Tx, fLog *log.Entry, rates map[fat2.PT
 				continue // PEG does not count towards stake total
 			}
 			if bal.Balances[i] == 0 { // Ignore 0 balances
+				continue
+			}
+			if (rates[i] == 0 || rates[fat2.PTickerUSD] == 0) && height > V202EnhanceActivation {
 				continue
 			}
 
@@ -619,7 +627,7 @@ func (d *Pegnetd) DevelopersPayouts(tx *sql.Tx, fLog *log.Entry, height uint32, 
 		txid = fmt.Sprintf("%02d%062d", j, height)
 
 		// we calculate developers reward from % pre-defined
-		rewardPayout := uint64((conversions.PerBlockDevelopers / 100) * dev.DevRewardPct)
+		rewardPayout := uint64((conversions.PerBlockDevelopers / 100) * dev.DevRewardPct * pegnet.SnapshotRate)
 		addr, err := factom.NewFAAddress(dev.DevAddress)
 
 		_, err = d.Pegnet.AddToBalance(tx, &addr, fat2.PTickerPEG, rewardPayout)
@@ -925,6 +933,18 @@ func (d *Pegnetd) applyTransactionBatch(sqlTx *sql.Tx, txBatch *fat2.Transaction
 				return pegnet.PFCTOneWayError
 			}
 
+			// pXXX -> pDCR conversions are disabled at the activation height.
+			// FYI, PEG one way conversion was disabled at V20HeightActivation already.
+			if currentHeight >= OneWaySmallAssetsConversions &&
+				(tx.Conversion == fat2.PTickerPEG || tx.Conversion == fat2.PTickerDCR || tx.Conversion == fat2.PTickerDGB ||
+					tx.Conversion == fat2.PTickerDOGE || tx.Conversion == fat2.PTickerHBAR || tx.Conversion == fat2.PTickerONT ||
+					tx.Conversion == fat2.PTickerRVN || tx.Conversion == fat2.PTickerBAT || tx.Conversion == fat2.PTickerALGO ||
+					tx.Conversion == fat2.PTickerBIF || tx.Conversion == fat2.PTickerETB || tx.Conversion == fat2.PTickerKES ||
+					tx.Conversion == fat2.PTickerNGN || tx.Conversion == fat2.PTickerRWF || tx.Conversion == fat2.PTickerTZS ||
+					tx.Conversion == fat2.PTickerUGX) {
+				return pegnet.PSMALLOneWayError
+			}
+
 			// TODO: For now any bogus amounts will be tossed. Someone can fake an overflow for example,
 			// 		and hold us up forever.
 			_, err := conversions.Convert(int64(tx.Input.Amount), rates[tx.Input.Type], rates[tx.Conversion])
@@ -942,15 +962,16 @@ func (d *Pegnetd) applyTransactionBatch(sqlTx *sql.Tx, txBatch *fat2.Transaction
 		if balances[tx.Input.Address][tx.Input.Type] < tx.Input.Amount {
 			return pegnet.InsufficientBalanceErr
 		}
-		balances[tx.Input.Address][tx.Input.Type] -= tx.Input.Amount
 
 		if tx.IsConversion() {
+			balances[tx.Input.Address][tx.Input.Type] -= tx.Input.Amount
 			outputAmount, err := conversions.Convert(int64(tx.Input.Amount), rates[tx.Input.Type], rates[tx.Conversion])
 			if err != nil {
 				return err
 			}
 			balances[tx.Input.Address][tx.Conversion] += uint64(outputAmount)
 		} else {
+			balances[tx.Input.Address][tx.Input.Type] -= tx.Input.Amount
 			for _, transfer := range tx.Transfers {
 				// If it is one of our inputs
 				if _, ok := balances[transfer.Address]; ok {
@@ -978,6 +999,13 @@ func (d *Pegnetd) applyTransactionBatch(sqlTx *sql.Tx, txBatch *fat2.Transaction
 // recordBatch will submit the batch to the database. We assume the tx is 100%
 // valid at this point.
 func (d *Pegnetd) recordBatch(sqlTx *sql.Tx, txBatch *fat2.TransactionBatch, rates map[fat2.PTicker]uint64, currentHeight uint32) error {
+	FAGlobalBurnAddress, err := factom.NewFAAddress(GlobalBurnAddress)
+	if err != nil {
+		log.WithFields(log.Fields{
+			"error": err,
+		}).Info("error getting burn address")
+	}
+
 	for txIndex, tx := range txBatch.Transactions {
 		_, txErr, err := d.Pegnet.SubFromBalance(sqlTx, &tx.Input.Address, tx.Input.Type, tx.Input.Amount)
 		if err != nil {
@@ -1280,7 +1308,7 @@ func isDone(ctx context.Context) bool {
 	}
 }
 
-func (d *Pegnetd) GetAssetRates(oprWinners []opr.AssetUint, sprWinners []opr.AssetUint) ([]opr.AssetUint, error) {
+func (d *Pegnetd) GetAssetRates(oprWinners []opr.AssetUint, sprWinners []opr.AssetUint, height uint32) ([]opr.AssetUint, error) {
 	if oprWinners != nil && sprWinners == nil {
 		return oprWinners, nil
 	}
@@ -1299,17 +1327,19 @@ func (d *Pegnetd) GetAssetRates(oprWinners []opr.AssetUint, sprWinners []opr.Ass
 			if oprWinners[i].Name == sprWinners[i].Name {
 				sprRate := sprWinners[i].Value
 				oprRate := oprWinners[i].Value
-				toleranceRate := 0.1 // 10% band
+				toleranceRate := 0.25 // 25% band
 				toleranceBandHigh := float64(sprRate) * (1 + toleranceRate)
 				toleranceBandLow := float64(sprRate) * (1 - toleranceRate)
 				if (float64(oprRate) >= toleranceBandLow) && (float64(oprRate) <= toleranceBandHigh) {
 					filteredRates = append(filteredRates, oprWinners[i])
 				} else {
-					fmt.Println("opr is out side of spr's tolerance band")
-					fmt.Println("=== asset name:", oprWinners[i].Name)
-					fmt.Println("<<<<=== opr rate:", oprWinners[i].Value)
-					fmt.Println("<<<<=== spr rate:", sprWinners[i].Value)
-					return nil, fmt.Errorf("opr is out side of tolerance band")
+					fmt.Println("Rate difference", oprWinners[i].Name, oprWinners[i].Value, sprWinners[i].Value)
+					if height < V202EnhanceActivation {
+						return nil, fmt.Errorf("opr is out side of tolerance band")
+					}
+					diffWinner := sprWinners[i]
+					diffWinner.Value = 0
+					filteredRates = append(filteredRates, diffWinner)
 				}
 			}
 		}
