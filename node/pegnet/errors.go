@@ -8,10 +8,12 @@ var (
 
 	// -2 is an invalid tx. Usually by timestamps
 
-	PFCTOneWayError          = errors.New("pFCT conversions are one way only at this height, they cannot be a conversion destination")
-	PFCTOneWayErrorInt int64 = -3
-	ZeroRatesError           = errors.New("an asset in the conversion has a rate of 0, and not allowed to be used for conversions")
-	ZeroRatesErrorInt  int64 = -4
+	PFCTOneWayError            = errors.New("pFCT conversions are one way only at this height, they cannot be a conversion destination")
+	PFCTOneWayErrorInt   int64 = -3
+	ZeroRatesError             = errors.New("an asset in the conversion has a rate of 0, and not allowed to be used for conversions")
+	ZeroRatesErrorInt    int64 = -4
+	PSMALLOneWayError          = errors.New("small marketcap assets conversions are one way only at this height, they cannot be a conversion destination")
+	PSMALLOneWayErrorInt int64 = -5
 )
 
 // IsRejectedTx takes an error, and returns the integer form of that error
@@ -26,6 +28,9 @@ func IsRejectedTx(err error) (int64, error) {
 	}
 	if err == PFCTOneWayError {
 		return PFCTOneWayErrorInt, nil
+	}
+	if err == PSMALLOneWayError {
+		return PSMALLOneWayErrorInt, nil
 	}
 	if err == ZeroRatesError {
 		return ZeroRatesErrorInt, nil
