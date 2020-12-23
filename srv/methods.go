@@ -185,15 +185,14 @@ func (s *APIServer) getGlobalRichList(_ context.Context, data json.RawMessage) i
 
 			usd += uint64(c)
 		}
-
-		if usd == 0 {
+		fmt.Println("addr", r.Address.String())
+		if usd == 0 || r.Address.String() == "FA2BURNBABYBURNoooooooooooooooooooooooooooooooDGvNXy" {
 			continue
 		}
 
 		var entry ResultGlobalRichList
 		entry.Address = r.Address.String()
 		entry.Equiv = usd
-
 		res = append(res, entry)
 	}
 

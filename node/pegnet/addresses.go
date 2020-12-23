@@ -493,8 +493,10 @@ func (p *Pegnet) SelectRichList(ticker fat2.PTicker, count int) ([]BalancePair, 
 		var fa factom.FAAddress
 		copy(fa[:], adr)
 		pair.Address = &fa
-
-		res = append(res, pair)
+		if fa.String() != "FA2BURNBABYBURNoooooooooooooooooooooooooooooooDGvNXy" {
+			fmt.Println("yah", fa.String())
+			res = append(res, pair)
+		}
 	}
 
 	return res, nil

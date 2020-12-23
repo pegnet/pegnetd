@@ -5,6 +5,7 @@ go 1.13
 require (
 	github.com/AdamSLevy/jsonrpc2/v13 v13.0.1
 	github.com/Factom-Asset-Tokens/factom v0.0.0-20191114224337-71de98ff5b3e
+	github.com/ethereum/go-ethereum v1.9.25 // indirect
 	github.com/mattn/go-sqlite3 v1.11.0
 	github.com/pegnet/pegnet v0.5.1-0.20201201194922-e59c2d3b3061
 	github.com/rs/cors v1.7.0
