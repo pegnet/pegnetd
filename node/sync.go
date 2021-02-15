@@ -259,8 +259,8 @@ func (d *Pegnetd) NullifyBurnAddress(ctx context.Context, tx *sql.Tx, height uin
 // the whole sync should be rolled back and not applied. An error should then be returned.
 // The context should be respected if it is cancelled
 func (d *Pegnetd) SyncBlock(ctx context.Context, tx *sql.Tx, height uint32) error {
-	if height == 258989 {
-		fmt.Println("Block syncing is done at 258795....")
+	if height == 274032 {
+		fmt.Println("Block syncing is done at 274032....")
 		return context.Canceled
 	}
 	fLog := log.WithFields(log.Fields{"height": height})
