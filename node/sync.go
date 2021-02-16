@@ -361,7 +361,14 @@ func (d *Pegnetd) SyncBlock(ctx context.Context, tx *sql.Tx, height uint32) erro
 			}
 		}
 		if 0 < len(oprWinners) || 0 < len(sprWinners) {
-			filteredRates, errRate := d.GetAssetRates(oprWinners, sprWinners, height)
+			var filteredRates []opr.AssetUint
+			var errRate error
+			if height < V20DevRewardsHeightActivation {
+				filteredRates, errRate = d.GetAssetRatesV0(oprWinners, sprWinners)
+			} else {
+				filteredRates, errRate = d.GetAssetRates(oprWinners, sprWinners, height)
+			}
+
 			if errRate != nil {
 				return err
 			}
@@ -1335,6 +1342,43 @@ func (d *Pegnetd) GetAssetRates(oprWinners []opr.AssetUint, sprWinners []opr.Ass
 						fmt.Println("<<<<=== spr rate:", sprWinners[i].Value)
 						return nil, fmt.Errorf("opr is out side of tolerance band")
 					}
+				}
+			}
+		}
+		return filteredRates, nil
+	}
+	return nil, fmt.Errorf("no winners")
+}
+
+func (d *Pegnetd) GetAssetRatesV0(oprWinners []opr.AssetUint, sprWinners []opr.AssetUint) ([]opr.AssetUint, error) {
+	if 0 < len(oprWinners) && 0 == len(sprWinners) {
+		return oprWinners, nil
+	}
+	if 0 == len(oprWinners) && 0 < len(sprWinners) {
+		return sprWinners, nil
+	}
+	if 0 < len(oprWinners) && 0 < len(sprWinners) {
+		// 1) sprWinners determine tolerance range
+		// 2) oprWinners set the real rates
+		if len(oprWinners) != len(sprWinners) {
+			return nil, fmt.Errorf("SPR & OPR use different assets version")
+		}
+
+		var filteredRates []opr.AssetUint
+		for i := range oprWinners {
+			if oprWinners[i].Name == sprWinners[i].Name {
+				sprRate := sprWinners[i].Value
+				oprRate := oprWinners[i].Value
+				toleranceRate := 0.01 // 1% band
+				if sprRate >= 100000 {
+					toleranceRate = 0.001 // 0.1% band
+				}
+				toleranceBandHigh := float64(sprRate) * (1 + toleranceRate)
+				toleranceBandLow := float64(sprRate) * (1 - toleranceRate)
+				if (float64(oprRate) >= toleranceBandLow) && (float64(oprRate) <= toleranceBandHigh) {
+					filteredRates = append(filteredRates, oprWinners[i])
+				} else {
+					return nil, fmt.Errorf("opr is out side of tolerance band")
 				}
 			}
 		}
