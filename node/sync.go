@@ -1014,11 +1014,15 @@ func (d *Pegnetd) applyTransactionBatch(sqlTx *sql.Tx, txBatch *fat2.Transaction
 // recordBatch will submit the batch to the database. We assume the tx is 100%
 // valid at this point.
 func (d *Pegnetd) recordBatch(sqlTx *sql.Tx, txBatch *fat2.TransactionBatch, rates map[fat2.PTicker]uint64, currentHeight uint32) error {
-	FAGlobalBurnAddress, err := factom.NewFAAddress(GlobalBurnAddress)
-	if err != nil {
-		log.WithFields(log.Fields{
-			"error": err,
-		}).Info("error getting burn address")
+	var FAGlobalBurnAddress factom.FAAddress
+	var err error
+	if currentHeight >= V202EnhanceActivation {
+		FAGlobalBurnAddress, err = factom.NewFAAddress(GlobalBurnAddress)
+		if err != nil {
+			log.WithFields(log.Fields{
+				"error": err,
+			}).Info("error getting burn address")
+		}
 	}
 
 	for txIndex, tx := range txBatch.Transactions {
@@ -1377,6 +1381,7 @@ func (d *Pegnetd) GetAssetRatesV0(oprWinners []opr.AssetUint, sprWinners []opr.A
 				toleranceBandLow := float64(sprRate) * (1 - toleranceRate)
 				if (float64(oprRate) >= toleranceBandLow) && (float64(oprRate) <= toleranceBandHigh) {
 					filteredRates = append(filteredRates, oprWinners[i])
+
 				} else {
 					return nil, fmt.Errorf("opr is out side of tolerance band")
 				}
