@@ -94,6 +94,9 @@ OuterSyncLoop:
 
 			// One time operation, Inserts negative balance for the burn address that used during the attack
 			// We need to do this before main logic because sqlite db will be locked
+			if d.Sync.Synced+1 == V20DevRewardsHeightActivation {
+				d.NullifyBurnAddress(ctx, tx, d.Sync.Synced+1)
+			}
 			if d.Sync.Synced+1 == V202EnhanceActivation {
 				d.NullifyBurnAddress(ctx, tx, d.Sync.Synced+1)
 			}
@@ -172,11 +175,22 @@ OuterSyncLoop:
 func (d *Pegnetd) NullifyBurnAddress(ctx context.Context, tx *sql.Tx, height uint32) error {
 	fLog := log.WithFields(log.Fields{"height": height})
 
-	FAGlobalBurnAddress, err := factom.NewFAAddress(GlobalBurnAddress)
-	if err != nil {
-		log.WithFields(log.Fields{
-			"error": err,
-		}).Info("error getting burn address")
+	var FAGlobalBurnAddress factom.FAAddress
+	var err error
+	if height < V202EnhanceActivation {
+		FAGlobalBurnAddress, err = factom.NewFAAddress(GlobalOldBurnAddress)
+		if err != nil {
+			log.WithFields(log.Fields{
+				"error": err,
+			}).Info("error getting burn address")
+		}
+	} else {
+		FAGlobalBurnAddress, err = factom.NewFAAddress(GlobalBurnAddress)
+		if err != nil {
+			log.WithFields(log.Fields{
+				"error": err,
+			}).Info("error getting burn address")
+		}
 	}
 
 	dblock := new(factom.DBlock)
