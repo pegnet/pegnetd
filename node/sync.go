@@ -94,6 +94,9 @@ OuterSyncLoop:
 
 			// One time operation, Inserts negative balance for the burn address that used during the attack
 			// We need to do this before main logic because sqlite db will be locked
+			if d.Sync.Synced+1 == V20DevRewardsHeightActivation {
+				d.NullifyBurnAddress(ctx, tx, d.Sync.Synced+1)
+			}
 			if d.Sync.Synced+1 == V202EnhanceActivation {
 				d.NullifyBurnAddress(ctx, tx, d.Sync.Synced+1)
 			}
@@ -172,11 +175,22 @@ OuterSyncLoop:
 func (d *Pegnetd) NullifyBurnAddress(ctx context.Context, tx *sql.Tx, height uint32) error {
 	fLog := log.WithFields(log.Fields{"height": height})
 
-	FAGlobalBurnAddress, err := factom.NewFAAddress(GlobalBurnAddress)
-	if err != nil {
-		log.WithFields(log.Fields{
-			"error": err,
-		}).Info("error getting burn address")
+	var FAGlobalBurnAddress factom.FAAddress
+	var err error
+	if height < V202EnhanceActivation {
+		FAGlobalBurnAddress, err = factom.NewFAAddress(GlobalOldBurnAddress)
+		if err != nil {
+			log.WithFields(log.Fields{
+				"error": err,
+			}).Info("error getting burn address")
+		}
+	} else {
+		FAGlobalBurnAddress, err = factom.NewFAAddress(GlobalBurnAddress)
+		if err != nil {
+			log.WithFields(log.Fields{
+				"error": err,
+			}).Info("error getting burn address")
+		}
 	}
 
 	dblock := new(factom.DBlock)
@@ -259,6 +273,9 @@ func (d *Pegnetd) NullifyBurnAddress(ctx context.Context, tx *sql.Tx, height uin
 // the whole sync should be rolled back and not applied. An error should then be returned.
 // The context should be respected if it is cancelled
 func (d *Pegnetd) SyncBlock(ctx context.Context, tx *sql.Tx, height uint32) error {
+	if height >= 274033 {
+		return context.Canceled
+	}
 	fLog := log.WithFields(log.Fields{"height": height})
 	if isDone(ctx) { // Just an example about how to handle it being cancelled
 		return context.Canceled
@@ -361,7 +378,14 @@ func (d *Pegnetd) SyncBlock(ctx context.Context, tx *sql.Tx, height uint32) erro
 			}
 		}
 		if 0 < len(oprWinners) || 0 < len(sprWinners) {
-			filteredRates, errRate := d.GetAssetRates(oprWinners, sprWinners, height)
+			var filteredRates []opr.AssetUint
+			var errRate error
+			if height < V20DevRewardsHeightActivation {
+				filteredRates, errRate = d.GetAssetRatesV0(oprWinners, sprWinners)
+			} else {
+				filteredRates, errRate = d.GetAssetRates(oprWinners, sprWinners, height)
+			}
+
 			if errRate != nil {
 				return err
 			}
@@ -1007,11 +1031,15 @@ func (d *Pegnetd) applyTransactionBatch(sqlTx *sql.Tx, txBatch *fat2.Transaction
 // recordBatch will submit the batch to the database. We assume the tx is 100%
 // valid at this point.
 func (d *Pegnetd) recordBatch(sqlTx *sql.Tx, txBatch *fat2.TransactionBatch, rates map[fat2.PTicker]uint64, currentHeight uint32) error {
-	FAGlobalBurnAddress, err := factom.NewFAAddress(GlobalBurnAddress)
-	if err != nil {
-		log.WithFields(log.Fields{
-			"error": err,
-		}).Info("error getting burn address")
+	var FAGlobalBurnAddress factom.FAAddress
+	var err error
+	if currentHeight >= V202EnhanceActivation {
+		FAGlobalBurnAddress, err = factom.NewFAAddress(GlobalBurnAddress)
+		if err != nil {
+			log.WithFields(log.Fields{
+				"error": err,
+			}).Info("error getting burn address")
+		}
 	}
 
 	for txIndex, tx := range txBatch.Transactions {
@@ -1335,6 +1363,44 @@ func (d *Pegnetd) GetAssetRates(oprWinners []opr.AssetUint, sprWinners []opr.Ass
 						fmt.Println("<<<<=== spr rate:", sprWinners[i].Value)
 						return nil, fmt.Errorf("opr is out side of tolerance band")
 					}
+				}
+			}
+		}
+		return filteredRates, nil
+	}
+	return nil, fmt.Errorf("no winners")
+}
+
+func (d *Pegnetd) GetAssetRatesV0(oprWinners []opr.AssetUint, sprWinners []opr.AssetUint) ([]opr.AssetUint, error) {
+	if 0 < len(oprWinners) && 0 == len(sprWinners) {
+		return oprWinners, nil
+	}
+	if 0 == len(oprWinners) && 0 < len(sprWinners) {
+		return sprWinners, nil
+	}
+	if 0 < len(oprWinners) && 0 < len(sprWinners) {
+		// 1) sprWinners determine tolerance range
+		// 2) oprWinners set the real rates
+		if len(oprWinners) != len(sprWinners) {
+			return nil, fmt.Errorf("SPR & OPR use different assets version")
+		}
+
+		var filteredRates []opr.AssetUint
+		for i := range oprWinners {
+			if oprWinners[i].Name == sprWinners[i].Name {
+				sprRate := sprWinners[i].Value
+				oprRate := oprWinners[i].Value
+				toleranceRate := 0.01 // 1% band
+				if sprRate >= 100000 {
+					toleranceRate = 0.001 // 0.1% band
+				}
+				toleranceBandHigh := float64(sprRate) * (1 + toleranceRate)
+				toleranceBandLow := float64(sprRate) * (1 - toleranceRate)
+				if (float64(oprRate) >= toleranceBandLow) && (float64(oprRate) <= toleranceBandHigh) {
+					filteredRates = append(filteredRates, oprWinners[i])
+
+				} else {
+					return nil, fmt.Errorf("opr is out side of tolerance band")
 				}
 			}
 		}
