@@ -428,6 +428,8 @@ github.com/pegnet/pegnet v0.5.1-0.20210202190654-9e83e202e2e4 h1:yjfTrMKM/hyq+d0
 github.com/pegnet/pegnet v0.5.1-0.20210202190654-9e83e202e2e4/go.mod h1:NxKKJ9wnx/EvzfHk0p6XPlQqXIJg0iA4po0vzsdNx0o=
 github.com/pegnet/pegnet v0.5.1-0.20210210195921-2333dd387595 h1:fdOUe5GDJXqfk4C+EFBDA73pk2IvQYF4kHgYHTZQ52Y=
 github.com/pegnet/pegnet v0.5.1-0.20210210195921-2333dd387595/go.mod h1:NxKKJ9wnx/EvzfHk0p6XPlQqXIJg0iA4po0vzsdNx0o=
+github.com/pegnet/pegnet v0.5.1-0.20210225213341-a476b4b2cc0f h1:RAO5vgcBX/IOuBjHLgr6JtLtmglLtUQQnG1Jwh5msmg=
+github.com/pegnet/pegnet v0.5.1-0.20210225213341-a476b4b2cc0f/go.mod h1:NxKKJ9wnx/EvzfHk0p6XPlQqXIJg0iA4po0vzsdNx0o=
 github.com/pelletier/go-toml v1.2.0 h1:T5zMGML61Wp+FlcbWjRDT7yAxhJNAiPPLOFECq181zc=
 github.com/pelletier/go-toml v1.2.0/go.mod h1:5z9KED0ma1S8pY6P1sdut58dfprrGBbd/94hg7ilaic=
 github.com/pelletier/go-toml v1.8.1 h1:1Nf83orprkJyknT6h7zbuEGUEjcyVlCxSUGTENmNCRM=
