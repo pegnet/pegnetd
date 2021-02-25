@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"runtime"
 	"sort"
 	"strconv"
 	"strings"
@@ -53,7 +54,7 @@ func init() {
 	//tx.Flags()
 	rootCmd.AddCommand(tx)
 	rootCmd.AddCommand(conv)
-
+	rootCmd.AddCommand(resetDB)
 }
 
 var minerDistro = &cobra.Command{
@@ -572,6 +573,28 @@ var status = &cobra.Command{
 			panic(err)
 		}
 		fmt.Println(string(data))
+	},
+}
+
+var resetDB = &cobra.Command{
+	Use:              "resetDB",
+	Short:            "reset sql database for the pegnetd node",
+	PersistentPreRun: always,
+	PreRun:           SoftReadConfig,
+	Run: func(cmd *cobra.Command, args []string) {
+		rawpath := viper.GetString(config.SqliteDBPath)
+		fmt.Println("Resetting database...", rawpath)
+		if runtime.GOOS == "windows" {
+			rawpath = strings.Replace(rawpath, "$HOME", "$USERPROFILE", -1)
+		}
+		path := os.ExpandEnv(rawpath)
+
+		err := os.Remove(path)
+		if err != nil {
+			fmt.Println("Resetting database is failed. Manual removing is required.", err)
+		} else {
+			fmt.Println("Database has been reset successfully.")
+		}
 	},
 }
 

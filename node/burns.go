@@ -11,6 +11,8 @@ var (
 	// BurnAddress that can be used for all assets
 	GlobalBurnAddress = "FA2BURNBABYBURNoooooooooooooooooooooooooooooooDGvNXy"
 
+	GlobalOldBurnAddress = "FA1y5ZGuHSLmf2TqNf6hVMkPiNGyQpQDTFJvDLRkKQaoPo4bmbgu"
+
 	// BurnRCD is the rcd representation of the burn address
 	BurnRCD = [32]byte{}
 )
