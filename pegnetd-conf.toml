@@ -13,6 +13,5 @@
   wallet = "http://localhost:8089/v2"
   walletUser = ""
   walletPass = ""
-
 [dblocksync]
   retry = "5s"
