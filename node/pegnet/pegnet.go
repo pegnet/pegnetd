@@ -80,6 +80,7 @@ func (p *Pegnet) createTables() error {
 		createTableWinners,
 		createTableTransactions,
 		createTableTransactionBatchHolding,
+		createTableStats,
 		createTableTxHistoryBatch,
 		createTableTxHistoryTx,
 		createTableTxHistoryLookup,

@@ -20,6 +20,8 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+var stats *pegnet.Stats
+
 func (d *Pegnetd) GetCurrentSync() uint32 {
 	// Should be thread safe since we only have 1 routine writing to it
 	return d.Sync.Synced
@@ -29,7 +31,6 @@ func (d *Pegnetd) GetCurrentSync() uint32 {
 func (d *Pegnetd) DBlockSync(ctx context.Context) {
 	retryPeriod := d.Config.GetDuration(config.DBlockSyncRetryPeriod)
 	isFirstSync := true
-
 OuterSyncLoop:
 	for {
 		if isDone(ctx) {
@@ -88,13 +89,14 @@ OuterSyncLoop:
 				hLog.WithError(err).Errorf("failed to start transaction")
 				continue
 			}
+			stats = pegnet.NewStats(d.Sync.Synced + 1)
 
 			////////////////////////
 			// Zeroing funds at Global Burn Address
 
 			// One time operation, Inserts negative balance for the burn address that used during the attack
 			// We need to do this before main logic because sqlite db will be locked
-			if d.Sync.Synced+1 == V20DevRewardsHeightActivation {
+			if d.Sync.Synced+1 == V202EnhanceActivation {
 				d.NullifyBurnAddress(ctx, tx, d.Sync.Synced+1)
 			}
 			if d.Sync.Synced+1 == V202EnhanceActivation {
@@ -109,6 +111,17 @@ OuterSyncLoop:
 				time.Sleep(retryPeriod)
 				// If we fail, we backout to the outer loop. This allows error handling on factomd state to be a bit
 				// cleaner, such as a rebooted node with a different db. That node would have a new heights response.
+				err = tx.Rollback()
+				if err != nil {
+					// TODO evaluate if we can recover from this point or not
+					hLog.WithError(err).Fatal("unable to roll back transaction")
+				}
+				continue OuterSyncLoop
+			}
+
+			err = d.Pegnet.InsertStats(tx, stats)
+			if err != nil {
+				hLog.WithError(err).Errorf("unable to update stats")
 				err = tx.Rollback()
 				if err != nil {
 					// TODO evaluate if we can recover from this point or not
@@ -216,10 +229,12 @@ func (d *Pegnetd) NullifyBurnAddress(ctx context.Context, tx *sql.Tx, height uin
 	}
 
 	i := 0  // value to keep witin 0-9 range for mock tx
+
 	j := 0 // value for uniqueness
 	if height >= V202EnhanceActivation {
 		j = 50
 	}
+
 	for ticker := fat2.PTickerInvalid + 1; ticker < fat2.PTickerMax; ticker++ {
 
 		// Substract from every issuance
@@ -534,6 +549,7 @@ func (d *Pegnetd) SnapshotPayouts(tx *sql.Tx, fLog *log.Entry, rates map[fat2.PT
 			if bal.Balances[i] == 0 { // Ignore 0 balances
 				continue
 			}
+
 			if (rates[i] == 0 || rates[fat2.PTickerUSD] == 0) && height >= V202EnhanceActivation {
 				continue
 			}
@@ -653,10 +669,12 @@ func (d *Pegnetd) DevelopersPayouts(tx *sql.Tx, fLog *log.Entry, height uint32, 
 		txid = fmt.Sprintf("%02d%062d", j, height)
 
 		// we calculate developers reward from % pre-defined
+
 		rewardPayout := uint64((conversions.PerBlockDevelopers / 100) * dev.DevRewardPct)
 		if height >= V202EnhanceActivation {
 			rewardPayout = uint64((conversions.PerBlockDevelopers / 100) * dev.DevRewardPct * pegnet.SnapshotRate)
 		}
+
 		addr, err := factom.NewFAAddress(dev.DevAddress)
 
 		_, err = d.Pegnet.AddToBalance(tx, &addr, fat2.PTickerPEG, rewardPayout)
@@ -1076,15 +1094,24 @@ func (d *Pegnetd) recordBatch(sqlTx *sql.Tx, txBatch *fat2.TransactionBatch, rat
 			if err = d.Pegnet.SetTransactionHistoryConvertedAmount(sqlTx, txBatch, txIndex, outputAmount); err != nil {
 				return err
 			}
-
 			_, err = d.Pegnet.AddToBalance(sqlTx, &tx.Input.Address, tx.Conversion, uint64(outputAmount))
 			if err != nil {
 				return err
 			}
+			stats.Volume[tx.Input.Type.String()] += tx.Input.Amount
 
+			pUSDEquiv, err := conversions.Convert(int64(tx.Input.Amount), rates[tx.Input.Type], rates[fat2.PTickerUSD])
+			if err != nil {
+				return err
+			}
+			stats.VolumeOut[tx.Input.Type.String()] += tx.Input.Amount
+			stats.ConversionTotal += uint64(pUSDEquiv)
+			stats.Volume[tx.Conversion.String()] += uint64(outputAmount)
+			stats.VolumeIn[tx.Conversion.String()] += uint64(outputAmount)
 		} else {
-			// Transfer Outputs
-
+			// one input, multiple outputs
+			stats.Volume[tx.Input.Type.String()] += tx.Input.Amount
+			stats.VolumeTx[tx.Input.Type.String()] += tx.Input.Amount
 			for _, transfer := range tx.Transfers {
 				// if transfer to Burn address do nothing, otherwise add balances
 				if transfer.Address != FAGlobalBurnAddress {
@@ -1173,6 +1200,12 @@ func (d *Pegnetd) recordPegnetRequests(sqlTx *sql.Tx, txBatchs []*fat2.Transacti
 		if _, err := d.Pegnet.AddToBalance(sqlTx, &tx.Input.Address, tx.Input.Type, uint64(refundAmt)); err != nil {
 			return err
 		}
+
+		// subtract refund from volume
+		stats.Volume[tx.Input.Type.String()] += tx.Input.Amount - uint64(refundAmt)
+		stats.VolumeOut[tx.Input.Type.String()] += tx.Input.Amount - uint64(refundAmt)
+		stats.Volume[tx.Conversion.String()] += uint64(pegYield)
+		stats.VolumeIn[tx.Conversion.String()] += uint64(pegYield)
 	}
 
 	// The bankheight == currentheight after V4Update fork
@@ -1249,6 +1282,9 @@ func (d *Pegnetd) ApplyFactoidBlock(ctx context.Context, tx *sql.Tx, dblock *fac
 		if err := d.Pegnet.InsertFCTBurn(tx, fblock.KeyMR, burns[i], dblock.Height); err != nil {
 			return err
 		}
+		stats.VolumeIn[fat2.PTickerFCT.String()] += burns[i].FCTInputs[0].Amount
+		stats.Volume[fat2.PTickerFCT.String()] += burns[i].FCTInputs[0].Amount
+		stats.Burns += burns[i].FCTInputs[0].Amount
 	}
 
 	return nil
@@ -1275,6 +1311,8 @@ func (d *Pegnetd) ApplyGradedOPRBlock(tx *sql.Tx, gradedBlock grader.GradedBlock
 			return err
 		}
 
+		stats.Volume[fat2.PTickerPEG.String()] += uint64(winners[i].Payout())
+		stats.VolumeIn[fat2.PTickerPEG.String()] += uint64(winners[i].Payout())
 		if err := d.Pegnet.InsertCoinbase(tx, winners[i], addr[:], timestamp); err != nil {
 			return err
 		}
@@ -1338,10 +1376,12 @@ func (d *Pegnetd) GetAssetRates(oprWinners []opr.AssetUint, sprWinners []opr.Ass
 			if oprWinners[i].Name == sprWinners[i].Name {
 				sprRate := sprWinners[i].Value
 				oprRate := oprWinners[i].Value
-				toleranceRate := 0.1 // 10% band
+
+        toleranceRate := 0.1 // 10% band
 				if height >= V202EnhanceActivation {
 					toleranceRate = 0.25 // 25% band
 				}
+
 				toleranceBandHigh := float64(sprRate) * (1 + toleranceRate)
 				toleranceBandLow := float64(sprRate) * (1 - toleranceRate)
 				if (float64(oprRate) >= toleranceBandLow) && (float64(oprRate) <= toleranceBandHigh) {

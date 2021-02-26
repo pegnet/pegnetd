@@ -58,7 +58,8 @@ func (s *APIServer) jrpcMethods() jrpc.MethodMap {
 		"get-sync-status": s.getSyncStatus,
 		"properties":      s.properties,
 
-		"get-pegnet-rates": s.getPegnetRates,
+		"get-pegnet-rates": s.getRecentPegnetRates,
+		"get-stats":        s.getStats,
 	}
 
 }
@@ -619,4 +620,47 @@ func unmarshalStrict(data []byte, v interface{}) error {
 	d := json.NewDecoder(b)
 	d.DisallowUnknownFields()
 	return d.Decode(v)
+}
+
+func (s *APIServer) getStats(_ context.Context, data json.RawMessage) interface{} {
+	params := ParamsGetStats{}
+	if _, _, err := validate(data, &params); err != nil {
+		return err
+	}
+	stats, err := s.Node.Pegnet.SelectStats(context.Background(), *params.Height)
+	if err == sql.ErrNoRows {
+		return ErrorNotFound
+	}
+	if err != nil {
+		panic(err)
+	}
+
+	// The balance results actually works for rates too
+	return stats
+}
+
+func (s *APIServer) getRecentPegnetRates(ctx context.Context, data json.RawMessage) interface{} {
+	params := ParamsGetPegnetRates{}
+	if _, _, err := validate(data, &params); err != nil {
+		return err
+	}
+
+	if params.Height == 0 {
+		synced, err := s.Node.Pegnet.SelectSynced(ctx, s.Node.Pegnet.DB)
+		if err != nil {
+			return err
+		}
+		params.Height = uint32(synced.Synced)
+	}
+
+	rates, err := s.Node.Pegnet.SelectRecentRates(ctx, params.Height)
+	if err == sql.ErrNoRows || rates == nil || len(rates) == 0 {
+		return ErrorNotFound
+	}
+	if err != nil {
+		panic(err) // This is an internal error
+	}
+
+	// The balance results actually works for rates too
+	return rates
 }

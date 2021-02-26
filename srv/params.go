@@ -159,6 +159,22 @@ func (ParamsGetPegnetRates) ValidChainID() *factom.Bytes32 {
 	return nil
 }
 
+type ParamsGetStats struct {
+	Height *uint32 `json:"height,omitempty"`
+}
+
+func (ParamsGetStats) HasIncludePending() bool { return false }
+
+func (p ParamsGetStats) IsValid() error {
+	if p.Height == nil {
+		return jrpc.ErrorInvalidParams(`required: "height"`)
+	}
+	return nil
+}
+func (ParamsGetStats) ValidChainID() *factom.Bytes32 {
+	return nil
+}
+
 type ParamsGetPegnetTransactionStatus struct {
 	Hash *factom.Bytes32 `json:"entryhash,omitempty"`
 }

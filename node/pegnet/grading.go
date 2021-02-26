@@ -208,6 +208,23 @@ func (p *Pegnet) SelectRates(ctx context.Context, height uint32) (map[fat2.PTick
 	}
 	return _extractAssets(rows)
 }
+func (p *Pegnet) SelectRecentRates(ctx context.Context, height uint32) (map[string]uint64, error) {
+	rows, err := p.DB.Query("SELECT token, value FROM pn_rate WHERE height = (SELECT MAX(height) FROM pn_rate WHERE height <= $1)", height)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	assets := make(map[string]uint64)
+	for rows.Next() {
+		var tickerName string
+		var rateValue uint64
+		if err := rows.Scan(&tickerName, &rateValue); err != nil {
+			return nil, err
+		}
+		assets[tickerName] = rateValue
+	}
+	return assets, nil
+}
 
 func (p *Pegnet) SelectRatesByKeyMR(ctx context.Context, keymr *factom.Bytes32) (map[fat2.PTicker]uint64, error) {
 	rows, err := p.DB.Query("SELECT token, value FROM pn_rate WHERE height = (SELECT height FROM pn_grade WHERE keymr = $1)", keymr)
