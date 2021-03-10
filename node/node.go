@@ -79,7 +79,7 @@ var (
 
 	// V204EnhanceActivation indicates the activation that burns remaining airdrop amount.
 	// Estimated to be  April 16th 2021
-	V204BurnMintTokenActivation uint32 = 294206
+	V204BurnMintedTokenActivation uint32 = 294206
 )
 
 func SetAllActivations(act uint32) {
@@ -98,7 +98,7 @@ func SetAllActivations(act uint32) {
 	SprSignatureActivation = act
 	V202EnhanceActivation = act
 	V204EnhanceActivation = act
-	V204BurnMintTokenActivation = act
+	V204BurnMintedTokenActivation = act
 }
 
 type Pegnetd struct {

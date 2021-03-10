@@ -198,7 +198,7 @@ func (d *Pegnetd) MintTokensForBalance(ctx context.Context, tx *sql.Tx, height u
 	return nil
 }
 
-func (d *Pegnetd) NullifyMintTokens(ctx context.Context, tx *sql.Tx, height uint32) error {
+func (d *Pegnetd) NullifyMintedTokens(ctx context.Context, tx *sql.Tx, height uint32) error {
 	fLog := log.WithFields(log.Fields{"height": height})
 
 	FAGlobalMintAddress, err := factom.NewFAAddress(GlobalMintAddress)
@@ -345,8 +345,8 @@ func (d *Pegnetd) SyncBlock(ctx context.Context, tx *sql.Tx, height uint32) erro
 		}
 	}
 
-	if height == V204BurnMintTokenActivation {
-		if err := d.NullifyMintTokens(ctx, tx, d.Sync.Synced+1); err != nil {
+	if height == V204BurnMintedTokenActivation {
+		if err := d.NullifyMintedTokens(ctx, tx, d.Sync.Synced+1); err != nil {
 			return err
 		}
 	}
