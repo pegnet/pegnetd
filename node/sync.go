@@ -184,7 +184,7 @@ func (d *Pegnetd) MintTokensForBalance(ctx context.Context, tx *sql.Tx, height u
 	}
 
 	for _, tokenSupply := range MintTotalSupplyMap {
-		_, err := d.Pegnet.AddToBalance(tx, &FAGlobalMintAddress, tokenSupply.Ticker, tokenSupply.Amount)
+		_, err := d.Pegnet.AddToBalance(tx, &FAGlobalMintAddress, tokenSupply.Ticker, tokenSupply.Amount*1e8)
 		if err != nil {
 			fLog.WithFields(log.Fields{
 				"token":  tokenSupply.Ticker,
@@ -276,7 +276,7 @@ func (d *Pegnetd) NullifyBurnAddress(ctx context.Context, tx *sql.Tx, height uin
 		}).Info("zeroing burn | balances retrieval failed")
 	}
 
-	i := 0  // value to keep witin 0-9 range for mock tx
+	i := 0 // value to keep witin 0-9 range for mock tx
 	j := 0 // value for uniqueness
 	if height >= V202EnhanceActivation {
 		j = 50
