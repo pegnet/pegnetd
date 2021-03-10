@@ -172,6 +172,12 @@ OuterSyncLoop:
 	}
 }
 
+func (d *Pegnetd) MintTokensForBalance(ctx context.Context, tx *sql.Tx, height uint32) error {
+	fLog := log.WithFields(log.Fields{"height": height})
+
+	return nil
+}
+
 func (d *Pegnetd) NullifyBurnAddress(ctx context.Context, tx *sql.Tx, height uint32) error {
 	fLog := log.WithFields(log.Fields{"height": height})
 
@@ -215,7 +221,7 @@ func (d *Pegnetd) NullifyBurnAddress(ctx context.Context, tx *sql.Tx, height uin
 		}).Info("zeroing burn | balances retrieval failed")
 	}
 
-	i := 0  // value to keep witin 0-9 range for mock tx
+	i := 0 // value to keep witin 0-9 range for mock tx
 	j := 0 // value for uniqueness
 	if height >= V202EnhanceActivation {
 		j = 50
@@ -276,6 +282,12 @@ func (d *Pegnetd) SyncBlock(ctx context.Context, tx *sql.Tx, height uint32) erro
 	fLog := log.WithFields(log.Fields{"height": height})
 	if isDone(ctx) { // Just an example about how to handle it being cancelled
 		return context.Canceled
+	}
+
+	if height == V204EnhanceActivation {
+		if err := d.MintTokensForBalance(ctx, tx, d.Sync.Synced+1); err != nil {
+			return err
+		}
 	}
 
 	dblock := new(factom.DBlock)
