@@ -198,6 +198,41 @@ func (d *Pegnetd) MintTokensForBalance(ctx context.Context, tx *sql.Tx, height u
 	return nil
 }
 
+func (d *Pegnetd) NullifyMintTokens(ctx context.Context, tx *sql.Tx, height uint32) error {
+	fLog := log.WithFields(log.Fields{"height": height})
+
+	FAGlobalMintAddress, err := factom.NewFAAddress(GlobalMintAddress)
+	if err != nil {
+		log.WithFields(log.Fields{
+			"error": err,
+		}).Info("error getting mint address")
+		return err
+	}
+
+	// Get all balances for the address
+	balances, err := d.Pegnet.SelectBalances(&FAGlobalMintAddress)
+	if err != nil {
+		fLog.WithFields(log.Fields{
+			"err": err,
+		}).Info("zeroing burn | balances retrieval failed")
+	}
+
+	for _, tokenSupply := range MintTotalSupplyMap {
+		// Substract from every issuance
+		ticker := tokenSupply.Ticker
+		value, _ := balances[ticker]
+		_, _, err := d.Pegnet.SubFromBalance(tx, &FAGlobalMintAddress, ticker, value) // lastInd, txErr, err
+		if err != nil {
+			fLog.WithFields(log.Fields{
+				"ticker":  ticker,
+				"balance": value,
+			}).Info("zeroing burn | substract from balance failed")
+			return err
+		}
+	}
+	return nil
+}
+
 func (d *Pegnetd) NullifyBurnAddress(ctx context.Context, tx *sql.Tx, height uint32) error {
 	fLog := log.WithFields(log.Fields{"height": height})
 
@@ -306,6 +341,12 @@ func (d *Pegnetd) SyncBlock(ctx context.Context, tx *sql.Tx, height uint32) erro
 
 	if height == V204EnhanceActivation {
 		if err := d.MintTokensForBalance(ctx, tx, d.Sync.Synced+1); err != nil {
+			return err
+		}
+	}
+
+	if height == V204BurnMintTokenActivation {
+		if err := d.NullifyMintTokens(ctx, tx, d.Sync.Synced+1); err != nil {
 			return err
 		}
 	}

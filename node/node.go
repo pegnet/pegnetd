@@ -76,6 +76,10 @@ var (
 	// V204EnhanceActivation indicates the activation of PegNet 2.0.4.
 	// Estimated to be  Mar 15th 2021
 	V204EnhanceActivation uint32 = 999999
+
+	// V204EnhanceActivation indicates the activation of PegNet 2.0.4.
+	// Estimated to be  Mar 15th 2021
+	V204BurnMintTokenActivation uint32 = 999999
 )
 
 func SetAllActivations(act uint32) {
