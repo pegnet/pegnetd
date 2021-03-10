@@ -97,6 +97,8 @@ func SetAllActivations(act uint32) {
 	OneWaySmallAssetsConversions = act
 	SprSignatureActivation = act
 	V202EnhanceActivation = act
+	V204EnhanceActivation = act
+	V204BurnMintTokenActivation = act
 }
 
 type Pegnetd struct {
