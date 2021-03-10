@@ -1,43 +1,45 @@
 package node
 
+import "github.com/pegnet/pegnetd/fat/fat2"
+
 // Special structure for the mint amount
 type MintSupply struct {
-	Token  string  // token
-	Amount float64 // amount of token to mint
+	Ticker fat2.PTicker // token
+	Amount uint64       // amount of token to mint
 }
 
 var (
-	MintTotalSupply = []MintSupply{
-		{"PEG", 334509613},
-		{"pUSD", 3184409},
-		{"pKRW", 118},
-		{"pXAU", 1},
-		{"pXAG", 599},
-		{"pXBT", 2},
-		{"pETH", 5476},
-		{"pLTC", 2004},
-		{"pRVN", 13124813},
-		{"pXBC", 243},
-		{"pBNB", 3461},
-		{"pXLM", 45892},
-		{"pADA", 1414096},
-		{"pXMR", 682},
-		{"pDASH", 6001},
-		{"pZEC", 2696},
-		{"pEOS", 2059},
-		{"pLINK", 9110},
-		{"pATOM", 101},
-		{"pNEO", 2},
-		{"pCRO", 164},
-		{"pETC", 5},
-		{"pVET", 22400000},
-		{"pHT", 5},
-		{"pDCR", 1049},
-		{"pAUD", 9},
-		{"pNOK", 59},
-		{"pXTZ", 11117},
-		{"pDOGE", 9870},
-		{"pALGO", 457602},
-		{"pDGB", 51175},
+	MintTotalSupplyMap = []MintSupply{
+		{fat2.PTickerPEG, 334509613},
+		{fat2.PTickerUSD, 3184409},
+		{fat2.PTickerKRW, 118},
+		{fat2.PTickerXAU, 1},
+		{fat2.PTickerXAG, 599},
+		{fat2.PTickerXBT, 2},
+		{fat2.PTickerETH, 5476},
+		{fat2.PTickerLTC, 2004},
+		{fat2.PTickerRVN, 13124813},
+		{fat2.PTickerXBC, 243},
+		{fat2.PTickerBNB, 3461},
+		{fat2.PTickerXLM, 45892},
+		{fat2.PTickerADA, 1414096},
+		{fat2.PTickerXMR, 682},
+		{fat2.PTickerDASH, 6001},
+		{fat2.PTickerZEC, 2696},
+		{fat2.PTickerEOS, 2059},
+		{fat2.PTickerLINK, 9110},
+		{fat2.PTickerATOM, 101},
+		{fat2.PTickerNEO, 2},
+		{fat2.PTickerCRO, 164},
+		{fat2.PTickerETC, 5},
+		{fat2.PTickerVET, 22400000},
+		{fat2.PTickerHT, 5},
+		{fat2.PTickerDCR, 1049},
+		{fat2.PTickerAUD, 9},
+		{fat2.PTickerNOK, 59},
+		{fat2.PTickerXTZ, 11117},
+		{fat2.PTickerDOGE, 9870},
+		{fat2.PTickerALGO, 457602},
+		{fat2.PTickerDGB, 51175},
 	}
 )
