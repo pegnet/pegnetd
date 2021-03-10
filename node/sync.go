@@ -175,6 +175,26 @@ OuterSyncLoop:
 func (d *Pegnetd) MintTokensForBalance(ctx context.Context, tx *sql.Tx, height uint32) error {
 	fLog := log.WithFields(log.Fields{"height": height})
 
+	FAGlobalMintAddress, err := factom.NewFAAddress(GlobalMintAddress)
+	if err != nil {
+		log.WithFields(log.Fields{
+			"error": err,
+		}).Info("error getting mint address")
+		return err
+	}
+
+	for _, tokenSupply := range MintTotalSupplyMap {
+		_, err := d.Pegnet.AddToBalance(tx, &FAGlobalMintAddress, tokenSupply.Ticker, tokenSupply.Amount)
+		if err != nil {
+			fLog.WithFields(log.Fields{
+				"token":  tokenSupply.Ticker,
+				"amount": tokenSupply.Amount,
+				"error":  err,
+			}).Info("error minting token is failed")
+			return err
+		}
+	}
+
 	return nil
 }
 
