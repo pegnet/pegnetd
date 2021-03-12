@@ -72,6 +72,14 @@ var (
 	// V202EnhanceActivation indicates the activation of PegNet 2.0.2.
 	// Estimated to be  Dec 3th 2020
 	V202EnhanceActivation uint32 = 274036
+
+	// V204EnhanceActivation indicates the activation of PegNet 2.0.4.
+	// Estimated to be  Mar 16th 2021
+	V204EnhanceActivation uint32 = 288878
+
+	// V204EnhanceActivation indicates the activation that burns remaining airdrop amount.
+	// Estimated to be  April 16th 2021
+	V204BurnMintedTokenActivation uint32 = 294206
 )
 
 func SetAllActivations(act uint32) {
@@ -89,6 +97,8 @@ func SetAllActivations(act uint32) {
 	OneWaySmallAssetsConversions = act
 	SprSignatureActivation = act
 	V202EnhanceActivation = act
+	V204EnhanceActivation = act
+	V204BurnMintedTokenActivation = act
 }
 
 type Pegnetd struct {
