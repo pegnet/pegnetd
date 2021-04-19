@@ -3,8 +3,10 @@ package node
 import (
 	"context"
 	"fmt"
+
 	"github.com/Factom-Asset-Tokens/factom"
 	"github.com/pegnet/pegnet/modules/graderStake"
+	"github.com/pegnet/pegnetd/config"
 )
 
 // Grade Staking Price Records
@@ -15,18 +17,18 @@ func (d *Pegnetd) GradeS(ctx context.Context, block *factom.EBlock) (graderStake
 		return nil, nil
 	}
 
-	if *block.ChainID != SPRChain {
+	if *block.ChainID != config.SPRChain {
 		return nil, fmt.Errorf("trying to grade a non-spr chain")
 	}
 
 	ver := uint8(5)
-	if block.Height >= V20HeightActivation {
+	if block.Height >= config.V20HeightActivation {
 		ver = 5
 	}
-	if block.Height >= SprSignatureActivation {
+	if block.Height >= config.SprSignatureActivation {
 		ver = 6
 	}
-	if block.Height >= V202EnhanceActivation {
+	if block.Height >= config.V202EnhanceActivation {
 		ver = 7
 	}
 
