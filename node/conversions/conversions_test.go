@@ -7,6 +7,8 @@ import (
 	"math/rand"
 	"testing"
 
+	"github.com/pegnet/pegnetd/node/conversions"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -52,7 +54,7 @@ func TestConversions_Convert_Vectors(t *testing.T) {
 		t.Run(test.Name, func(t *testing.T) {
 			assert := assert.New(t)
 
-			observedY1, err := Convert(test.X1, test.XRate, test.YRate)
+			observedY1, err := conversions.Convert(1, test.X1, test.XRate, test.XRate, test.YRate, test.YRate)
 			if len(test.ErrorString) != 0 {
 				assert.EqualError(err, test.ErrorString)
 				return
@@ -63,13 +65,13 @@ func TestConversions_Convert_Vectors(t *testing.T) {
 			// Due to truncation in integer division, there is often error present in the
 			// conversion from Y back to X. Thus, we check that it is within the expected
 			// margin of error.
-			observedX2, err := Convert(test.Y1, test.YRate, test.XRate)
+			observedX2, err := conversions.Convert(1, test.Y1, test.YRate, test.YRate, test.XRate, test.XRate)
 			require.NoError(t, err)
 			observedError := abs(test.X1 - observedX2)
 			maxExpectedError := maxConversionError(test.XRate, test.YRate)
 			require.True(t, observedError <= maxExpectedError, "Margin of error exceeded for conversion Y1 --> X2")
 
-			observedY2, err := Convert(test.X2, test.XRate, test.YRate)
+			observedY2, err := conversions.Convert(1, test.X2, test.XRate, test.XRate, test.YRate, test.YRate)
 			require.NoError(t, err)
 			observedError = abs(test.Y1 - observedY2)
 			assert.True(observedError <= maxExpectedError, "Margin of error exceeded for conversion X2 --> Y2")
@@ -89,7 +91,7 @@ func TestConversions_Convert_Random(t *testing.T) {
 		t.Run(fmt.Sprintf("Iteration %d", i), func(t *testing.T) {
 			assert := assert.New(t)
 
-			y1, err := Convert(x1, xRate, yRate)
+			y1, err := conversions.Convert(1, x1, xRate, xRate, yRate, yRate)
 			if len(expectedErrorString) != 0 {
 				assert.EqualError(err, expectedErrorString)
 				return
@@ -99,13 +101,13 @@ func TestConversions_Convert_Random(t *testing.T) {
 			// Due to truncation in integer division, there is often error present in the
 			// conversion from Y back to X. Thus, we check that it is within the expected
 			// margin of error.
-			x2, err := Convert(y1, yRate, xRate)
+			x2, err := conversions.Convert(1, y1, yRate, yRate, xRate, xRate)
 			require.NoError(t, err)
 			observedError := abs(x1 - x2)
 			maxExpectedError := maxConversionError(yRate, xRate)
 			assert.True(observedError <= maxExpectedError, "Margin of error exceeded for Y1 --> X2: observedError=%d, maxError=%d", observedError, maxExpectedError)
 
-			y2, err := Convert(x2, xRate, yRate)
+			y2, err := conversions.Convert(1, x2, xRate, xRate, yRate, yRate)
 			require.NoError(t, err)
 			observedError = abs(y1 - y2)
 			maxExpectedError = maxConversionError(xRate, yRate)
