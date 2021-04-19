@@ -6,7 +6,8 @@ import (
 	"github.com/pegnet/pegnetd/fat/fat2"
 )
 
-const AveragePeriod = uint64(288) // Our Average Period is 2 days (144 10 minute blocks per day)
+const AveragePeriod = uint64(288)         // Our Average Period is 2 days (144 10 minute blocks per day)
+const AverageRequired = AveragePeriod / 2 // If we have at least half the rates, we can do conversions
 
 // getPegNetRateAverages
 // Gets all the rates for the AveragePeriod (the number of blocks contributing to the average), and computes
@@ -55,14 +56,14 @@ func (d *Pegnetd) GetPegNetRateAverages(ctx context.Context, height uint32) (Avg
 	}
 
 	for k, v := range ratesOverPeriod { //                      When we average the rates, we return a zero for
-		averages[k] = 0                      //                   any asset that doesn't have a rate in all blocks
-		if uint64(len(v)) != AveragePeriod { //                 We can see missing rates because the list isn't
-			continue //                                           long enough.  Just skip it, it will be zero
+		averages[k] = 0                       //                  any asset that doesn't have a rate in all blocks
+		if uint64(len(v)) < AverageRequired { //                We can see missing rates because the list isn't
+			continue //                                           long enough. Too many missing rates, and we skip it
 		}
 		for _, v2 := range v { //                               Sum up all the rates found for an asset
-			averages[k] += v2
-		}
-		averages[k] = averages[k] / AveragePeriod //            We made sure all valid assets have AveragePeriod rates
+			averages[k] += v2 //                                The assumption is that rates are no where near
+		} //                                                       64 bits, so they won't overflow
+		averages[k] = averages[k] / uint64(len(v)) // Divide the sum of the rates by the number of rates
 	}
 
 	return averages // Return the rates we found.
