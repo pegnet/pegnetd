@@ -19,8 +19,9 @@ func TestAveragePeriod(t *testing.T) {
 	exit.GlobalExitHandler.AddCancel(cancel)
 	_ = ctx
 
-	fctDat, _ := os.Create("FCT.tsv")
-	defer fctDat.Close()
+	// Open a file to write values that can be pulled into a spreadsheet and plotted.
+	//fctDat, _ := os.Create("FCT.tsv")
+	//defer fctDat.Close()
 
 	// Get the config
 	conf := viper.GetViper()
@@ -38,14 +39,17 @@ func TestAveragePeriod(t *testing.T) {
 	for i := uint32(208500); i < 210500; i++ {
 
 		averages := n.GetPegNetRateAverages(ctx, i).(map[fat2.PTicker]uint64)
+		_ = averages
+
 		for pAsset, v := range averages {
 			fmt.Sprintf("%6s %15d", pAsset, v)
 		}
 		// Get the rate for FCT at the current height
 		price := n.LastAveragesData[fat2.PTickerFCT][len(n.LastAveragesData[fat2.PTickerFCT])-1]
 		avgPrice := averages[fat2.PTickerFCT]
-		fctDat.WriteString(fmt.Sprintf("%f\t%f\n", float64(price)/100000000, float64(avgPrice)/100000000))
-		_ = averages
+
+		// Write out a tab delineated file to plot to double check the averages against the values
+		//	fctDat.WriteString(fmt.Sprintf("%f\t%f\n", float64(price)/100000000, float64(avgPrice)/100000000))
 
 		if i%10000 == 0 {
 			fmt.Printf("%6d ", i)
