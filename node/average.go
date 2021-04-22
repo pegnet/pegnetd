@@ -6,8 +6,8 @@ import (
 	"github.com/pegnet/pegnetd/fat/fat2"
 )
 
-const AveragePeriod = uint64(288)         // Our Average Period is 2 days (144 10 minute blocks per day)
-const AverageRequired = AveragePeriod / 2 // If we have at least half the rates, we can do conversions
+var AveragePeriod = uint64(288)         // Our Average Period is 2 days (144 10 minute blocks per day)
+var AverageRequired = AveragePeriod / 2 // If we have at least half the rates, we can do conversions
 
 // getPegNetRateAverages
 // Gets all the rates for the AveragePeriod (the number of blocks contributing to the average), and computes
