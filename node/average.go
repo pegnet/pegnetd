@@ -23,42 +23,71 @@ func (d *Pegnetd) GetPegNetRateAverages(ctx context.Context, height uint32) (Avg
 		return d.LastAverages
 	}
 
-	ratesOverPeriod := map[fat2.PTicker][]uint64{} //           First collect all the values over the blocks
-	averages := map[fat2.PTicker]uint64{}          //             in the average period, then compute the averages
-
-	defer func() { //                                           Always set up the cache when exiting the routine
-		d.LastAveragesHeight = height
-		d.LastAverages = averages
-	}()
-
-	startHeight := height - (uint32(AveragePeriod)) + 1 //      The startHeight is AveragePeriod before height+1
-	//                                                            (add 1 so the block at height is included)
-	if startHeight < 1 { //                                     If AveragePeriod blocks don't exist, then ignore
-		return averages
+	ratesOverPeriod := d.LastAveragesData //                    First collect all the values over the blocks
+	averages := map[fat2.PTicker]uint64{} //                      in the average period, then compute the averages
+	if ratesOverPeriod == nil {           //                    If no map exists yet
+		ratesOverPeriod = map[fat2.PTicker][]uint64{} //          create one.
 	}
 
-	for h := startHeight; height <= height; h++ { //            Collect rates over the blocks (including height)
-		var rates map[fat2.PTicker]uint64 //                    Collect all the rates
-		var err error
+	defer func() { //                                           Always set up the cache when exiting the routine
+		d.LastAveragesData = ratesOverPeriod //                   Save the data we used to create averages
+		d.LastAveragesHeight = height        //                   Save the height of this data
+		d.LastAverages = averages            //                   Save the averages we computed
+	}()
 
-		if rates, err = d.Pegnet.SelectRates(ctx, h); err != nil { // Pull the rates out of the database at each
-			return averages //                                          height.  Return averages if an error
+	// collectRatesAtHeight
+	// This routine collects all the data used to compute an average.  If any data is missing, then
+	// that data is represented by a zero.
+	collectRatesAtHeight := func(h uint32) {
+		for k := range ratesOverPeriod { //                   Make sure there is room for a new height
+			for len(ratesOverPeriod[k]) >= int(AveragePeriod) { //  If at the limit or above,
+				copy(ratesOverPeriod[k], ratesOverPeriod[k][1:])                    // Shift data down 1 element
+				ratesOverPeriod[k] = ratesOverPeriod[k][:len(ratesOverPeriod[k])-1] //   And drop off the last value
+			}
 		}
 
-		for k, v := range rates { //                            For all the rates
-			if ratesOverPeriod[k] == nil { //                     if no rates yet, at a slice for them
-				ratesOverPeriod[k] = []uint64{} //              Allocate the slice
-			}
-			if v != 0 { //                                      Only collect non-zero rates
+		if rates, err := d.Pegnet.SelectRates(ctx, h); err != nil { // Pull the rates out of the database at each
+			panic("no recovery from a database error getting rates")
+		} else {
+			for k, v := range rates { //                            For all the rates
+				if ratesOverPeriod[k] == nil { //                     if no rates yet, at a slice for them
+					ratesOverPeriod[k] = []uint64{} //              Allocate the slice
+				}
 				ratesOverPeriod[k] = append(ratesOverPeriod[k], v) // Add the rates we find
 			}
 		}
 	}
 
-	for k, v := range ratesOverPeriod { //                      When we average the rates, we return a zero for
-		averages[k] = 0                       //                  any asset that doesn't have a rate in all blocks
-		if uint64(len(v)) < AverageRequired { //                We can see missing rates because the list isn't
-			continue //                                           long enough. Too many missing rates, and we skip it
+	switch {
+	//   If the LastAveragesHeight is out of range given our current height, we just need to load
+	//     all the values
+	case d.LastAveragesHeight+1 < height || d.LastAveragesHeight > height:
+		for k, v := range ratesOverPeriod {
+			if v != nil {
+				ratesOverPeriod[k] = ratesOverPeriod[k][:0]
+			}
+		}
+		startHeightS := int64(height) - (int64(AveragePeriod)) + 1 // startHeight is AveragePeriod before height+1
+		//                                                            (add 1 so the block at height is included)
+		if startHeightS < 1 { //                                    If AveragePeriod blocks don't exist,
+			startHeightS = 1 //                                      then flour the start to 1
+		}
+
+		startHeight := uint32(startHeightS)
+
+		for h := startHeight; h <= height; h++ { //            Collect rates over the blocks (including height)
+			collectRatesAtHeight(h) //                           and add them to ratesOverPeriod
+		}
+
+	//   If all we need is the next height, then only collect that height.
+	case d.LastAveragesHeight+1 == height:
+		collectRatesAtHeight(height) //                         Add the current height to the dataset so far
+	}
+
+	for k, v := range ratesOverPeriod { //                        The average rate is zero for any asset without
+		averages[k] = 0                                       //    the number of required rates
+		if AveragePeriod-numberMissing(v) < AverageRequired { //  Count the missing values, and if not enough
+			continue //                                             skip it
 		}
 		for _, v2 := range v { //                               Sum up all the rates found for an asset
 			averages[k] += v2 //                                The assumption is that rates are no where near
@@ -67,4 +96,16 @@ func (d *Pegnetd) GetPegNetRateAverages(ctx context.Context, height uint32) (Avg
 	}
 
 	return averages // Return the rates we found.
+}
+
+func numberMissing(dataset []uint64) (numZeros uint64) {
+	for _, v := range dataset {
+		if v == 0 {
+			numZeros++
+		}
+	}
+	if len(dataset) < int(AveragePeriod) {
+		numZeros += AveragePeriod - uint64(len(dataset))
+	}
+	return numZeros
 }

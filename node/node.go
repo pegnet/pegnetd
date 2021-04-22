@@ -22,8 +22,9 @@ type Pegnetd struct {
 	Sync   *pegnet.BlockSync
 	Pegnet *pegnet.Pegnet
 
-	LastAverages       map[fat2.PTicker]uint64 // Cache for averages when requested for the same height
-	LastAveragesHeight uint32                  // Height of the current cache
+	LastAveragesData   map[fat2.PTicker][]uint64 // The last set of data used to create averages
+	LastAverages       map[fat2.PTicker]uint64   // Cache for averages when requested for the same height
+	LastAveragesHeight uint32                    // Height of the current cache
 }
 
 func NewPegnetd(ctx context.Context, conf *viper.Viper) (*Pegnetd, error) {
