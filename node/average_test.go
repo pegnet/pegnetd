@@ -15,6 +15,9 @@ import (
 )
 
 func TestAveragePeriod(t *testing.T) {
+
+	t.Skip("Should not be run as part of automated tests")
+
 	ctx, cancel := context.WithCancel(context.Background())
 	exit.GlobalExitHandler.AddCancel(cancel)
 	_ = ctx
@@ -44,12 +47,13 @@ func TestAveragePeriod(t *testing.T) {
 		for pAsset, v := range averages {
 			fmt.Sprintf("%6s %15d", pAsset, v)
 		}
-		// Get the rate for FCT at the current height
-		price := n.LastAveragesData[fat2.PTickerFCT][len(n.LastAveragesData[fat2.PTickerFCT])-1]
-		avgPrice := averages[fat2.PTickerFCT]
 
 		// Write out a tab delineated file to plot to double check the averages against the values
-		//	fctDat.WriteString(fmt.Sprintf("%f\t%f\n", float64(price)/100000000, float64(avgPrice)/100000000))
+		//
+		//     // Get the rate for FCT at the current height
+		//     price := n.LastAveragesData[fat2.PTickerFCT][len(n.LastAveragesData[fat2.PTickerFCT])-1]
+		//     avgPrice := averages[fat2.PTickerFCT]
+		//	   fctDat.WriteString(fmt.Sprintf("%f\t%f\n", float64(price)/100000000, float64(avgPrice)/100000000))
 
 		if i%10000 == 0 {
 			fmt.Printf("%6d ", i)
