@@ -6,18 +6,20 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"runtime"
 	"sort"
 	"strconv"
 	"strings"
 	"text/tabwriter"
 	"time"
 
-	"github.com/pegnet/pegnet/modules/conversions"
+	"github.com/pegnet/pegnetd/node"
 
 	"github.com/Factom-Asset-Tokens/factom"
 	"github.com/pegnet/pegnetd/config"
 	"github.com/pegnet/pegnetd/fat/fat2"
-	"github.com/pegnet/pegnetd/node"
+
+	"github.com/pegnet/pegnetd/node/conversions"
 	"github.com/pegnet/pegnetd/node/pegnet"
 	"github.com/pegnet/pegnetd/srv"
 	"github.com/spf13/cobra"
@@ -53,7 +55,7 @@ func init() {
 	//tx.Flags()
 	rootCmd.AddCommand(tx)
 	rootCmd.AddCommand(conv)
-
+	rootCmd.AddCommand(resetDB)
 }
 
 var minerDistro = &cobra.Command{
@@ -349,8 +351,8 @@ var conv = &cobra.Command{
 
 		// Let's check the pXXX -> pFCT first
 		status := getStatus()
-		if (destAsset == "pFCT" || destAsset == "FCT") && uint32(status.Current) >= node.OneWaypFCTConversions {
-			cmd.PrintErrln(fmt.Sprintf("pXXX -> pFCT conversions are not allowed since block height %d. If you need to acquire pFCT, you have to burn FCT -> pFCT", node.OneWaypFCTConversions))
+		if (destAsset == "pFCT" || destAsset == "FCT") && uint32(status.Current) >= config.OneWaypFCTConversions {
+			cmd.PrintErrln(fmt.Sprintf("pXXX -> pFCT conversions are not allowed since block height %d. If you need to acquire pFCT, you have to burn FCT -> pFCT", config.OneWaypFCTConversions))
 			os.Exit(1)
 		}
 
@@ -359,8 +361,8 @@ var conv = &cobra.Command{
 		if (destAsset == "PEG" || destAsset == "pDCR" || destAsset == "pDGB" || destAsset == "pDOGE" || destAsset == "pHBAR" ||
 			destAsset == "pONT" || destAsset == "pRVN" || destAsset == "pBAT" || destAsset == "pALGO" || destAsset == "pBIF" ||
 			destAsset == "pETB" || destAsset == "pKES" || destAsset == "pNGN" || destAsset == "pRWF" || destAsset == "pTZS" ||
-			destAsset == "pUGX") && uint32(status.Current) >= node.OneWaySmallAssetsConversions {
-			cmd.PrintErrln(fmt.Sprintf("pXXX -> pSmallAssets conversions are not allowed since block height %d.", node.OneWaySmallAssetsConversions))
+			destAsset == "pUGX") && uint32(status.Current) >= config.OneWaySmallAssetsConversions {
+			cmd.PrintErrln(fmt.Sprintf("pXXX -> pSmallAssets conversions are not allowed since block height %d.", config.OneWaySmallAssetsConversions))
 			os.Exit(1)
 		}
 
@@ -575,6 +577,28 @@ var status = &cobra.Command{
 	},
 }
 
+var resetDB = &cobra.Command{
+	Use:              "resetDB",
+	Short:            "reset sql database for the pegnetd node",
+	PersistentPreRun: always,
+	PreRun:           SoftReadConfig,
+	Run: func(cmd *cobra.Command, args []string) {
+		rawpath := viper.GetString(config.SqliteDBPath)
+		fmt.Println("Resetting database...", rawpath)
+		if runtime.GOOS == "windows" {
+			rawpath = strings.Replace(rawpath, "$HOME", "$USERPROFILE", -1)
+		}
+		path := os.ExpandEnv(rawpath)
+
+		err := os.Remove(path)
+		if err != nil {
+			fmt.Println("Resetting database is failed. Manual removing is required.", err)
+		} else {
+			fmt.Println("Database has been reset successfully.")
+		}
+	},
+}
+
 func getProperties() srv.PegnetdProperties {
 	cl := srv.NewClient()
 	cl.PegnetdServer = viper.GetString(config.Pegnetd)
@@ -770,7 +794,7 @@ var getBank = &cobra.Command{
 		cl := srv.NewClient()
 		cl.PegnetdServer = viper.GetString(config.Pegnetd)
 		var res pegnet.BankEntry
-		err = cl.Request("get-bank", srv.ParamsGetBank{Height: int32(height)}, &res)
+		err = cl.Request("get-bank", srv.ParamsGetBank{Height: int32(height)}, &res) //TODO: height should be uint32
 		if err != nil {
 			fmt.Printf("Failed to make RPC request\nDetails:\n%v\n", err)
 			os.Exit(1)
@@ -799,9 +823,9 @@ var getBank = &cobra.Command{
 		if err == nil {
 			fmt.Println("")
 			fmt.Println("Value in USD")
-			dAmt, _ := conversions.Convert(res.BankAmount, rates[fat2.PTickerPEG], rates[fat2.PTickerUSD])
-			dUsed, _ := conversions.Convert(res.BankUsed, rates[fat2.PTickerPEG], rates[fat2.PTickerUSD])
-			dReq, _ := conversions.Convert(res.PEGRequested, rates[fat2.PTickerPEG], rates[fat2.PTickerUSD])
+			dAmt, _ := conversions.Convert(uint32(height), res.BankAmount, rates[fat2.PTickerPEG], rates[fat2.PTickerPEG], rates[fat2.PTickerUSD], rates[fat2.PTickerUSD])
+			dUsed, _ := conversions.Convert(uint32(height), res.BankUsed, rates[fat2.PTickerPEG], rates[fat2.PTickerPEG], rates[fat2.PTickerUSD], rates[fat2.PTickerUSD])
+			dReq, _ := conversions.Convert(uint32(height), res.PEGRequested, rates[fat2.PTickerPEG], rates[fat2.PTickerPEG], rates[fat2.PTickerUSD], rates[fat2.PTickerUSD])
 			fmt.Printf("PEG in Bank   : $%s\n", FactoshiToFactoid(dAmt))
 			fmt.Printf("PEG Consumed  : $%s\n", FactoshiToFactoid(dUsed))
 			fmt.Printf("PEG Requested : $%s\n", FactoshiToFactoid(dReq))

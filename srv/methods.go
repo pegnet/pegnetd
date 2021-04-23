@@ -34,10 +34,9 @@ import (
 	jrpc "github.com/AdamSLevy/jsonrpc2/v13"
 	"github.com/Factom-Asset-Tokens/factom"
 	sqlite3 "github.com/mattn/go-sqlite3"
-	"github.com/pegnet/pegnet/modules/conversions"
 	"github.com/pegnet/pegnetd/config"
 	"github.com/pegnet/pegnetd/fat/fat2"
-	"github.com/pegnet/pegnetd/node"
+	"github.com/pegnet/pegnetd/node/conversions"
 	"github.com/pegnet/pegnetd/node/pegnet"
 )
 
@@ -95,8 +94,8 @@ func (s *APIServer) getBank(ctx context.Context, data json.RawMessage) interface
 		params.Height = int32(synced.Synced)
 	}
 
-	if params.Height < int32(node.V4OPRUpdate) {
-		return jrpc.ErrorInvalidParams(fmt.Sprintf("the height %d is below the activation height (%d) of this feature", params.Height, node.V4OPRUpdate))
+	if params.Height < int32(config.V4OPRUpdate) {
+		return jrpc.ErrorInvalidParams(fmt.Sprintf("the height %d is below the activation height (%d) of this feature", params.Height, config.V4OPRUpdate))
 	}
 	result, err := s.Node.Pegnet.SelectBankEntry(nil, params.Height)
 	if err != nil {
@@ -144,7 +143,7 @@ type ResultGlobalRichList struct {
 	Equiv   uint64 `json:"pusd"`
 }
 
-func (s *APIServer) getGlobalRichList(_ context.Context, data json.RawMessage) interface{} {
+func (s *APIServer) getGlobalRichList(ctx context.Context, data json.RawMessage) interface{} {
 	params := ParamsGetGlobalRichList{}
 	_, _, err := validate(data, &params)
 	if err != nil {
@@ -157,6 +156,7 @@ func (s *APIServer) getGlobalRichList(_ context.Context, data json.RawMessage) i
 
 	height := s.Node.GetCurrentSync()
 	rates, realHeight, err := s.Node.Pegnet.SelectMostRecentRatesBeforeHeight(nil, s.Node.Pegnet.DB, height+1)
+	averages := s.Node.GetPegNetRateAverages(ctx, realHeight).(map[fat2.PTicker]uint64)
 	if err != nil {
 		return err
 	}
@@ -178,7 +178,13 @@ func (s *APIServer) getGlobalRichList(_ context.Context, data json.RawMessage) i
 			if r.Balances[i] == 0 {
 				continue
 			}
-			c, err := conversions.Convert(int64(r.Balances[i]), rates[i], rates[fat2.PTickerUSD])
+			c, err := conversions.Convert(
+				height,
+				int64(r.Balances[i]),
+				rates[i],
+				averages[i],
+				rates[fat2.PTickerUSD],
+				averages[fat2.PTickerUSD])
 			if err != nil {
 				return err
 			}
@@ -213,7 +219,7 @@ type ResultGetRichList struct {
 	Equiv   uint64 `json:"pusd"`
 }
 
-func (s *APIServer) getRichList(_ context.Context, data json.RawMessage) interface{} {
+func (s *APIServer) getRichList(ctx context.Context, data json.RawMessage) interface{} {
 	params := ParamsGetRichList{}
 	_, _, err := validate(data, &params)
 	if err != nil {
@@ -226,6 +232,7 @@ func (s *APIServer) getRichList(_ context.Context, data json.RawMessage) interfa
 
 	height := s.Node.GetCurrentSync()
 	rates, rateHeight, err := s.Node.Pegnet.SelectMostRecentRatesBeforeHeight(nil, s.Node.Pegnet.DB, height+1)
+	averages := s.Node.GetPegNetRateAverages(ctx, rateHeight).(map[fat2.PTicker]uint64)
 	if err != nil {
 		return err
 	}
@@ -243,7 +250,13 @@ func (s *APIServer) getRichList(_ context.Context, data json.RawMessage) interfa
 		entry.Address = r.Address.String()
 		entry.Amount = r.Balance
 		if rateHeight > 0 {
-			c, err := conversions.Convert(int64(r.Balance), rates[ticker], rates[fat2.PTickerUSD])
+			c, err := conversions.Convert(
+				height,
+				int64(r.Balance),
+				rates[ticker],
+				averages[ticker],
+				rates[fat2.PTickerUSD],
+				averages[fat2.PTickerUSD])
 			if err != nil {
 				return err
 			}
@@ -473,7 +486,7 @@ func (s *APIServer) sendTransaction(_ context.Context, data json.RawMessage) int
 	}
 
 	entry := params.Entry()
-	entry.ChainID = &node.TransactionChain
+	entry.ChainID = &config.TransactionChain // TODO consider not passing a pointer to the config.TransactionChain
 	// TODO: attempt to apply
 	//txErr, err := attemptApplyFAT2TxBatch(chain, entry)
 	//if err != nil {
@@ -592,7 +605,7 @@ func validate(data json.RawMessage, params Params) (interface{}, func(), error) 
 	//}
 	chainID := params.ValidChainID()
 	if chainID != nil {
-		if *chainID != node.TransactionChain {
+		if *chainID != config.TransactionChain {
 			return nil, nil, ErrorTokenNotFound
 		}
 		// TODO: Do we need to stub out any of the chain fields?

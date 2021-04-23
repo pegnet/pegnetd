@@ -9,13 +9,13 @@ import (
 	"time"
 
 	"github.com/Factom-Asset-Tokens/factom"
-	"github.com/pegnet/pegnet/modules/conversions"
 	"github.com/pegnet/pegnet/modules/grader"
 	"github.com/pegnet/pegnet/modules/graderStake"
 	"github.com/pegnet/pegnet/modules/opr"
 	"github.com/pegnet/pegnet/modules/transactionid"
 	"github.com/pegnet/pegnetd/config"
 	"github.com/pegnet/pegnetd/fat/fat2"
+	"github.com/pegnet/pegnetd/node/conversions"
 	"github.com/pegnet/pegnetd/node/pegnet"
 	log "github.com/sirupsen/logrus"
 )
@@ -94,7 +94,10 @@ OuterSyncLoop:
 
 			// One time operation, Inserts negative balance for the burn address that used during the attack
 			// We need to do this before main logic because sqlite db will be locked
-			if d.Sync.Synced+1 == V202EnhanceActivation {
+			if d.Sync.Synced+1 == config.V20DevRewardsHeightActivation {
+				d.NullifyBurnAddress(ctx, tx, d.Sync.Synced+1)
+			}
+			if d.Sync.Synced+1 == config.V202EnhanceActivation {
 				d.NullifyBurnAddress(ctx, tx, d.Sync.Synced+1)
 			}
 
@@ -169,14 +172,86 @@ OuterSyncLoop:
 	}
 }
 
-func (d *Pegnetd) NullifyBurnAddress(ctx context.Context, tx *sql.Tx, height uint32) error {
+func (d *Pegnetd) MintTokensForBalance(ctx context.Context, tx *sql.Tx, height uint32) error {
 	fLog := log.WithFields(log.Fields{"height": height})
 
-	FAGlobalBurnAddress, err := factom.NewFAAddress(GlobalBurnAddress)
+	FAGlobalMintAddress, err := factom.NewFAAddress(GlobalMintAddress)
 	if err != nil {
 		log.WithFields(log.Fields{
 			"error": err,
-		}).Info("error getting burn address")
+		}).Info("error getting mint address")
+		return err
+	}
+
+	for _, tokenSupply := range MintTotalSupplyMap {
+		_, err := d.Pegnet.AddToBalance(tx, &FAGlobalMintAddress, tokenSupply.Ticker, tokenSupply.Amount*1e8)
+		if err != nil {
+			fLog.WithFields(log.Fields{
+				"token":  tokenSupply.Ticker,
+				"amount": tokenSupply.Amount,
+				"error":  err,
+			}).Info("error minting token is failed")
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (d *Pegnetd) NullifyMintedTokens(ctx context.Context, tx *sql.Tx, height uint32) error {
+	fLog := log.WithFields(log.Fields{"height": height})
+
+	FAGlobalMintAddress, err := factom.NewFAAddress(GlobalMintAddress)
+	if err != nil {
+		log.WithFields(log.Fields{
+			"error": err,
+		}).Info("error getting mint address")
+		return err
+	}
+
+	// Get all balances for the address
+	balances, err := d.Pegnet.SelectBalances(&FAGlobalMintAddress)
+	if err != nil {
+		fLog.WithFields(log.Fields{
+			"err": err,
+		}).Info("zeroing burn | balances retrieval failed")
+	}
+
+	for _, tokenSupply := range MintTotalSupplyMap {
+		// Substract from every issuance
+		ticker := tokenSupply.Ticker
+		value, _ := balances[ticker]
+		_, _, err := d.Pegnet.SubFromBalance(tx, &FAGlobalMintAddress, ticker, value) // lastInd, txErr, err
+		if err != nil {
+			fLog.WithFields(log.Fields{
+				"ticker":  ticker,
+				"balance": value,
+			}).Info("zeroing burn | substract from balance failed")
+			return err
+		}
+	}
+	return nil
+}
+
+func (d *Pegnetd) NullifyBurnAddress(ctx context.Context, tx *sql.Tx, height uint32) error {
+	fLog := log.WithFields(log.Fields{"height": height})
+
+	var FAGlobalBurnAddress factom.FAAddress
+	var err error
+	if height < config.V202EnhanceActivation {
+		FAGlobalBurnAddress, err = factom.NewFAAddress(GlobalOldBurnAddress)
+		if err != nil {
+			log.WithFields(log.Fields{
+				"error": err,
+			}).Info("error getting burn address")
+		}
+	} else {
+		FAGlobalBurnAddress, err = factom.NewFAAddress(GlobalBurnAddress)
+		if err != nil {
+			log.WithFields(log.Fields{
+				"error": err,
+			}).Info("error getting burn address")
+		}
 	}
 
 	dblock := new(factom.DBlock)
@@ -201,8 +276,11 @@ func (d *Pegnetd) NullifyBurnAddress(ctx context.Context, tx *sql.Tx, height uin
 		}).Info("zeroing burn | balances retrieval failed")
 	}
 
-	i := 0  // value to keep witin 0-9 range for mock tx
-	j := 50 // value for uniqueness
+	i := 0 // value to keep witin 0-9 range for mock tx
+	j := 0 // value for uniqueness
+	if height >= config.V202EnhanceActivation {
+		j = 50
+	}
 	for ticker := fat2.PTickerInvalid + 1; ticker < fat2.PTickerMax; ticker++ {
 
 		// Substract from every issuance
@@ -219,7 +297,10 @@ func (d *Pegnetd) NullifyBurnAddress(ctx context.Context, tx *sql.Tx, height uin
 		// We need to mock a TXID to record nullify recrods
 		// add more uniqness into hash value by reusing iterating j value in addtion to current height
 		// so it doesn't overlap with staking and rewards we have in place
-		txid = fmt.Sprintf("%03d%061d", j, height)
+		txid = fmt.Sprintf("%064d", height-(uint32(j)))
+		if height >= config.V202EnhanceActivation {
+			txid = fmt.Sprintf("%03d%061d", j, height)
+		}
 
 		// Mock entry hash value
 		addTxid := fmt.Sprintf("%d-%s", i, txid)
@@ -234,6 +315,16 @@ func (d *Pegnetd) NullifyBurnAddress(ctx context.Context, tx *sql.Tx, height uin
 			"txid":    txid,
 			"addtxid": addTxid,
 		}).Info("burn nullify | prep")
+
+		if height < config.V202EnhanceActivation {
+			err = d.Pegnet.InsertZeroingCoinbase(tx, txid, addTxid, height, heightTimestamp, value, ticker.String(), FAGlobalBurnAddress)
+			if err != nil {
+				fLog.WithFields(log.Fields{
+					"error": err,
+				}).Info("zeroing burn | coinbase tx failed")
+				return err
+			}
+		}
 	}
 
 	return nil
@@ -248,6 +339,18 @@ func (d *Pegnetd) SyncBlock(ctx context.Context, tx *sql.Tx, height uint32) erro
 		return context.Canceled
 	}
 
+	if height == config.V204EnhanceActivation {
+		if err := d.MintTokensForBalance(ctx, tx, d.Sync.Synced+1); err != nil {
+			return err
+		}
+	}
+
+	if height == config.V204BurnMintedTokenActivation {
+		if err := d.NullifyMintedTokens(ctx, tx, d.Sync.Synced+1); err != nil {
+			return err
+		}
+	}
+
 	dblock := new(factom.DBlock)
 	dblock.Height = height
 	if err := dblock.Get(nil, d.FactomClient); err != nil {
@@ -255,19 +358,19 @@ func (d *Pegnetd) SyncBlock(ctx context.Context, tx *sql.Tx, height uint32) erro
 	}
 
 	// First, gather all entries we need from factomd
-	oprEBlock := dblock.EBlock(OPRChain)
+	oprEBlock := dblock.EBlock(config.OPRChain)
 	if oprEBlock != nil {
 		if err := multiFetch(oprEBlock, d.FactomClient); err != nil {
 			return err
 		}
 	}
-	transactionsEBlock := dblock.EBlock(TransactionChain)
+	transactionsEBlock := dblock.EBlock(config.TransactionChain)
 	if transactionsEBlock != nil {
 		if err := multiFetch(transactionsEBlock, d.FactomClient); err != nil {
 			return err
 		}
 	}
-	sprEBlock := dblock.EBlock(SPRChain)
+	sprEBlock := dblock.EBlock(config.SPRChain)
 	if sprEBlock != nil {
 		if err := multiFetch(sprEBlock, d.FactomClient); err != nil {
 			return err
@@ -279,7 +382,7 @@ func (d *Pegnetd) SyncBlock(ctx context.Context, tx *sql.Tx, height uint32) erro
 	gradedBlock, err := d.Grade(ctx, oprEBlock)
 	gradedSPRBlock, err_s := d.GradeS(ctx, sprEBlock)
 	isRatesAvailable := false
-	if height < V20HeightActivation {
+	if height < config.V20HeightActivation {
 		if err != nil {
 			return err
 		}
@@ -296,13 +399,13 @@ func (d *Pegnetd) SyncBlock(ctx context.Context, tx *sql.Tx, height uint32) erro
 				// 2: Price is determined by equation
 				// 3: Price is determine by miners
 				var phase pegnet.PEGPricingPhase
-				if height < PEGPricingActivation {
+				if height < config.PEGPricingActivation {
 					phase = pegnet.PEGPriceIsZero
 				}
-				if height >= PEGPricingActivation {
+				if height >= config.PEGPricingActivation {
 					phase = pegnet.PEGPriceIsEquation
 				}
-				if height >= PEGFreeFloatingPriceActivation {
+				if height >= config.PEGFreeFloatingPriceActivation {
 					phase = pegnet.PEGPriceIsFloating
 				}
 
@@ -345,7 +448,14 @@ func (d *Pegnetd) SyncBlock(ctx context.Context, tx *sql.Tx, height uint32) erro
 			}
 		}
 		if 0 < len(oprWinners) || 0 < len(sprWinners) {
-			filteredRates, errRate := d.GetAssetRates(oprWinners, sprWinners, height)
+			var filteredRates []opr.AssetUint
+			var errRate error
+			if height < config.V20DevRewardsHeightActivation {
+				filteredRates, errRate = d.GetAssetRatesV0(oprWinners, sprWinners)
+			} else {
+				filteredRates, errRate = d.GetAssetRates(oprWinners, sprWinners, height)
+			}
+
 			if errRate != nil {
 				return err
 			}
@@ -363,7 +473,7 @@ func (d *Pegnetd) SyncBlock(ctx context.Context, tx *sql.Tx, height uint32) erro
 	}
 
 	// Only apply transactions if we crossed the activation
-	if height >= TransactionConversionActivation {
+	if height >= config.TransactionConversionActivation {
 		rates, err := d.Pegnet.SelectPendingRates(ctx, tx, height)
 		if err != nil {
 			return err
@@ -372,17 +482,17 @@ func (d *Pegnetd) SyncBlock(ctx context.Context, tx *sql.Tx, height uint32) erro
 		// Before we apply any balance changes, we will snapshot the balances at the START of the block.
 		// This means the balances are the same as the end of the block n-1.
 		// This activation is nested in the activation that has the rates
-		if height >= V20HeightActivation && height%pegnet.SnapshotRate == 0 {
+		if height >= config.V20HeightActivation && height%pegnet.SnapshotRate == 0 {
 
 			// check if the height has no rates, what do we do?
 			// check rates from previous height
-			if rates == nil && height < V202EnhanceActivation {
+			if rates == nil && height < config.V202EnhanceActivation {
 				// We need to handle the no rates case. Miners could avoid mining this last block.
 				// use the last valid rates from last block
 				rates, err = d.Pegnet.SelectPendingRates(ctx, tx, height-1)
 			}
 
-			if (rates == nil || len(rates) == 0) && height >= V202EnhanceActivation {
+			if (rates == nil || len(rates) == 0) && height >= config.V202EnhanceActivation {
 				rates, _, err = d.Pegnet.SelectMostRecentRatesBeforeHeight(ctx, tx, height)
 			}
 
@@ -425,7 +535,7 @@ func (d *Pegnetd) SyncBlock(ctx context.Context, tx *sql.Tx, height uint32) erro
 	}
 
 	// Only apply burn transaction if height does not cross the activation
-	if height < V20HeightActivation {
+	if height < config.V20HeightActivation {
 		// 3) Apply FCT --> pFCT burns that happened in this block
 		//    These funds will be available for transactions and conversions executed in the next block
 		// TODO: Check the order of operations on this and what block to add burns from.
@@ -442,7 +552,7 @@ func (d *Pegnetd) SyncBlock(ctx context.Context, tx *sql.Tx, height uint32) erro
 		}
 	}
 
-	if height >= V20HeightActivation {
+	if height >= config.V20HeightActivation {
 		// 5) Apply effects of graded SPR Block (PEG rewards, if any)
 		//    These funds will be available for transactions and conversions executed in the next block
 		if gradedSPRBlock != nil {
@@ -453,7 +563,7 @@ func (d *Pegnetd) SyncBlock(ctx context.Context, tx *sql.Tx, height uint32) erro
 	}
 
 	// 6) Apply Developers Rewards
-	if height >= V20DevRewardsHeightActivation && height%pegnet.SnapshotRate == 0 {
+	if height >= config.V20DevRewardsHeightActivation && height%pegnet.SnapshotRate == 0 {
 
 		// init developers list explicitely
 		// and forward to function
@@ -497,12 +607,12 @@ func (d *Pegnetd) SnapshotPayouts(tx *sql.Tx, fLog *log.Entry, rates map[fat2.PT
 			if bal.Balances[i] == 0 { // Ignore 0 balances
 				continue
 			}
-			if (rates[i] == 0 || rates[fat2.PTickerUSD] == 0) && height > V202EnhanceActivation {
+			if (rates[i] == 0 || rates[fat2.PTickerUSD] == 0) && height >= config.V202EnhanceActivation {
 				continue
 			}
 
 			// Convert from pXXX -> pUSD
-			c, err := conversions.Convert(int64(bal.Balances[i]), rates[i], rates[fat2.PTickerUSD])
+			c, err := conversions.Convert(height, int64(bal.Balances[i]), rates[i], rates[i], rates[fat2.PTickerUSD], rates[fat2.PTickerUSD])
 			if err != nil {
 				return err
 			}
@@ -616,7 +726,10 @@ func (d *Pegnetd) DevelopersPayouts(tx *sql.Tx, fLog *log.Entry, height uint32, 
 		txid = fmt.Sprintf("%02d%062d", j, height)
 
 		// we calculate developers reward from % pre-defined
-		rewardPayout := uint64((conversions.PerBlockDevelopers / 100) * dev.DevRewardPct * pegnet.SnapshotRate)
+		rewardPayout := uint64((conversions.PerBlockDevelopers / 100) * dev.DevRewardPct)
+		if height >= config.V202EnhanceActivation {
+			rewardPayout = uint64((conversions.PerBlockDevelopers / 100) * dev.DevRewardPct * pegnet.SnapshotRate)
+		}
 		addr, err := factom.NewFAAddress(dev.DevAddress)
 
 		_, err = d.Pegnet.AddToBalance(tx, &addr, fat2.PTickerPEG, rewardPayout)
@@ -724,7 +837,7 @@ func multiFetch(eblock *factom.EBlock, c *factom.Client) error {
 // The bank table helps track the demand for peg at a given height.
 // The bank is the total amount of PEG allowed to be issued for any given height.
 func (d *Pegnetd) SyncBank(ctx context.Context, sqlTx *sql.Tx, currentHeight uint32) error {
-	if (currentHeight >= V4OPRUpdate) && (currentHeight < V20HeightActivation) { // V4 forward tracks this
+	if (currentHeight >= config.V4OPRUpdate) && (currentHeight < config.V20HeightActivation) { // V4 forward tracks this
 		err := d.Pegnet.InsertBankAmount(sqlTx, int32(currentHeight), int64(pegnet.BankBaseAmount))
 		if err != nil {
 			return err
@@ -741,6 +854,8 @@ func (d *Pegnetd) ApplyTransactionBatchesInHolding(ctx context.Context, sqlTx *s
 	if err != nil {
 		return err
 	}
+
+	averages := d.GetPegNetRateAverages(ctx, height).(map[fat2.PTicker]uint64) // Get the averages for all the passets
 
 	// All batches with a PEG conversion
 	var pegConversions []*fat2.TransactionBatch
@@ -759,7 +874,7 @@ func (d *Pegnetd) ApplyTransactionBatchesInHolding(ctx context.Context, sqlTx *s
 		for i, txBatch := range txBatches {
 			// Re-validate transaction batch because timestamp might not be valid anymore
 
-			if currentHeight >= V20HeightActivation {
+			if currentHeight >= config.V20HeightActivation {
 				if err := txBatch.ValidatePegTx(int32(currentHeight)); err != nil {
 					d.Pegnet.SetTransactionHistoryExecuted(sqlTx, txBatch, -2)
 					continue
@@ -779,7 +894,7 @@ func (d *Pegnetd) ApplyTransactionBatchesInHolding(ctx context.Context, sqlTx *s
 
 			// This will apply all batche inputs, and all batch outputs except
 			// conversions to PEG if we are above the PegnetConversionLimit Act
-			err = d.applyTransactionBatch(sqlTx, txBatch, rates, currentHeight)
+			err = d.applyTransactionBatch(sqlTx, txBatch, rates, averages, currentHeight)
 			// The err needs to be converted to a code. If the err is still
 			// not nil, then the code is 0 and the error is probably db related.
 			// If the code is < 0, the tx is rejected.
@@ -790,10 +905,10 @@ func (d *Pegnetd) ApplyTransactionBatchesInHolding(ctx context.Context, sqlTx *s
 			} else if rejectCode < 0 { // Tx rejected
 				d.Pegnet.SetTransactionHistoryExecuted(sqlTx, txBatch, rejectCode)
 			} else if err == nil { // Tx accepted
-				if currentHeight < V20HeightActivation {
+				if currentHeight < config.V20HeightActivation {
 					// If PegnetConversion limits are on, we process conversions to
 					// peg in a second pass.
-					if currentHeight >= PegnetConversionLimitActivation && txBatch.HasPEGRequest() {
+					if currentHeight >= config.PegnetConversionLimitActivation && txBatch.HasPEGRequest() {
 						// Batch applied, we need to do the PEG conversions at the end
 						pegConversions = append(pegConversions, txBatches[i])
 					}
@@ -809,10 +924,10 @@ func (d *Pegnetd) ApplyTransactionBatchesInHolding(ctx context.Context, sqlTx *s
 		// This is processing each height of conversions as its own block
 		// of conversions. After the v4 update, all pending conversions get
 		// processed together for peg conversions
-		if currentHeight >= PegnetConversionLimitActivation && currentHeight < V4OPRUpdate {
+		if currentHeight >= config.PegnetConversionLimitActivation && currentHeight < config.V4OPRUpdate {
 			// All heights before v4 use the currentHeight-1 with a 5K PEG bank
 			bank := pegnet.BankBaseAmount
-			err = d.recordPegnetRequests(sqlTx, pegConversions, rates, currentHeight, bank, int32(currentHeight-1))
+			err = d.recordPegnetRequests(sqlTx, pegConversions, rates, averages, currentHeight, bank, int32(currentHeight-1))
 			if err != nil {
 				return err
 			}
@@ -821,13 +936,13 @@ func (d *Pegnetd) ApplyTransactionBatchesInHolding(ctx context.Context, sqlTx *s
 	}
 
 	// Process all pending using the same bank
-	if (currentHeight >= V4OPRUpdate) && (currentHeight < V20HeightActivation) {
+	if (currentHeight >= config.V4OPRUpdate) && (currentHeight < config.V20HeightActivation) {
 		// The bank entry should be here from the sync banks called before this function.
 		bentry, err := d.Pegnet.SelectBankEntry(sqlTx, int32(currentHeight))
 		if err != nil {
 			return err
 		}
-		err = d.recordPegnetRequests(sqlTx, pegConversions, rates, currentHeight, uint64(bentry.BankAmount), int32(currentHeight))
+		err = d.recordPegnetRequests(sqlTx, pegConversions, rates, averages, currentHeight, uint64(bentry.BankAmount), int32(currentHeight))
 		if err != nil {
 			return err
 		}
@@ -876,7 +991,7 @@ func (d *Pegnetd) ApplyTransactionBlock(sqlTx *sql.Tx, eblock *factom.EBlock) er
 		}
 
 		// No conversions in the batch, it can be applied immediately
-		if err = d.applyTransactionBatch(sqlTx, txBatch, nil, eblock.Height); err != nil &&
+		if err = d.applyTransactionBatch(sqlTx, txBatch, nil, nil, eblock.Height); err != nil &&
 			err != pegnet.InsufficientBalanceErr { // Allowed Exception
 			return err
 		} else if err == pegnet.InsufficientBalanceErr {
@@ -888,7 +1003,15 @@ func (d *Pegnetd) ApplyTransactionBlock(sqlTx *sql.Tx, eblock *factom.EBlock) er
 
 // applyTransactionBatch
 //	currentHeight is just for tracing
-func (d *Pegnetd) applyTransactionBatch(sqlTx *sql.Tx, txBatch *fat2.TransactionBatch, rates map[fat2.PTicker]uint64, currentHeight uint32) error {
+func (d *Pegnetd) applyTransactionBatch(
+	sqlTx *sql.Tx,
+	txBatch *fat2.TransactionBatch,
+	rates map[fat2.PTicker]uint64,
+	averages map[fat2.PTicker]uint64,
+	currentHeight uint32,
+
+) error {
+
 	balances := make(map[factom.FAAddress]map[fat2.PTicker]uint64)
 
 	// We need to do all checks up front, then apply the tx
@@ -918,13 +1041,13 @@ func (d *Pegnetd) applyTransactionBatch(sqlTx *sql.Tx, txBatch *fat2.Transaction
 			}
 
 			// pXXX -> pFCT conversions are disabled at the activation height
-			if currentHeight >= OneWaypFCTConversions && tx.Conversion == fat2.PTickerFCT {
+			if currentHeight >= config.OneWaypFCTConversions && tx.Conversion == fat2.PTickerFCT {
 				return pegnet.PFCTOneWayError
 			}
 
 			// pXXX -> pDCR conversions are disabled at the activation height.
 			// FYI, PEG one way conversion was disabled at V20HeightActivation already.
-			if currentHeight >= OneWaySmallAssetsConversions &&
+			if currentHeight >= config.OneWaySmallAssetsConversions &&
 				(tx.Conversion == fat2.PTickerPEG || tx.Conversion == fat2.PTickerDCR || tx.Conversion == fat2.PTickerDGB ||
 					tx.Conversion == fat2.PTickerDOGE || tx.Conversion == fat2.PTickerHBAR || tx.Conversion == fat2.PTickerONT ||
 					tx.Conversion == fat2.PTickerRVN || tx.Conversion == fat2.PTickerBAT || tx.Conversion == fat2.PTickerALGO ||
@@ -936,7 +1059,11 @@ func (d *Pegnetd) applyTransactionBatch(sqlTx *sql.Tx, txBatch *fat2.Transaction
 
 			// TODO: For now any bogus amounts will be tossed. Someone can fake an overflow for example,
 			// 		and hold us up forever.
-			_, err := conversions.Convert(int64(tx.Input.Amount), rates[tx.Input.Type], rates[tx.Conversion])
+			_, err := conversions.Convert(currentHeight, int64(tx.Input.Amount),
+				rates[tx.Input.Type],
+				averages[tx.Input.Type],
+				rates[tx.Conversion],
+				averages[tx.Conversion])
 			if err != nil {
 				return nil
 			}
@@ -954,7 +1081,13 @@ func (d *Pegnetd) applyTransactionBatch(sqlTx *sql.Tx, txBatch *fat2.Transaction
 
 		if tx.IsConversion() {
 			balances[tx.Input.Address][tx.Input.Type] -= tx.Input.Amount
-			outputAmount, err := conversions.Convert(int64(tx.Input.Amount), rates[tx.Input.Type], rates[tx.Conversion])
+			outputAmount, err := conversions.Convert(
+				currentHeight,
+				int64(tx.Input.Amount),
+				rates[tx.Input.Type],
+				averages[tx.Input.Type],
+				rates[tx.Conversion],
+				averages[tx.Conversion])
 			if err != nil {
 				return err
 			}
@@ -971,7 +1104,7 @@ func (d *Pegnetd) applyTransactionBatch(sqlTx *sql.Tx, txBatch *fat2.Transaction
 	}
 
 	// The tx batch should be 100% valid to apply
-	err := d.recordBatch(sqlTx, txBatch, rates, currentHeight)
+	err := d.recordBatch(sqlTx, txBatch, rates, averages, currentHeight)
 	if err != nil {
 		return err
 	}
@@ -987,12 +1120,16 @@ func (d *Pegnetd) applyTransactionBatch(sqlTx *sql.Tx, txBatch *fat2.Transaction
 
 // recordBatch will submit the batch to the database. We assume the tx is 100%
 // valid at this point.
-func (d *Pegnetd) recordBatch(sqlTx *sql.Tx, txBatch *fat2.TransactionBatch, rates map[fat2.PTicker]uint64, currentHeight uint32) error {
-	FAGlobalBurnAddress, err := factom.NewFAAddress(GlobalBurnAddress)
-	if err != nil {
-		log.WithFields(log.Fields{
-			"error": err,
-		}).Info("error getting burn address")
+func (d *Pegnetd) recordBatch(sqlTx *sql.Tx, txBatch *fat2.TransactionBatch, rates, averages map[fat2.PTicker]uint64, currentHeight uint32) error {
+	var FAGlobalBurnAddress factom.FAAddress
+	var err error
+	if currentHeight >= config.V202EnhanceActivation {
+		FAGlobalBurnAddress, err = factom.NewFAAddress(GlobalBurnAddress)
+		if err != nil {
+			log.WithFields(log.Fields{
+				"error": err,
+			}).Info("error getting burn address")
+		}
 	}
 
 	for txIndex, tx := range txBatch.Transactions {
@@ -1013,9 +1150,15 @@ func (d *Pegnetd) recordBatch(sqlTx *sql.Tx, txBatch *fat2.TransactionBatch, rat
 
 		// All conversions to PEG after the activation height have their
 		// outputs processed later. We only subtract their inputs right now.
-		if currentHeight >= PegnetConversionLimitActivation && tx.IsPEGRequest() {
+		if currentHeight >= config.PegnetConversionLimitActivation && tx.IsPEGRequest() {
 			// Ensure the output is valid, as we will process it later
-			_, err := conversions.Convert(int64(tx.Input.Amount), rates[tx.Input.Type], rates[tx.Conversion])
+			_, err := conversions.Convert(
+				currentHeight,
+				int64(tx.Input.Amount),
+				rates[tx.Input.Type],
+				averages[tx.Input.Type],
+				rates[tx.Conversion],
+				averages[tx.Conversion])
 			if err != nil {
 				return err
 			}
@@ -1024,7 +1167,13 @@ func (d *Pegnetd) recordBatch(sqlTx *sql.Tx, txBatch *fat2.TransactionBatch, rat
 		// Outputs
 		if tx.IsConversion() {
 			// Conversions Output
-			outputAmount, err := conversions.Convert(int64(tx.Input.Amount), rates[tx.Input.Type], rates[tx.Conversion])
+			outputAmount, err := conversions.Convert(
+				currentHeight,
+				int64(tx.Input.Amount),
+				rates[tx.Input.Type],
+				averages[tx.Input.Type],
+				rates[tx.Conversion],
+				averages[tx.Conversion])
 			if err != nil {
 				return err
 			}
@@ -1066,7 +1215,7 @@ type pegRequest struct {
 	TxIndex            int
 }
 
-func (d *Pegnetd) recordPegnetRequests(sqlTx *sql.Tx, txBatchs []*fat2.TransactionBatch, rates map[fat2.PTicker]uint64, currentHeight uint32, bank uint64, bankHeight int32) error {
+func (d *Pegnetd) recordPegnetRequests(sqlTx *sql.Tx, txBatchs []*fat2.TransactionBatch, rates, averages map[fat2.PTicker]uint64, currentHeight uint32, bank uint64, bankHeight int32) error {
 	limit := conversions.NewConversionSupply(bank)
 	txData := make(map[string]pegRequest)
 
@@ -1081,7 +1230,13 @@ func (d *Pegnetd) recordPegnetRequests(sqlTx *sql.Tx, txBatchs []*fat2.Transacti
 			txid := transactionid.FormatTxID(j, txBatchs[i].Entry.Hash.String())
 
 			// We caught the error earlier, so we can ignore it here.
-			pegAmt, _ := conversions.Convert(int64(tx.Input.Amount), rates[tx.Input.Type], rates[tx.Conversion])
+			pegAmt, _ := conversions.Convert(
+				currentHeight,
+				int64(tx.Input.Amount),
+				rates[tx.Input.Type],
+				averages[tx.Input.Type],
+				rates[tx.Conversion],
+				averages[tx.Conversion])
 			txData[txid] = pegRequest{
 				TxID:               txid,
 				Batch:              txBatchs[i],
@@ -1104,7 +1259,7 @@ func (d *Pegnetd) recordPegnetRequests(sqlTx *sql.Tx, txBatchs []*fat2.Transacti
 		totalPaid += int64(pegYield)
 		tx := txData[txid].Batch.Transactions[txData[txid].TxIndex]
 
-		refundAmt := conversions.Refund(int64(tx.Input.Amount), int64(pegYield), rates[tx.Input.Type], rates[tx.Conversion])
+		refundAmt := conversions.Refund(currentHeight, int64(tx.Input.Amount), int64(pegYield), rates[tx.Input.Type], rates[tx.Conversion])
 
 		log.WithFields(log.Fields{
 			"batch-entryhash": txData[txid].Batch.Entry.Hash.String(),
@@ -1132,7 +1287,7 @@ func (d *Pegnetd) recordPegnetRequests(sqlTx *sql.Tx, txBatchs []*fat2.Transacti
 	}
 
 	// The bankheight == currentheight after V4Update fork
-	if bankHeight >= int32(V4OPRUpdate) {
+	if bankHeight >= int32(config.V4OPRUpdate) {
 		err := d.Pegnet.UpdateBankEntry(sqlTx, bankHeight, totalPaid, int64(limit.TotalRequested()))
 		if err != nil {
 			return err
@@ -1294,19 +1449,66 @@ func (d *Pegnetd) GetAssetRates(oprWinners []opr.AssetUint, sprWinners []opr.Ass
 			if oprWinners[i].Name == sprWinners[i].Name {
 				sprRate := sprWinners[i].Value
 				oprRate := oprWinners[i].Value
-				toleranceRate := 0.25 // 25% band
+				toleranceRate := 0.1 // 10% band
+				if height >= config.V202EnhanceActivation {
+					toleranceRate = 0.25 // 25% band
+				}
 				toleranceBandHigh := float64(sprRate) * (1 + toleranceRate)
 				toleranceBandLow := float64(sprRate) * (1 - toleranceRate)
 				if (float64(oprRate) >= toleranceBandLow) && (float64(oprRate) <= toleranceBandHigh) {
 					filteredRates = append(filteredRates, oprWinners[i])
 				} else {
-					fmt.Println("Rate difference", oprWinners[i].Name, oprWinners[i].Value, sprWinners[i].Value)
-					if height < V202EnhanceActivation {
+					if height >= config.V202EnhanceActivation {
+						fmt.Println("Rate difference", oprWinners[i].Name, oprWinners[i].Value, sprWinners[i].Value)
+						diffWinner := sprWinners[i]
+						diffWinner.Value = 0
+						filteredRates = append(filteredRates, diffWinner)
+					} else {
+						fmt.Println("opr is out side of spr's tolerance band")
+
+						fmt.Println("=== asset name:", oprWinners[i].Name)
+						fmt.Println("<<<<=== opr rate:", oprWinners[i].Value)
+						fmt.Println("<<<<=== spr rate:", sprWinners[i].Value)
 						return nil, fmt.Errorf("opr is out side of tolerance band")
 					}
-					diffWinner := sprWinners[i]
-					diffWinner.Value = 0
-					filteredRates = append(filteredRates, diffWinner)
+				}
+			}
+		}
+		return filteredRates, nil
+	}
+	return nil, fmt.Errorf("no winners")
+}
+
+func (d *Pegnetd) GetAssetRatesV0(oprWinners []opr.AssetUint, sprWinners []opr.AssetUint) ([]opr.AssetUint, error) {
+	if 0 < len(oprWinners) && 0 == len(sprWinners) {
+		return oprWinners, nil
+	}
+	if 0 == len(oprWinners) && 0 < len(sprWinners) {
+		return sprWinners, nil
+	}
+	if 0 < len(oprWinners) && 0 < len(sprWinners) {
+		// 1) sprWinners determine tolerance range
+		// 2) oprWinners set the real rates
+		if len(oprWinners) != len(sprWinners) {
+			return nil, fmt.Errorf("SPR & OPR use different assets version")
+		}
+
+		var filteredRates []opr.AssetUint
+		for i := range oprWinners {
+			if oprWinners[i].Name == sprWinners[i].Name {
+				sprRate := sprWinners[i].Value
+				oprRate := oprWinners[i].Value
+				toleranceRate := 0.01 // 1% band
+				if sprRate >= 100000 {
+					toleranceRate = 0.001 // 0.1% band
+				}
+				toleranceBandHigh := float64(sprRate) * (1 + toleranceRate)
+				toleranceBandLow := float64(sprRate) * (1 - toleranceRate)
+				if (float64(oprRate) >= toleranceBandLow) && (float64(oprRate) <= toleranceBandHigh) {
+					filteredRates = append(filteredRates, oprWinners[i])
+
+				} else {
+					return nil, fmt.Errorf("opr is out side of tolerance band")
 				}
 			}
 		}

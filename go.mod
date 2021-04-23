@@ -7,12 +7,13 @@ require (
 	github.com/Factom-Asset-Tokens/factom v0.0.0-20191114224337-71de98ff5b3e
 	github.com/ethereum/go-ethereum v1.9.25 // indirect
 	github.com/mattn/go-sqlite3 v1.11.0
-	github.com/pegnet/pegnet v0.5.1-0.20201201194922-e59c2d3b3061
+	github.com/pegnet/pegnet v0.5.1-0.20210225213341-a476b4b2cc0f
 	github.com/rs/cors v1.7.0
 	github.com/sirupsen/logrus v1.4.2
 	github.com/spf13/cobra v0.0.5
 	github.com/spf13/viper v1.4.0
 	github.com/stretchr/testify v1.4.0
+	launchpad.net/gocheck v0.0.0-20140225173054-000000000087 // indirect
 )
 
 replace github.com/Factom-Asset-Tokens/factom => github.com/Emyrk/factom v0.0.0-20200113153851-17d98c31e1bd
