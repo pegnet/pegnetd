@@ -74,7 +74,9 @@ var (
 	// PIP10AveragingActivation changes conversions to use the lesser of a rolling average and market price
 	// for the source of a conversion, and the higher of the rolling average and the market price for the
 	// target of a conversion
-	PIP10AverageActivation uint32 = 300000
+	//
+	// Activation of 2.0.5
+	PIP10AverageActivation uint32 = 295190
 )
 
 func SetAllActivations(act uint32) {
