@@ -4,7 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 
-	"github.com/pegnet/pegnet/modules/conversions"
+	"github.com/pegnet/pegnetd/node/conversions"
 )
 
 // BankEntry is for managing the PEG Bank.

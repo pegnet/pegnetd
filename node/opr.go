@@ -4,8 +4,10 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+
 	"github.com/Factom-Asset-Tokens/factom"
 	"github.com/pegnet/pegnet/modules/grader"
+	"github.com/pegnet/pegnetd/config"
 )
 
 func (d *Pegnetd) Grade(ctx context.Context, block *factom.EBlock) (grader.GradedBlock, error) {
@@ -15,21 +17,21 @@ func (d *Pegnetd) Grade(ctx context.Context, block *factom.EBlock) (grader.Grade
 		return nil, nil
 	}
 
-	if *block.ChainID != OPRChain {
+	if *block.ChainID != config.OPRChain {
 		return nil, fmt.Errorf("trying to grade a non-opr chain")
 	}
 
 	ver := uint8(1)
-	if block.Height >= GradingV2Activation {
+	if block.Height >= config.GradingV2Activation {
 		ver = 2
 	}
-	if block.Height >= PEGFreeFloatingPriceActivation {
+	if block.Height >= config.PEGFreeFloatingPriceActivation {
 		ver = 3
 	}
-	if block.Height >= V4OPRUpdate {
+	if block.Height >= config.V4OPRUpdate {
 		ver = 4
 	}
-	if block.Height >= V20HeightActivation {
+	if block.Height >= config.V20HeightActivation {
 		ver = 5
 	}
 
