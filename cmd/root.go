@@ -149,12 +149,12 @@ func always(cmd *cobra.Command, args []string) {
 		}
 
 		// Set all activations for testing
-		node.SetAllActivations(uint32(act))
+		config.SetAllActivations(uint32(act))
 	}
 
 	if testingact, _ := cmd.Flags().GetInt32("testingact"); testingact >= 0 {
 		fat2.Fat2RCDEActivation = uint32(testingact)
-		node.V20HeightActivation = uint32(testingact)
+		config.V20HeightActivation = uint32(testingact)
 		// Also updaet hardfork
 		pegnet.Hardforks[1].ActivationHeight = uint32(testingact)
 	}

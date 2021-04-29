@@ -39,7 +39,7 @@ type Params interface {
 }
 
 type ParamsGetBank struct {
-	Height int32 `json:"height,omitempty"`
+	Height int32 `json:"height,omitempty"` // TODO Height should be uint32
 }
 
 func (p ParamsGetBank) HasIncludePending() bool { return false }

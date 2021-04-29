@@ -4,11 +4,12 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/pegnet/pegnetd/config"
+
 	"github.com/spf13/cobra"
 
 	"github.com/Factom-Asset-Tokens/factom"
 	"github.com/pegnet/pegnetd/fat/fat2"
-	"github.com/pegnet/pegnetd/node"
 )
 
 func addressRules(input string, output string) error {
@@ -67,7 +68,7 @@ func signAndSend(source string, tx *fat2.Transaction, cl *factom.Client, payment
 	var txBatch fat2.TransactionBatch
 	txBatch.Version = 1
 	txBatch.Transactions = []fat2.Transaction{*tx}
-	txBatch.Entry.ChainID = &node.TransactionChain
+	txBatch.Entry.ChainID = &config.TransactionChain //TODO consider not passing a pointer to config.TransactionChain
 
 	// Sign the tx and make an entry
 	entry, err := txBatch.Sign(priv)
