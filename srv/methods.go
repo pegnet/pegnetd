@@ -57,7 +57,8 @@ func (s *APIServer) jrpcMethods() jrpc.MethodMap {
 		"get-sync-status": s.getSyncStatus,
 		"properties":      s.properties,
 
-		"get-pegnet-rates": s.getPegnetRates,
+		"get-pegnet-rates":         s.getPegnetRates,
+		"get-pegnet-average-rates": s.getPegnetAverageRates,
 	}
 
 }
@@ -470,6 +471,26 @@ func (s *APIServer) getPegnetRates(ctx context.Context, data json.RawMessage) in
 
 	// The balance results actually works for rates too
 	return ResultPegnetTickerMap(rates)
+}
+
+// getPegnetAverageRates
+// Call to the routine off of pegnetd to get the average rates.  Note that random querries of
+// this api isn't likely to be too efficient, but it only servers the needs of local calls to the api.
+func (s *APIServer) getPegnetAverageRates(ctx context.Context, data json.RawMessage) interface{} {
+	params := ParamsGetPegnetRates{}                      //                Get the parameters passed to the
+	if _, _, err := validate(data, &params); err != nil { //                  command, and validate them
+		return err //                                                       Report an error if don't have a height.
+	}
+
+	if params.Height == 0 { //                                              If the height is zero, then interpret
+		synced, err := s.Node.Pegnet.SelectSynced(ctx, s.Node.Pegnet.DB) //   this to mean the latest height
+		if err != nil {                                                  // If an error, then we can't do anything
+			return err
+		}
+		params.Height = uint32(synced.Synced) //                            Use the latest blockheight
+	}
+
+	return s.Node.GetPegNetRateAverages(ctx, params.Height) //              Then call to get all the averages.
 }
 
 func (s *APIServer) sendTransaction(_ context.Context, data json.RawMessage) interface{} {

@@ -731,7 +731,46 @@ var getTXs = &cobra.Command{
 
 var getRates = &cobra.Command{
 	Use:              "rates <height>",
-	Short:            "Fetch the pegnet quotes for the assets at a given height (if their are quotes)",
+	Short:            "Fetch the pegnet quotes for the assets at a given height (if there are quotes)",
+	PersistentPreRun: always,
+	PreRun:           SoftReadConfig,
+	Args:             cobra.MaximumNArgs(1),
+	Run: func(cmd *cobra.Command, args []string) {
+		var height int
+		var err error
+		if len(args) > 0 {
+			height, err = strconv.Atoi(args[0])
+			if height <= 0 || err != nil {
+				cmd.PrintErrf("height must be a number greater than 0")
+				os.Exit(1)
+			}
+		}
+
+		cl := srv.NewClient()
+		cl.PegnetdServer = viper.GetString(config.Pegnetd)
+		res, err := getPegnetRates(uint32(height), cl)
+		if err != nil {
+			fmt.Printf("Failed to make RPC request\nDetails:\n%v\n", err)
+			os.Exit(1)
+		}
+
+		// Change the units to be human readable
+		humanBals := make(map[string]string)
+		for k, bal := range res {
+			humanBals[k.String()] = FactoshiToFactoid(int64(bal))
+		}
+
+		data, err := json.Marshal(humanBals)
+		if err != nil {
+			panic(err)
+		}
+		fmt.Println(string(data))
+	},
+}
+
+var getAverages = &cobra.Command{
+	Use:              "averages <height>",
+	Short:            "Fetch the pegnet average quotes for the assets at a given height (if there are quotes)",
 	PersistentPreRun: always,
 	PreRun:           SoftReadConfig,
 	Args:             cobra.MaximumNArgs(1),
@@ -771,6 +810,12 @@ var getRates = &cobra.Command{
 func getPegnetRates(height uint32, cl *srv.Client) (srv.ResultPegnetTickerMap, error) {
 	var res srv.ResultPegnetTickerMap
 	err := cl.Request("get-pegnet-rates", srv.ParamsGetPegnetRates{Height: height}, &res)
+	return res, err
+}
+
+func getPegnetAverageRates(height uint32, cl *srv.Client) (srv.ResultPegnetTickerMap, error) {
+	var res srv.ResultPegnetTickerMap
+	err := cl.Request("get-pegnet-average-rates", srv.ParamsGetPegnetRates{Height: height}, &res)
 	return res, err
 }
 
