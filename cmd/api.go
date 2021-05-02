@@ -37,6 +37,7 @@ func init() {
 
 	get.AddCommand(getTX)
 	get.AddCommand(getRates)
+	get.AddCommand(getAverages)
 	getBank.Flags().Bool("raw", false, "Print the full json data")
 	get.AddCommand(getBank)
 	getTXs.Flags().Bool("burn", false, "Show burns")
@@ -787,7 +788,7 @@ var getAverages = &cobra.Command{
 
 		cl := srv.NewClient()
 		cl.PegnetdServer = viper.GetString(config.Pegnetd)
-		res, err := getPegnetRates(uint32(height), cl)
+		res, err := getPegnetAverageRates(uint32(height), cl)
 		if err != nil {
 			fmt.Printf("Failed to make RPC request\nDetails:\n%v\n", err)
 			os.Exit(1)

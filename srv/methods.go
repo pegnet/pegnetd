@@ -470,7 +470,8 @@ func (s *APIServer) getPegnetRates(ctx context.Context, data json.RawMessage) in
 	}
 
 	// The balance results actually works for rates too
-	return ResultPegnetTickerMap(rates)
+	rt := ResultPegnetTickerMap(rates)
+	return rt
 }
 
 // getPegnetAverageRates
@@ -487,10 +488,12 @@ func (s *APIServer) getPegnetAverageRates(ctx context.Context, data json.RawMess
 		if err != nil {                                                  // If an error, then we can't do anything
 			return err
 		}
-		params.Height = uint32(synced.Synced) //                            Use the latest blockheight
+		params.Height = uint32(synced.Synced) //                            Use the latest blopegckheight
 	}
 
-	return s.Node.GetPegNetRateAverages(ctx, params.Height) //              Then call to get all the averages.
+	averages := s.Node.GetPegNetRateAverages(ctx, params.Height) //              Then call to get all the averages.
+	rt := ResultPegnetTickerMap(averages.(map[fat2.PTicker]uint64))
+	return rt
 }
 
 func (s *APIServer) sendTransaction(_ context.Context, data json.RawMessage) interface{} {
