@@ -31,6 +31,9 @@ func (d *Pegnetd) GradeS(ctx context.Context, block *factom.EBlock) (graderStake
 	if block.Height >= config.V202EnhanceActivation {
 		ver = 7
 	}
+	if block.Height >= config.PIP18DelegateStakingActivation {
+		ver = 8
+	}
 
 	g, err := graderStake.NewGrader(ver, int32(block.Height))
 	if err != nil {
@@ -43,8 +46,16 @@ func (d *Pegnetd) GradeS(ctx context.Context, block *factom.EBlock) (graderStake
 		}
 		// allow only top 100 stake holders submit prices
 		stakerRCD := extids[1]
-		if d.Pegnet.IsIncludedTopPEGAddress(stakerRCD) {
-			// ignore bad opr errors
+		if block.Height < config.PIP18DelegateStakingActivation {
+			if d.Pegnet.IsIncludedTopPEGAddress(stakerRCD) {
+				// ignore bad opr errors
+				err = g.AddSPR(entry.Hash[:], extids, entry.Content)
+				if err != nil {
+					// This is a noisy debug print
+					//logrus.WithError(err).WithFields(logrus.Fields{"hash": entry.Hash.String()}).Debug("failed to add spr")
+				}
+			}
+		} else {
 			err = g.AddSPR(entry.Hash[:], extids, entry.Content)
 			if err != nil {
 				// This is a noisy debug print
