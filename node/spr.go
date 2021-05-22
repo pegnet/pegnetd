@@ -55,7 +55,7 @@ func (d *Pegnetd) GradeS(ctx context.Context, block *factom.EBlock) (graderStake
 					//logrus.WithError(err).WithFields(logrus.Fields{"hash": entry.Hash.String()}).Debug("failed to add spr")
 				}
 			}
-		} else {
+		} else if d.Pegnet.IsNonZeroPEGAddress(stakerRCD) {
 			err = g.AddSPR(entry.Hash[:], extids, entry.Content)
 			if err != nil {
 				// This is a noisy debug print
