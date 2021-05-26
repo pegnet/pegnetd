@@ -464,7 +464,7 @@ func (p *Pegnet) IsIncludedTopPEGAddress(address []byte) bool {
 
 func (p *Pegnet) IsNonZeroPEGAddress(address []byte) bool {
 	stmt2 := `SELECT COUNT(*) FROM pn_addresses WHERE peg_balance > 0 AND address = ?;`
-	rows, err2 := p.DB.Query(stmt2, address[:])
+	rows, err2 := p.DB.Query(stmt2, address)
 	if err2 != nil {
 		fmt.Println("DB query is failed")
 		return false
