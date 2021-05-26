@@ -36,8 +36,12 @@ func (d *Pegnetd) GradeS(ctx context.Context, block *factom.EBlock) (graderStake
 	}
 
 	g, err := graderStake.NewGrader(ver, int32(block.Height))
-	if err != nil {
+	gv2, err2 := graderStake.NewGraderV4(ver, int32(block.Height))
+	if err != nil && ver < 8 {
 		return nil, err
+	}
+	if err2 != nil && ver >= 8 {
+		return nil, err2
 	}
 	for _, entry := range block.Entries {
 		extids := make([][]byte, len(entry.ExtIDs))
@@ -55,8 +59,8 @@ func (d *Pegnetd) GradeS(ctx context.Context, block *factom.EBlock) (graderStake
 					//logrus.WithError(err).WithFields(logrus.Fields{"hash": entry.Hash.String()}).Debug("failed to add spr")
 				}
 			}
-		} else if d.Pegnet.IsNonZeroPEGAddress(stakerRCD) {
-			err = g.AddSPR(entry.Hash[:], extids, entry.Content)
+		} else if pegBalance, _ := d.Pegnet.GetPEGAddress(stakerRCD); pegBalance > 0 {
+			err = gv2.AddSPRV4(entry.Hash[:], extids, entry.Content, pegBalance)
 			if err != nil {
 				// This is a noisy debug print
 				//logrus.WithError(err).WithFields(logrus.Fields{"hash": entry.Hash.String()}).Debug("failed to add spr")
