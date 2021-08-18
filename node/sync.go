@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"github.com/pegnet/pegnet/modules/graderDelegateStake"
 	"math/big"
 	"sort"
 	"time"
@@ -380,7 +381,17 @@ func (d *Pegnetd) SyncBlock(ctx context.Context, tx *sql.Tx, height uint32) erro
 	// Then, grade the new OPR Block. The results of this will be used
 	// to execute conversions that are in holding.
 	gradedBlock, err := d.Grade(ctx, oprEBlock)
-	gradedSPRBlock, err_s := d.GradeS(ctx, sprEBlock)
+
+	var gradedSPRBlock graderStake.GradedBlock
+	var gradedDelegatedSPRBlock graderDelegateStake.DelegatedGradedBlock
+	var err_s error
+	if sprEBlock != nil {
+		if height < config.PIP18DelegateStakingActivation {
+			gradedSPRBlock, err_s = d.GradeS(ctx, sprEBlock)
+		} else {
+			gradedDelegatedSPRBlock, err_s = d.GradeDelegatedS(ctx, sprEBlock)
+		}
+	}
 	isRatesAvailable := false
 	if height < config.V20HeightActivation {
 		if err != nil {
@@ -441,10 +452,19 @@ func (d *Pegnetd) SyncBlock(ctx context.Context, tx *sql.Tx, height uint32) erro
 				oprWinners = winnersOpr[0].OPR.GetOrderedAssetsUint()
 			}
 		}
-		if gradedSPRBlock != nil {
-			winnersSpr := gradedSPRBlock.Winners()
-			if 0 < len(winnersSpr) {
-				sprWinners = winnersSpr[0].SPR.GetOrderedAssetsUint()
+		if height < config.PIP18DelegateStakingActivation {
+			if gradedSPRBlock != nil {
+				winnersSpr := gradedSPRBlock.Winners()
+				if 0 < len(winnersSpr) {
+					sprWinners = winnersSpr[0].SPR.GetOrderedAssetsUint()
+				}
+			}
+		} else {
+			if gradedDelegatedSPRBlock != nil {
+				winnersSpr := gradedDelegatedSPRBlock.Winners()
+				if 0 < len(winnersSpr) {
+					sprWinners = winnersSpr[0].SPR.GetOrderedAssetsUint()
+				}
 			}
 		}
 		if 0 < len(oprWinners) || 0 < len(sprWinners) {
@@ -555,9 +575,17 @@ func (d *Pegnetd) SyncBlock(ctx context.Context, tx *sql.Tx, height uint32) erro
 	if height >= config.V20HeightActivation {
 		// 5) Apply effects of graded SPR Block (PEG rewards, if any)
 		//    These funds will be available for transactions and conversions executed in the next block
-		if gradedSPRBlock != nil {
-			if err := d.ApplyGradedSPRBlock(tx, gradedSPRBlock, dblock.Timestamp); err != nil {
-				return err
+		if height < config.PIP18DelegateStakingActivation {
+			if gradedSPRBlock != nil {
+				if err := d.ApplyGradedSPRBlock(tx, gradedSPRBlock, dblock.Timestamp); err != nil {
+					return err
+				}
+			}
+		} else {
+			if gradedDelegatedSPRBlock != nil {
+				if err := d.ApplyGradedDelegatedSPRBlock(tx, gradedDelegatedSPRBlock, dblock.Timestamp); err != nil {
+					return err
+				}
 			}
 		}
 	}
@@ -1415,6 +1443,34 @@ func (d *Pegnetd) ApplyGradedSPRBlock(tx *sql.Tx, gradedSPRBlock graderStake.Gra
 		}
 
 		if err := d.Pegnet.InsertStaking100Coinbase(tx, winners[i], addr[:], timestamp); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// ApplyGradedDelegatedSPRBlock pays out PEG to the winners of the given GradedBlock.
+// If an error is returned, the sql.Tx should be rolled back by the caller.
+func (d *Pegnetd) ApplyGradedDelegatedSPRBlock(tx *sql.Tx, gradedSPRBlock graderDelegateStake.DelegatedGradedBlock, timestamp time.Time) error {
+	winners := gradedSPRBlock.Winners()
+	for i := range winners {
+		addr, err := factom.NewFAAddress(winners[i].SPR.GetAddress())
+		if err != nil {
+			// TODO: This is kinda an odd case. I think we should just drop the rewards
+			// 		for an invalid address. We can always add back the rewards and they will have
+			//		a higher balance after a change.
+			log.WithError(err).WithFields(log.Fields{
+				"height": winners[i].SPR.GetHeight(),
+				"ehash":  fmt.Sprintf("%x", winners[i].EntryHash),
+			}).Warnf("failed to reward")
+			continue
+		}
+
+		if _, err := d.Pegnet.AddToBalance(tx, &addr, fat2.PTickerPEG, uint64(winners[i].Payout())); err != nil {
+			return err
+		}
+
+		if err := d.Pegnet.InsertStaking100CoinbaseDelegate(tx, winners[i], addr[:], timestamp); err != nil {
 			return err
 		}
 	}
