@@ -63,6 +63,16 @@ func (d *Pegnetd) GradeS(ctx context.Context, block *factom.EBlock) (graderStake
 	return nil, nil
 }
 
+func isElementExist(element string, list []string) bool {
+	isExist := false
+	for j := 0; j < len(list); j++ {
+		if list[j] == element {
+			isExist = true
+		}
+	}
+	return isExist
+}
+
 // Grade Staking Price Records
 func (d *Pegnetd) GradeDelegatedS(ctx context.Context, block *factom.EBlock) (graderDelegateStake.DelegatedGradedBlock, error) {
 	if block == nil {
@@ -85,6 +95,7 @@ func (d *Pegnetd) GradeDelegatedS(ctx context.Context, block *factom.EBlock) (gr
 		if err != nil {
 			return nil, err
 		}
+		var groupOfDelegatorsAddress []string
 		for _, entry := range block.Entries {
 			extids := make([][]byte, len(entry.ExtIDs))
 			for i := range entry.ExtIDs {
@@ -101,8 +112,13 @@ func (d *Pegnetd) GradeDelegatedS(ctx context.Context, block *factom.EBlock) (gr
 					continue
 				}
 				for i := 0; i < len(listOfDelegatorsAddress); i++ {
+					isDuplicatedAddress := isElementExist(listOfDelegatorsAddress[i], groupOfDelegatorsAddress)
+					if isDuplicatedAddress {
+						continue
+					}
 					individualBalance, _ := d.Pegnet.GetPEGAddress([]byte(listOfDelegatorsAddress[i]))
 					balanceOfPEG += individualBalance
+					groupOfDelegatorsAddress = append(groupOfDelegatorsAddress, listOfDelegatorsAddress[i])
 				}
 			}
 			err = g.AddSPRV4(entry.Hash[:], extids, entry.Content, balanceOfPEG)
