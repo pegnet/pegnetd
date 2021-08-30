@@ -82,7 +82,7 @@ var (
 	//	1. Balances of PEG for each address is more complicated.  It is the balance of PEG for the address (assuming it has not be delegated)
 	//	2. We quit looking at the rich list, and just consider the top 100 submissions with the highest stake
 	//	3. We pay out with the ratio of the total PEG staked. (Removes old top 100 PEG addresses staking reward and give staking opportunity to all PEG holders)
-	PIP18DelegateStakingActivation uint32 = 999999
+	PIP18DelegateStakingActivation uint32 = 313042
 )
 
 func SetAllActivations(act uint32) {
