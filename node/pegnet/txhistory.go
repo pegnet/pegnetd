@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"github.com/pegnet/pegnet/modules/graderDelegateStake"
 	"strings"
 	"time"
 
@@ -390,6 +391,45 @@ func (p *Pegnet) InsertCoinbase(tx *sql.Tx, winner *grader.GradingOPR, addr []by
 // InsertCoinbase inserts the payouts from staking into the history system.
 // There is one transaction per winning SPR, with the entry hash pointing to that specific spr
 func (p *Pegnet) InsertStaking100Coinbase(tx *sql.Tx, winner *graderStake.GradingSPR, addr []byte, timestamp time.Time) error {
+	stmt, err := tx.Prepare(`INSERT INTO "pn_history_txbatch"
+                (entry_hash, height, blockorder, timestamp, executed) VALUES
+                (?, ?, ?, ?, ?)`)
+	if err != nil {
+		return err
+	}
+
+	lookup, err := tx.Prepare(insertLookupQuery)
+	if err != nil {
+		return err
+	}
+
+	_, err = stmt.Exec(winner.EntryHash, winner.SPR.GetHeight(), 0, timestamp.Unix(), winner.SPR.GetHeight())
+	if err != nil {
+		return err
+	}
+
+	coinbaseStatement, err := tx.Prepare(`INSERT INTO "pn_history_transaction"
+                (entry_hash, tx_index, action_type, from_address, from_asset, from_amount, to_asset, to_amount, outputs) VALUES
+                (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+	if err != nil {
+		return err
+	}
+
+	_, err = coinbaseStatement.Exec(winner.EntryHash, 0, Coinbase, addr, "", 0, "PEG", winner.Payout(), "")
+	if err != nil {
+		return err
+	}
+
+	if _, err = lookup.Exec(winner.EntryHash, 0, addr); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// InsertCoinbase inserts the payouts from staking into the history system.
+// There is one transaction per winning SPR, with the entry hash pointing to that specific spr
+func (p *Pegnet) InsertStaking100CoinbaseDelegate(tx *sql.Tx, winner *graderDelegateStake.GradingDelegatedSPR, addr []byte, timestamp time.Time) error {
 	stmt, err := tx.Prepare(`INSERT INTO "pn_history_txbatch"
                 (entry_hash, height, blockorder, timestamp, executed) VALUES
                 (?, ?, ?, ?, ?)`)

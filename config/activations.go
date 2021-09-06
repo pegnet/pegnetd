@@ -77,6 +77,12 @@ var (
 	//
 	// Activation of 2.0.5
 	PIP10AverageActivation uint32 = 295190
+
+	// PIP18DelegateStakingActivation implements delegate staking by using PEG addresses.
+	//	1. Balances of PEG for each address is more complicated.  It is the balance of PEG for the address (assuming it has not be delegated)
+	//	2. We quit looking at the rich list, and just consider the top 100 submissions with the highest stake
+	//	3. We pay out with the ratio of the total PEG staked. (Removes old top 100 PEG addresses staking reward and give staking opportunity to all PEG holders)
+	PIP18DelegateStakingActivation uint32 = 314482
 )
 
 func SetAllActivations(act uint32) {
@@ -97,4 +103,5 @@ func SetAllActivations(act uint32) {
 	V204EnhanceActivation = act
 	V204BurnMintedTokenActivation = act
 	PIP10AverageActivation = act
+	PIP18DelegateStakingActivation = act
 }

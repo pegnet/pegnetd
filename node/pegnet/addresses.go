@@ -462,6 +462,25 @@ func (p *Pegnet) IsIncludedTopPEGAddress(address []byte) bool {
 	return false
 }
 
+func (p *Pegnet) GetPEGAddress(address []byte) (uint64, error) {
+	stmt2 := `SELECT peg_balance FROM pn_addresses WHERE address = ?;`
+	rows, err2 := p.DB.Query(stmt2, address)
+	if err2 != nil {
+		fmt.Println("DB query is failed")
+		return 0, err2
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var pegBalance uint64
+		if err := rows.Scan(&pegBalance); err != nil {
+			return 0, err
+		}
+		return pegBalance, nil
+	}
+	return 0, nil
+}
+
 // SelectRichList returns the balance of all addresses for a given ticker
 func (p *Pegnet) SelectRichList(ticker fat2.PTicker, count int) ([]BalancePair, error) {
 	if ticker <= fat2.PTickerInvalid || fat2.PTickerMax <= ticker {
