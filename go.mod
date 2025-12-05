@@ -8,10 +8,11 @@ require (
 	github.com/mattn/go-sqlite3 v1.11.0
 	github.com/pegnet/pegnet v0.5.1-0.20210225213341-a476b4b2cc0f
 	github.com/rs/cors v1.7.0
-	github.com/sirupsen/logrus v1.4.2
+	github.com/sirupsen/logrus v1.8.3
 	github.com/spf13/cobra v0.0.5
 	github.com/spf13/viper v1.4.0
-	github.com/stretchr/testify v1.4.0
+	github.com/stretchr/testify v1.7.0
+	launchpad.net/gocheck v0.0.0-20140225173054-000000000087 // indirect
 )
 
 replace github.com/Factom-Asset-Tokens/factom => github.com/Emyrk/factom v0.0.0-20200113153851-17d98c31e1bd
